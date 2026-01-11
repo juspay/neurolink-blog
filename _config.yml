@@ -1,14 +1,164 @@
-title: Neurolink Blog
-description: Latest updates and insights from Neurolink
-baseurl: ""
-url: "https://blog.neurolink.ink"
+# The Site Configuration
+theme: jekyll-theme-chirpy
 
-# Build settings
-markdown: kramdown
-theme: minima
+# Site language
+lang: en
 
-# Collections
+# Timezone
+timezone: Asia/Kolkata
+
+# Site title
+title: NeuroLink Blog
+
+# Tagline
+tagline: AI Integration Made Simple
+
+# Description for SEO
+description: Technical tutorials and guides for NeuroLink - the unified AI SDK
+
+# Site URL - Update this for production
+url: "https://juspay.github.io"
+baseurl: "/neurolink-blog"
+
+# GitHub info
+github:
+  username: juspay
+
+# Social links
+social:
+  name: NeuroLink Team
+  email: # optional
+  links:
+    - https://github.com/juspay/neurolink
+    - https://discord.gg/neurolink
+
+# Google Analytics
+google_analytics:
+  id: G-49WW54GH6Y
+
+# Theme mode: light, dark, or blank for auto
+theme_mode: # Leave blank for auto (follows system preference)
+
+# Avatar image
+avatar: /assets/img/avatar.svg
+
+# TOC - Table of Contents
+toc: true
+
+# Comments with giscus
+comments:
+  provider: giscus
+  giscus:
+    repo: juspay/neurolink-blog
+    repo_id: R_kgDOQ2_uQA
+    category: Announcements
+    category_id: DIC_kwDOQ2_uQM4C0z-W
+    mapping: pathname
+    strict: 0
+    reactions_enabled: 1
+    emit_metadata: 1
+    input_position: top
+    theme: preferred_color_scheme
+    lang: en
+    crossorigin: anonymous
+
+# Self-hosted analytics (optional)
+analytics:
+  google:
+    id: G-49WW54GH6Y
+  goatcounter:
+    id: # optional
+  umami:
+    id: # optional
+  matomo:
+    id: # optional
+
+# PWA - Progressive Web App
+pwa:
+  enabled: true
+  cache:
+    enabled: true
+
+# Pagination
+paginate: 10
+
+# Kramdown settings
+kramdown:
+  footnote_backlink: "&#8617;&#xfe0e;"
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: highlight
+    span:
+      line_numbers: false
+    block:
+      line_numbers: true
+      start_line: 1
+
+# Collections (if needed later)
 collections:
-  posts:
+  tabs:
     output: true
-    permalink: /:year/:month/:day/:title/
+    sort_by: order
+
+# Defaults for posts
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+      comments: true
+      toc: true
+      permalink: /posts/:title/
+  - scope:
+      path: _tabs
+      type: tabs
+    values:
+      layout: page
+      permalink: /:title/
+
+# SASSy
+sass:
+  style: compressed
+
+# Compression
+compress_html:
+  clippings: all
+  comments: all
+  endings: all
+  profile: false
+  blanklines: false
+  ignore:
+    envs: [development]
+
+# Exclude from build
+exclude:
+  - "*.gem"
+  - "*.gemspec"
+  - docs
+  - tools
+  - README.md
+  - LICENSE
+  - "*.config.js"
+  - package*.json
+  - Gemfile.lock
+  - vendor
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-archives
+  - jekyll-include-cache
+  - jekyll-paginate
+
+# Jekyll Archives
+jekyll-archives:
+  enabled: [categories, tags]
+  layouts:
+    category: category
+    tag: tag
+  permalinks:
+    tag: /tags/:name/
+    category: /categories/:name/

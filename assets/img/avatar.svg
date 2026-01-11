@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="marineSimple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0190e0"/>
+      <stop offset="100%" style="stop-color:#016fb9"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Simplified neural hub symbol -->
+  <g transform="translate(32, 32)">
+    <!-- Central hub - Bright Marine -->
+    <circle cx="0" cy="0" r="10" fill="url(#marineSimple)"/>
+    <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+    
+    <!-- 4 main connection nodes -->
+    <!-- Top - Deep Saffron -->
+    <line x1="0" y1="-10" x2="0" y2="-18" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="-22" r="5" fill="#ff9505"/>
+    
+    <!-- Right - Spicy Paprika -->
+    <line x1="10" y1="0" x2="18" y2="0" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="22" cy="0" r="5" fill="#ec4e20"/>
+    
+    <!-- Bottom - Deep Saffron -->
+    <line x1="0" y1="10" x2="0" y2="18" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="22" r="5" fill="#ff9505"/>
+    
+    <!-- Left - Spicy Paprika -->
+    <line x1="-10" y1="0" x2="-18" y2="0" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="-22" cy="0" r="5" fill="#ec4e20"/>
+  </g>
+</svg>

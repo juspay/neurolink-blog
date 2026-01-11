@@ -1,0 +1,7 @@
+- type: github
+  icon: "fab fa-github"
+  url: "https://github.com/juspay/neurolink"
+
+- type: discord
+  icon: "fab fa-discord"
+  url: "https://discord.gg/neurolink"
