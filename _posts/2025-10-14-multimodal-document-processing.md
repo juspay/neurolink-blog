@@ -1,11 +1,11 @@
 ---
 layout: post
 title: "Multimodal Document Processing with NeuroLink"
-date: 2025-10-07 10:00:00 +0530
+date: 2025-10-14 10:00:00 +0530
 categories: [Tutorials, Features]
 tags: [multimodal, pdf, csv, documents, processing]
 author: neurolink
-description: "Learn how to process PDFs, CSVs, Office documents, images, and audio files using NeuroLink's unified multimodal API."
+description: "Learn how to process PDFs, CSVs, images, and text files using NeuroLink's unified multimodal API."
 image:
   path: /assets/img/og-multimodal-tutorial.png
   alt: Multimodal Document Processing Tutorial
@@ -14,24 +14,25 @@ mermaid: true
 pin: false
 ---
 
-# Processing PDFs, CSVs, and Office Documents with AI
+# Processing PDFs, CSVs, Images, and Text with AI
 
-Document processing sits at the heart of enterprise AI adoption. Financial reports, contracts, invoices, spreadsheets, presentations. Your business runs on documents. Now AI can understand them all.
+Document processing sits at the heart of enterprise AI adoption. Financial reports, contracts, invoices, spreadsheets, and more. Your business runs on documents. NeuroLink's unified API processes the most common formats with native support.
 
-The challenge? Each format requires different parsing. PDFs need visual analysis. CSVs need tabular understanding. Office documents need text extraction. Different APIs. Different libraries. Different headaches.
+The challenge? Each format requires different parsing. PDFs need visual analysis. CSVs need tabular understanding. Images need vision capabilities. Different APIs. Different libraries. Different headaches.
 
 NeuroLink solves this with a unified multimodal API. One interface handles every format. Auto-detection identifies file types. Smart routing selects the right provider. You write one code path for all documents.
 
-This tutorial walks you through complete document processing with NeuroLink. You will learn PDF analysis, CSV data extraction, Office document handling, and production pipeline patterns. By the end, you will process any business document through a single, type-safe TypeScript interface.
+This tutorial walks you through complete document processing with NeuroLink. You will learn PDF analysis, CSV data extraction, and production pipeline patterns. By the end, you will process documents through a single, type-safe TypeScript interface.
+
+> **Note:** Currently supported file types are **PDF, CSV, images, and plain text**. Office document support (.xlsx, .docx, .pptx) is defined in the type system but not yet implemented.
 
 ```mermaid
 flowchart LR
     subgraph Input["Your Documents"]
         PDF["PDF Files"]
         CSV["CSV Data"]
-        XLS["Excel Sheets"]
-        DOC["Word Docs"]
-        PPT["PowerPoint"]
+        IMG["Images"]
+        TXT["Text Files"]
     end
 
     subgraph NL["NeuroLink SDK"]
@@ -51,7 +52,7 @@ flowchart LR
         INS["Insights"]
     end
 
-    PDF & CSV & XLS & DOC & PPT --> FD
+    PDF & CSV & IMG & TXT --> FD
     FD --> PR
     PR --> V & A & O
     V & A & O --> SUM & EXT & INS
@@ -81,11 +82,11 @@ import { NeuroLink } from "@juspay/neurolink";
 
 const ai = new NeuroLink();
 
-// Process ANY document type
+// Process supported document types
 const result = await ai.generate({
   input: {
     text: "Analyze this document and extract key insights",
-    files: ["report.pdf", "data.csv", "summary.xlsx"]
+    files: ["report.pdf", "data.csv"]
   }
 });
 ```
@@ -133,9 +134,13 @@ Different formats require different processing strategies:
 |--------|----------------|------------------|----------|
 | PDF | Native binary (visual) | Vertex AI, Anthropic, OpenAI, Google AI, Bedrock | Charts, tables, layouts |
 | CSV | Text conversion (markdown) | All providers | Data analysis |
-| Excel | Text extraction per sheet | All providers | Multi-sheet data |
-| Word | Text with structure markers | All providers | Contract analysis |
-| PowerPoint | Slide-by-slide extraction | All providers | Presentation summary |
+| Images | Native binary (visual) | Vision-capable providers | Screenshots, photos |
+| Text | Direct text input | All providers | Plain text files |
+| Excel* | Planned | - | Multi-sheet data |
+| Word* | Planned | - | Contract analysis |
+| PowerPoint* | Planned | - | Presentation summary |
+
+*Office formats are defined in the type system but not yet implemented.
 
 ---
 
@@ -166,9 +171,10 @@ const ai = new NeuroLink();
 const result = await ai.generate({
   input: {
     text: "What is the total revenue mentioned in this financial report?",
-    pdfFiles: ["quarterly-report.pdf"]
+    files: ["quarterly-report.pdf"]
   },
   provider: "vertex",  // PDF-capable provider
+  model: 'gemini-2.0-flash-001',
   maxTokens: 1000
 });
 
@@ -185,39 +191,35 @@ Extract structured JSON from unstructured PDFs using schema enforcement:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
+import { z } from "zod";
 
 const ai = new NeuroLink();
+
+// Define schema using Zod
+const InvoiceSchema = z.object({
+  vendor: z.string(),
+  invoiceNumber: z.string(),
+  date: z.string(),
+  lineItems: z.array(z.object({
+    description: z.string(),
+    quantity: z.number(),
+    unitPrice: z.number(),
+    total: z.number()
+  })),
+  subtotal: z.number(),
+  tax: z.number(),
+  total: z.number()
+});
 
 // Extract structured data from invoice
 const invoice = await ai.generate({
   input: {
     text: "Extract invoice details in JSON format",
-    pdfFiles: ["invoice.pdf"]
+    files: ["invoice.pdf"]
   },
   provider: "anthropic",
-  schema: {
-    type: "object",
-    properties: {
-      vendor: { type: "string" },
-      invoiceNumber: { type: "string" },
-      date: { type: "string" },
-      lineItems: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            description: { type: "string" },
-            quantity: { type: "number" },
-            unitPrice: { type: "number" },
-            total: { type: "number" }
-          }
-        }
-      },
-      subtotal: { type: "number" },
-      tax: { type: "number" },
-      total: { type: "number" }
-    }
-  },
+  model: 'claude-sonnet-4-5-20250929',
+  schema: InvoiceSchema,
   output: { format: "json" }
 });
 
@@ -235,9 +237,10 @@ Compare multiple documents in a single request:
 const comparison = await ai.generate({
   input: {
     text: "Compare Q1 and Q2 reports. What changed in revenue and expenses?",
-    pdfFiles: ["q1-report.pdf", "q2-report.pdf"]
+    files: ["q1-report.pdf", "q2-report.pdf"]
   },
   provider: "vertex",
+  model: 'gemini-2.0-flash-001',
   maxTokens: 2000
 });
 
@@ -251,23 +254,23 @@ The model maintains context across documents, enabling meaningful comparisons.
 
 ### CLI PDF Commands
 
-Process PDFs directly from the command line:
+Process PDFs directly from the command line using the `--file` flag (auto-detects file type):
 
 ```bash
 # Basic PDF analysis
 npx @juspay/neurolink generate "Summarize this contract" \
-  --pdf contract.pdf \
+  --file contract.pdf \
   --provider vertex
 
 # Multiple PDFs
 npx @juspay/neurolink generate "Compare these invoices" \
-  --pdf invoice1.pdf \
-  --pdf invoice2.pdf \
+  --file invoice1.pdf \
+  --file invoice2.pdf \
   --provider anthropic
 
 # Stream PDF analysis (for long documents)
 npx @juspay/neurolink stream "Explain this document in detail" \
-  --pdf technical-spec.pdf \
+  --file technical-spec.pdf \
   --provider bedrock
 ```
 
@@ -309,7 +312,7 @@ const ai = new NeuroLink();
 const insights = await ai.generate({
   input: {
     text: "What are the key trends in this sales data? Identify top performers.",
-    csvFiles: ["sales-2024.csv"]
+    files: ["sales-2024.csv"]
   }
 });
 
@@ -330,7 +333,7 @@ Control how CSV data is processed:
 const analysis = await ai.generate({
   input: {
     text: "Identify the top 10 customers by total revenue",
-    csvFiles: ["customers.csv"]
+    files: ["customers.csv"]
   },
   csvOptions: {
     maxRows: 1000,            // Limit rows (1-10000)
@@ -356,7 +359,8 @@ const verification = await ai.generate({
       "monthly-report.pdf"   // Auto-detected as PDF
     ]
   },
-  provider: "vertex"  // Supports both formats
+  provider: "vertex",  // Supports both formats
+  model: 'gemini-2.0-flash-001',
 });
 ```
 
@@ -364,113 +368,25 @@ NeuroLink's auto-detection handles mixed formats seamlessly.
 
 ### CLI CSV Commands
 
+Use the `--file` flag which auto-detects CSV format:
+
 ```bash
 # Analyze CSV data
-npx @juspay/neurolink generate "Find trends in this data" --csv sales.csv
+npx @juspay/neurolink generate "Find trends in this data" --file sales.csv
 
 # Multiple CSVs
-npx @juspay/neurolink generate "Compare datasets" --csv q1.csv --csv q2.csv
-
-# With options
-npx @juspay/neurolink generate "Summarize top rows" \
-  --csv large-data.csv \
-  --csv-max-rows 500 \
-  --csv-format json
+npx @juspay/neurolink generate "Compare datasets" --file q1.csv --file q2.csv
 ```
 
 ---
 
-## Part 3: Office Documents
+## Part 3: Office Documents (Future Support)
 
-Excel, Word, and PowerPoint files dominate enterprise workflows. NeuroLink extracts intelligence from all of them.
+> **Important:** Office document processing (.xlsx, .docx, .pptx) is defined in the SDK's type system but **not yet implemented**. The file type definitions exist for forward compatibility, but attempting to process these formats will result in an error. Currently supported file types are: **PDF, CSV, images, and plain text**.
+>
+> This section describes the planned API design. Check the [NeuroLink changelog](https://github.com/juspay/neurolink/releases) for implementation updates.
 
-### Excel Processing
-
-```typescript
-const ai = new NeuroLink();
-
-// Analyze Excel spreadsheet
-const excel = await ai.generate({
-  input: {
-    text: "Summarize the financial projections across all sheets",
-    files: ["projections.xlsx"]
-  }
-});
-
-console.log(excel.content);
-// "Financial Projections Summary:
-//  Sheet 'Revenue': Projects $50M by 2026
-//  Sheet 'Expenses': Shows 12% reduction target
-//  Sheet 'Cash Flow': Positive by Q3 2025..."
-```
-
-Multi-sheet workbooks are processed automatically. Each sheet contributes to the complete analysis.
-
-> **Code Example:** See the [Office Documents documentation](https://docs.neurolink.ink/features/office-documents/) for Excel patterns.
-
-### Word Document Analysis
-
-Extract structured information from contracts and agreements:
-
-```typescript
-// Extract structured information from Word doc
-const contract = await ai.generate({
-  input: {
-    text: "Extract all obligations, deadlines, and parties from this agreement",
-    files: ["service-agreement.docx"]
-  },
-  schema: {
-    type: "object",
-    properties: {
-      parties: { type: "array", items: { type: "string" } },
-      effectiveDate: { type: "string" },
-      obligations: { type: "array", items: { type: "string" } },
-      deadlines: { type: "array", items: { type: "string" } },
-      terminationClauses: { type: "array", items: { type: "string" } }
-    }
-  },
-  output: { format: "json" }
-});
-
-console.log(JSON.parse(contract.content));
-// { parties: ["Acme Corp", "TechStart Inc"],
-//   effectiveDate: "2025-01-01",
-//   obligations: ["Deliver software by Q2", ...] }
-```
-
-### PowerPoint Summarization
-
-Create executive summaries from presentation decks:
-
-```typescript
-// Create executive summary of presentation
-const presentation = await ai.generate({
-  input: {
-    text: "Create an executive summary of this quarterly review deck",
-    files: ["quarterly-review.pptx"]
-  },
-  maxTokens: 1500
-});
-
-console.log(presentation.content);
-// "Executive Summary - Q3 2025 Review:
-//  Key Achievements: Launched 3 products, grew ARR 40%
-//  Challenges: Supply chain delays, talent acquisition
-//  Next Quarter Focus: International expansion, AI integration..."
-```
-
-### CLI Office Commands
-
-```bash
-# Excel analysis
-npx @juspay/neurolink generate "Compare sheets" --file budget.xlsx
-
-# Word extraction
-npx @juspay/neurolink generate "Find all deadlines" --file contract.docx --output json
-
-# PowerPoint summary
-npx @juspay/neurolink generate "Create 3-bullet summary" --file presentation.pptx
-```
+When Office document support is implemented, you will be able to process Excel, Word, and PowerPoint files using the same unified API pattern shown above for PDFs and CSVs
 
 ---
 
@@ -555,7 +471,7 @@ class DocumentPipeline {
 Production document processing encounters various error conditions. A robust error handling strategy anticipates these failures and recovers gracefully. Here is a comprehensive approach:
 
 ```typescript
-import { NeuroLink, NeuroLinkError } from "@juspay/neurolink";
+import { NeuroLink } from "@juspay/neurolink";
 
 const ai = new NeuroLink();
 
@@ -566,63 +482,64 @@ async function processDocumentSafely(filePath: string, query: string) {
         text: query,
         files: [filePath]
       },
-      provider: "vertex"
+      provider: "vertex",
+      model: 'gemini-2.0-flash-001',
     });
 
     return { success: true, content: result.content };
   } catch (error: any) {
-    // Handle specific error codes
-    switch (error.code) {
-      case "FILE_TOO_LARGE":
-        // PDF exceeds provider page limit (100 pages for most providers)
-        // Strategy: Split document into chunks
-        console.log(`Document ${filePath} exceeds page limit`);
-        return await processLargeDocument(filePath, query);
+    // Check error message for specific conditions
+    const errorMessage = error.message?.toLowerCase() || "";
 
-      case "UNSUPPORTED_FORMAT":
-        // File type not recognized or supported
-        // Strategy: Convert to supported format or log for manual review
-        console.log(`Unsupported format: ${filePath}`);
-        return { success: false, error: "Format not supported", requiresManualReview: true };
-
-      case "PROVIDER_NOT_CAPABLE":
-        // Provider cannot handle this file type (e.g., Ollama with native PDF)
-        // Strategy: Automatic fallback to capable provider
-        console.log("Falling back to vision-capable provider");
-        return await processWithFallbackProvider(filePath, query);
-
-      case "FILE_NOT_FOUND":
-        // File path invalid or file deleted
-        console.log(`File not found: ${filePath}`);
-        return { success: false, error: "File not found" };
-
-      case "RATE_LIMIT_EXCEEDED":
-        // Provider rate limit hit
-        // Strategy: Exponential backoff retry
-        console.log("Rate limited, retrying with backoff");
-        return await retryWithBackoff(() => processDocumentSafely(filePath, query));
-
-      case "CONTEXT_LENGTH_EXCEEDED":
-        // Document content exceeds model context window
-        // Strategy: Summarize in chunks or use larger context model
-        console.log("Context length exceeded, chunking document");
-        return await processInChunks(filePath, query);
-
-      case "AUTHENTICATION_ERROR":
-        // Invalid or expired API credentials
-        console.error("Authentication failed - check provider credentials");
-        throw error; // Cannot recover, must fix credentials
-
-      case "NETWORK_ERROR":
-        // Transient network failure
-        console.log("Network error, scheduling retry");
-        return await retryWithBackoff(() => processDocumentSafely(filePath, query), 3);
-
-      default:
-        // Unknown error - log and rethrow
-        console.error(`Unexpected error processing ${filePath}:`, error);
-        throw error;
+    if (errorMessage.includes("too large") || errorMessage.includes("page limit")) {
+      // PDF exceeds provider page limit (100 pages for most providers)
+      // Strategy: Split document into chunks
+      console.log(`Document ${filePath} exceeds page limit`);
+      return await processLargeDocument(filePath, query);
     }
+
+    if (errorMessage.includes("unsupported") || errorMessage.includes("format")) {
+      // File type not recognized or supported
+      // Strategy: Convert to supported format or log for manual review
+      console.log(`Unsupported format: ${filePath}`);
+      return { success: false, error: "Format not supported", requiresManualReview: true };
+    }
+
+    if (errorMessage.includes("not found") || errorMessage.includes("enoent")) {
+      // File path invalid or file deleted
+      console.log(`File not found: ${filePath}`);
+      return { success: false, error: "File not found" };
+    }
+
+    if (errorMessage.includes("rate limit") || errorMessage.includes("429")) {
+      // Provider rate limit hit
+      // Strategy: Exponential backoff retry
+      console.log("Rate limited, retrying with backoff");
+      return await retryWithBackoff(() => processDocumentSafely(filePath, query));
+    }
+
+    if (errorMessage.includes("context") || errorMessage.includes("token limit")) {
+      // Document content exceeds model context window
+      // Strategy: Summarize in chunks or use larger context model
+      console.log("Context length exceeded, chunking document");
+      return await processInChunks(filePath, query);
+    }
+
+    if (errorMessage.includes("auth") || errorMessage.includes("credential") || errorMessage.includes("401")) {
+      // Invalid or expired API credentials
+      console.error("Authentication failed - check provider credentials");
+      throw error; // Cannot recover, must fix credentials
+    }
+
+    if (errorMessage.includes("network") || errorMessage.includes("econnrefused") || errorMessage.includes("timeout")) {
+      // Transient network failure
+      console.log("Network error, scheduling retry");
+      return await retryWithBackoff(() => processDocumentSafely(filePath, query), 3);
+    }
+
+    // Try fallback provider for other errors
+    console.log("Attempting fallback to alternative provider");
+    return await processWithFallbackProvider(filePath, query);
   }
 }
 
@@ -634,6 +551,15 @@ async function processLargeDocument(filePath: string, query: string) {
   console.log("Splitting document for processing...");
   // ... implementation
   return { success: true, content: "Aggregated results", chunked: true };
+}
+
+// Helper: Process documents in chunks for context window limits
+async function processInChunks(filePath: string, query: string) {
+  // Split query or document content into manageable chunks
+  // Process each chunk separately and combine results
+  console.log("Processing in chunks due to context limits...");
+  // ... implementation
+  return { success: true, content: "Chunked results combined", chunked: true };
 }
 
 // Helper: Fallback to different provider
@@ -713,8 +639,8 @@ function validateDocument(filePath: string): ValidationResult {
     return { valid: false, error: "File is empty" };
   }
 
-  // Validate supported extensions
-  const supportedExtensions = [".pdf", ".csv", ".xlsx", ".xls", ".docx", ".doc", ".pptx", ".ppt"];
+  // Validate supported extensions (currently implemented)
+  const supportedExtensions = [".pdf", ".csv", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
   if (!supportedExtensions.includes(ext)) {
     return { valid: false, error: `Unsupported extension: ${ext}` };
   }
@@ -757,7 +683,9 @@ async function analyzeWithStreaming(filePath: string) {
   let fullResponse = "";
 
   for await (const chunk of result.stream) {
-    if (chunk.type === "text") {
+    // Text chunks have content property (no type field)
+    // Audio chunks have { type: "audio", audio: AudioChunk }
+    if ("content" in chunk && typeof chunk.content === "string") {
       process.stdout.write(chunk.content);
       fullResponse += chunk.content;
     }
@@ -801,7 +729,8 @@ async function batchProcess(files: string[]) {
               text: "Summarize this document",
               files: [file]
             },
-            provider: "vertex"
+            provider: "vertex",
+            model: 'gemini-2.0-flash-001',
           });
           return { file, success: true, content: result.content };
         } catch (error: any) {
@@ -828,18 +757,21 @@ async function batchProcess(files: string[]) {
 
 Not all providers handle documents equally:
 
-| Provider | Native PDF | Max Size | Max Pages | CSV | Excel | Word |
-|----------|------------|----------|-----------|-----|-------|------|
-| Vertex AI | Yes | 5 MB | 100 | Yes | Yes | Yes |
-| Anthropic | Yes | 5 MB | 100 | Yes | Yes | Yes |
-| Google AI | Yes | 2 GB | 100 | Yes | Yes | Yes |
-| OpenAI | Yes | 10 MB | 100 | Yes | Yes | Yes |
-| Bedrock | Yes | 5 MB | 100 | Yes | Yes | Yes |
-| Azure | No* | - | - | Yes | Yes | Yes |
-| Mistral | No* | - | - | Yes | Yes | Yes |
-| Ollama | No* | - | - | Yes | Yes | Yes |
+| Provider | Native PDF | Max Size | Max Pages | CSV | Excel* | Word* |
+|----------|------------|----------|-----------|-----|--------|-------|
+| vertex | Yes | 5 MB | 100 | Yes | Planned | Planned |
+| Anthropic | Yes | 5 MB | 100 | Yes | Planned | Planned |
+| google-ai | Yes | 2 GB | 100 | Yes | Planned | Planned |
+| OpenAI | Yes | 10 MB | 100 | Yes | Planned | Planned |
+| Bedrock | Yes | 5 MB | 100 | Yes | Planned | Planned |
+| LiteLLM | Yes | 10 MB | 100 | Yes | Planned | Planned |
+| Azure OpenAI | Yes (via Files API) | 10 MB | 100 | Yes | Planned | Planned |
+| Mistral | No | - | - | Yes | Planned | Planned |
+| Ollama | No | - | - | Yes | Planned | Planned |
 
-*These providers convert PDFs to images for processing
+*Excel and Word support is defined in the type system but not yet implemented. Mistral and Ollama do not currently support PDF input.
+
+> **Note:** LiteLLM limits depend on upstream model configuration.
 
 > **Note:** Pricing changes frequently. Check provider documentation for current rates.
 
@@ -864,7 +796,7 @@ const ai = new NeuroLink({
 const result = await ai.generate({
   input: {
     text: "Analyze this data",
-    csvFiles: ["large-data.csv"]
+    files: ["large-data.csv"]
   },
   csvOptions: {
     maxRows: 500,           // Limit rows (1-10000)
@@ -889,9 +821,10 @@ async function processLargePDF(filePath: string) {
         3. Main conclusions and recommendations
 
         If the document is very long, prioritize the most important sections.`,
-      pdfFiles: [filePath]
+      files: [filePath]
     },
     provider: "vertex",  // Native PDF support with 100 page limit
+    model: 'gemini-2.0-flash-001',
     maxTokens: 4000
   });
 
@@ -908,19 +841,20 @@ async function processMultiPartPDF(pdfParts: string[]) {
     const result = await ai.generate({
       input: {
         text: "Summarize the key points from this document section",
-        pdfFiles: [partPath]
+        files: [partPath]
       },
-      provider: "vertex"
+      provider: "vertex",
+      model: 'gemini-2.0-flash-001',
     });
     summaries.push(result.content);
   }
 
   // Combine segment summaries into final summary
+  const combinedSummaries = summaries.join("\n\n---\n\n");
   const finalResult = await ai.generate({
     input: {
-      text: "Combine these section summaries into a cohesive document summary",
-    },
-    messages: [{ role: "user", content: summaries.join("\n\n---\n\n") }]
+      text: `Combine these section summaries into a cohesive document summary:\n\n${combinedSummaries}`
+    }
   });
 
   return finalResult.content;
@@ -1073,7 +1007,7 @@ You now have everything needed to process any business document with AI. Here's 
 
 ### Expand Your Capabilities
 
-- **[OpenRouter Integration Guide]({% post_url 2025-12-28-openrouter-integration-guide %})** - Access 300+ models through a single API
+- **[OpenRouter Integration Guide]({% post_url 2025-12-30-openrouter-integration-guide %})** - Access 500+ models through a single API
 - **[Enterprise HITL & Guardrails Guide](https://docs.neurolink.ink/features/hitl/)** - Add human review for high-stakes documents
 - **[Conversation Memory Configuration](https://docs.neurolink.ink/conversation-memory/)** - Remember context across document sessions
 
@@ -1098,17 +1032,18 @@ The setup wizard guides you through configuration. You'll analyze your first PDF
 
 ## Summary
 
-Document processing is now solved. NeuroLink's unified API handles PDFs, CSVs, Excel, Word, and PowerPoint through a single interface. Auto-detection identifies formats. Smart routing selects providers. Type-safe schemas extract structured data.
+Document processing is simplified. NeuroLink's unified API handles PDFs, CSVs, images, and text files through a single interface. Auto-detection identifies formats. Smart routing selects providers. Type-safe Zod schemas extract structured data.
 
 You learned how to:
 
 - Process PDFs with native visual analysis
-- Extract insights from CSV and Excel data
-- Analyze Word documents and PowerPoint presentations
+- Extract insights from CSV data
 - Build production pipelines with error handling
 - Optimize for performance and cost
 
-Stop juggling document libraries. Start extracting insights. One API. Any document. Real intelligence.
+Office document support (Excel, Word, PowerPoint) is defined in the type system and coming soon.
+
+Stop juggling document libraries. Start extracting insights. One API. Supported documents. Real intelligence.
 
 ---
 
@@ -1119,9 +1054,8 @@ flowchart LR
     subgraph Docs["Your Documents"]
         D1["PDFs"]
         D2["CSVs"]
-        D3["Excel"]
-        D4["Word"]
-        D5["PPT"]
+        D3["Images"]
+        D4["Text"]
     end
 
     subgraph NL["NeuroLink"]
@@ -1135,11 +1069,11 @@ flowchart LR
         I4["Comparisons"]
     end
 
-    D1 & D2 & D3 & D4 & D5 --> API
+    D1 & D2 & D3 & D4 --> API
     API --> I1 & I2 & I3 & I4
 
     style API fill:#6366f1,stroke:#4f46e5,color:#fff
     style I1 fill:#22c55e,stroke:#16a34a,color:#fff
 ```
 
-**One API. Any Document. Real Intelligence.**
+**One API. Supported Documents. Real Intelligence.**

@@ -1,33 +1,136 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="marineSimple" x1="0%" y1="0%" x2="100%" y2="100%">
+    <!-- Primary gradient - Bright Marine -->
+    <linearGradient id="marineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#0190e0"/>
       <stop offset="100%" style="stop-color:#016fb9"/>
     </linearGradient>
+    
+    <!-- Background - Charcoal Brown -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3d3d38"/>
+      <stop offset="100%" style="stop-color:#353531"/>
+    </linearGradient>
+    
+    <!-- Glow effects -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="warmGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="brainGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
   
-  <!-- Simplified neural hub symbol -->
-  <g transform="translate(32, 32)">
-    <!-- Central hub - Bright Marine -->
-    <circle cx="0" cy="0" r="10" fill="url(#marineSimple)"/>
-    <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+  <!-- Rounded background -->
+  <rect width="512" height="512" rx="96" fill="url(#bgGradient)"/>
+  
+  <!-- Neural network symbol centered -->
+  <g transform="translate(256, 256)">
+    <!-- Outer orbital rings -->
+    <circle cx="0" cy="0" r="165" fill="none" stroke="#016fb9" stroke-width="2" opacity="0.2"/>
+    <circle cx="0" cy="0" r="130" fill="none" stroke="#016fb9" stroke-width="1.5" opacity="0.12"/>
     
-    <!-- 4 main connection nodes -->
-    <!-- Top - Deep Saffron -->
-    <line x1="0" y1="-10" x2="0" y2="-18" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="0" cy="-22" r="5" fill="#ff9505"/>
+    <!-- Central brain hub - larger circle -->
+    <circle cx="0" cy="0" r="65" fill="url(#marineGradient)" filter="url(#glow)"/>
     
-    <!-- Right - Spicy Paprika -->
-    <line x1="10" y1="0" x2="18" y2="0" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="22" cy="0" r="5" fill="#ec4e20"/>
+    <!-- Stylized Brain Icon - prominent and detailed -->
+    <g filter="url(#brainGlow)">
+      <!-- Left hemisphere -->
+      <path d="M-6 -42 
+               C-22 -42 -36 -32 -40 -16 
+               C-44 0 -40 16 -32 28 
+               C-26 36 -18 42 -8 44
+               C-4 44 -2 42 0 40" 
+            fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Right hemisphere -->
+      <path d="M6 -42 
+               C22 -42 36 -32 40 -16 
+               C44 0 40 16 32 28 
+               C26 36 18 42 8 44
+               C4 44 2 42 0 40" 
+            fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Brain stem -->
+      <path d="M0 40 L0 50" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+      
+      <!-- Left hemisphere folds/gyri -->
+      <path d="M-34 -20 C-26 -26 -18 -20 -14 -10" 
+            fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+      <path d="M-36 4 C-28 -2 -20 4 -16 12" 
+            fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+      <path d="M-30 22 C-22 18 -16 24 -12 32" 
+            fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.65"/>
+      
+      <!-- Right hemisphere folds/gyri -->
+      <path d="M34 -20 C26 -26 18 -20 14 -10" 
+            fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+      <path d="M36 4 C28 -2 20 4 16 12" 
+            fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+      <path d="M30 22 C22 18 16 24 12 32" 
+            fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.65"/>
+      
+      <!-- Center corpus callosum hint -->
+      <line x1="0" y1="-38" x2="0" y2="36" stroke="#ffffff" stroke-width="2" opacity="0.35"/>
+    </g>
     
-    <!-- Bottom - Deep Saffron -->
-    <line x1="0" y1="10" x2="0" y2="18" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="0" cy="22" r="5" fill="#ff9505"/>
+    <!-- Neural connection lines to provider nodes -->
+    <!-- Top -->
+    <line x1="0" y1="-65" x2="0" y2="-100" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="0" cy="-120" r="22" fill="#ff9505" filter="url(#warmGlow)"/>
+    <circle cx="0" cy="-120" r="8" fill="#ffffff" opacity="0.9"/>
     
-    <!-- Left - Spicy Paprika -->
-    <line x1="-10" y1="0" x2="-18" y2="0" stroke="#016fb9" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="-22" cy="0" r="5" fill="#ec4e20"/>
+    <!-- Top-right -->
+    <line x1="46" y1="-46" x2="72" y2="-72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="85" cy="-85" r="18" fill="#016fb9" filter="url(#glow)"/>
+    <circle cx="85" cy="-85" r="6" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- Right -->
+    <line x1="65" y1="0" x2="100" y2="0" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="120" cy="0" r="22" fill="#ec4e20" filter="url(#warmGlow)"/>
+    <circle cx="120" cy="0" r="8" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- Bottom-right -->
+    <line x1="46" y1="46" x2="72" y2="72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="85" cy="85" r="18" fill="#016fb9" filter="url(#glow)"/>
+    <circle cx="85" cy="85" r="6" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- Bottom -->
+    <line x1="0" y1="65" x2="0" y2="100" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="0" cy="120" r="22" fill="#ff9505" filter="url(#warmGlow)"/>
+    <circle cx="0" cy="120" r="8" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- Bottom-left -->
+    <line x1="-46" y1="46" x2="-72" y2="72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-85" cy="85" r="18" fill="#016fb9" filter="url(#glow)"/>
+    <circle cx="-85" cy="85" r="6" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- Left -->
+    <line x1="-65" y1="0" x2="-100" y2="0" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-120" cy="0" r="22" fill="#ec4e20" filter="url(#warmGlow)"/>
+    <circle cx="-120" cy="0" r="8" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- Top-left -->
+    <line x1="-46" y1="-46" x2="-72" y2="-72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-85" cy="-85" r="18" fill="#016fb9" filter="url(#glow)"/>
+    <circle cx="-85" cy="-85" r="6" fill="#ffffff" opacity="0.9"/>
   </g>
 </svg>

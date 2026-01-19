@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512"><svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Primary gradient - Bright Marine -->
+    <linearGradient id="marineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0190e0"></stop>
+      <stop offset="100%" style="stop-color:#016fb9"></stop>
+    </linearGradient>
+    
+    <!-- Background - Charcoal Brown -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3d3d38"></stop>
+      <stop offset="100%" style="stop-color:#353531"></stop>
+    </linearGradient>
+    
+    <!-- Glow effects -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"></feGaussianBlur>
+      <feMerge>
+        <feMergeNode in="coloredBlur"></feMergeNode>
+        <feMergeNode in="SourceGraphic"></feMergeNode>
+      </feMerge>
+    </filter>
+    
+    <filter id="warmGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="coloredBlur"></feGaussianBlur>
+      <feMerge>
+        <feMergeNode in="coloredBlur"></feMergeNode>
+        <feMergeNode in="SourceGraphic"></feMergeNode>
+      </feMerge>
+    </filter>
+    
+    <filter id="brainGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"></feGaussianBlur>
+      <feMerge>
+        <feMergeNode in="coloredBlur"></feMergeNode>
+        <feMergeNode in="SourceGraphic"></feMergeNode>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Rounded background -->
+  <rect width="512" height="512" rx="96" fill="url(#bgGradient)"></rect>
+  
+  <!-- Neural network symbol centered -->
+  <g transform="translate(256, 256)">
+    <!-- Outer orbital rings -->
+    <circle cx="0" cy="0" r="165" fill="none" stroke="#016fb9" stroke-width="2" opacity="0.2"></circle>
+    <circle cx="0" cy="0" r="130" fill="none" stroke="#016fb9" stroke-width="1.5" opacity="0.12"></circle>
+    
+    <!-- Central brain hub - larger circle -->
+    <circle cx="0" cy="0" r="65" fill="url(#marineGradient)" filter="url(#glow)"></circle>
+    
+    <!-- Stylized Brain Icon - prominent and detailed -->
+    <g filter="url(#brainGlow)">
+      <!-- Left hemisphere -->
+      <path d="M-6 -42 
+               C-22 -42 -36 -32 -40 -16 
+               C-44 0 -40 16 -32 28 
+               C-26 36 -18 42 -8 44
+               C-4 44 -2 42 0 40" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
+      
+      <!-- Right hemisphere -->
+      <path d="M6 -42 
+               C22 -42 36 -32 40 -16 
+               C44 0 40 16 32 28 
+               C26 36 18 42 8 44
+               C4 44 2 42 0 40" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
+      
+      <!-- Brain stem -->
+      <path d="M0 40 L0 50" stroke="#ffffff" stroke-width="4" stroke-linecap="round"></path>
+      
+      <!-- Left hemisphere folds/gyri -->
+      <path d="M-34 -20 C-26 -26 -18 -20 -14 -10" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"></path>
+      <path d="M-36 4 C-28 -2 -20 4 -16 12" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"></path>
+      <path d="M-30 22 C-22 18 -16 24 -12 32" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.65"></path>
+      
+      <!-- Right hemisphere folds/gyri -->
+      <path d="M34 -20 C26 -26 18 -20 14 -10" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"></path>
+      <path d="M36 4 C28 -2 20 4 16 12" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.75"></path>
+      <path d="M30 22 C22 18 16 24 12 32" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.65"></path>
+      
+      <!-- Center corpus callosum hint -->
+      <line x1="0" y1="-38" x2="0" y2="36" stroke="#ffffff" stroke-width="2" opacity="0.35"></line>
+    </g>
+    
+    <!-- Neural connection lines to provider nodes -->
+    <!-- Top -->
+    <line x1="0" y1="-65" x2="0" y2="-100" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="0" cy="-120" r="22" fill="#ff9505" filter="url(#warmGlow)"></circle>
+    <circle cx="0" cy="-120" r="8" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Top-right -->
+    <line x1="46" y1="-46" x2="72" y2="-72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="85" cy="-85" r="18" fill="#016fb9" filter="url(#glow)"></circle>
+    <circle cx="85" cy="-85" r="6" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Right -->
+    <line x1="65" y1="0" x2="100" y2="0" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="120" cy="0" r="22" fill="#ec4e20" filter="url(#warmGlow)"></circle>
+    <circle cx="120" cy="0" r="8" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Bottom-right -->
+    <line x1="46" y1="46" x2="72" y2="72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="85" cy="85" r="18" fill="#016fb9" filter="url(#glow)"></circle>
+    <circle cx="85" cy="85" r="6" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Bottom -->
+    <line x1="0" y1="65" x2="0" y2="100" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="0" cy="120" r="22" fill="#ff9505" filter="url(#warmGlow)"></circle>
+    <circle cx="0" cy="120" r="8" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Bottom-left -->
+    <line x1="-46" y1="46" x2="-72" y2="72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="-85" cy="85" r="18" fill="#016fb9" filter="url(#glow)"></circle>
+    <circle cx="-85" cy="85" r="6" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Left -->
+    <line x1="-65" y1="0" x2="-100" y2="0" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="-120" cy="0" r="22" fill="#ec4e20" filter="url(#warmGlow)"></circle>
+    <circle cx="-120" cy="0" r="8" fill="#ffffff" opacity="0.9"></circle>
+    
+    <!-- Top-left -->
+    <line x1="-46" y1="-46" x2="-72" y2="-72" stroke="#016fb9" stroke-width="5" stroke-linecap="round"></line>
+    <circle cx="-85" cy="-85" r="18" fill="#016fb9" filter="url(#glow)"></circle>
+    <circle cx="-85" cy="-85" r="6" fill="#ffffff" opacity="0.9"></circle>
+  </g>
+</svg></svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
+@media (prefers-color-scheme: dark) { :root { filter: none; } }
+</style></svg>

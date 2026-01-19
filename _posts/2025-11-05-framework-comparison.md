@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "AI SDK Framework Comparison: NeuroLink vs LangChain vs Vercel AI"
-date: 2026-01-06 10:00:00 +0530
+date: 2025-11-05 10:00:00 +0530
 categories: [Comparisons, Analysis]
 tags: [comparison, langchain, vercel-ai, frameworks, benchmarks]
 author: neurolink
@@ -33,9 +33,9 @@ Our methodology: real code comparisons, reproducible benchmarks, honest feature 
 ```mermaid
 flowchart TB
     subgraph Decision["Your Decision"]
-        Q1{{"Multi-provider<br/>+ Governance?"}}
-        Q2{{"Complex Agents<br/>+ Python?"}}
-        Q3{{"React Streaming<br/>+ Edge?"}}
+        Q1{"Multi-provider + Governance?"}
+        Q2{"Complex Agents + Python?"}
+        Q3{"React Streaming + Edge?"}
     end
 
     Q1 -->|Yes| NL["NeuroLink"]
@@ -88,7 +88,7 @@ LangChain pioneered the "chain" abstraction. Its ecosystem is unmatched for agen
 | **Philosophy** | Minimal, streaming-optimized, React-native |
 | **Language** | TypeScript only |
 | **Focus** | Frontend integration, streaming, edge deployment |
-| **Bundle** | 45KB (smallest in class) |
+| **Bundle** | ~186KB (core package) |
 
 Vercel AI SDK prioritizes developer experience for React applications. If you're building Next.js apps with streaming UI, nothing matches its simplicity.
 
@@ -102,24 +102,24 @@ Vercel AI SDK prioritizes developer experience for React applications. If you're
 |----------|-----------|-----------|---------------|
 | OpenAI | Native | Native | Native |
 | Anthropic | Native | Native | Native |
-| Google Vertex | Native | Native | Limited |
-| AWS Bedrock | Native | Native | Limited |
+| Google Vertex | Native | Native | Full official provider |
+| AWS Bedrock | Native | Native | Full official provider |
 | Azure OpenAI | Native | Native | Native |
-| **OpenRouter (300+)** | **Native** | Community | No |
+| **OpenRouter (400+)** | **Native** | Community | Community provider |
 | **LiteLLM Hub** | **Native** | Community | No |
 | Ollama (Local) | Native | Native | Native |
 | Custom Endpoints | Native | Native | Limited |
-| **Total Native Providers** | **13** | **10** | **5** |
+| **Total Native Providers** | **13** | **10** | **20+ (includes community)** |
 
-**Key Insight**: NeuroLink's OpenRouter integration provides access to 300+ models through a single API key—a significant advantage for multi-model strategies.
+**Key Insight**: NeuroLink's OpenRouter integration provides access to 400+ models through a single API key—a significant advantage for multi-model strategies.
 
 ### Enterprise Features
 
 | Feature | NeuroLink | LangChain | Vercel AI SDK |
 |---------|-----------|-----------|---------------|
-| HITL Workflows | Built-in | Manual | No |
-| Guardrails/Filters | Built-in | Via extension | No |
-| PII Detection | Built-in | Manual | No |
+| HITL Workflows | Built-in | Built-in | No |
+| Guardrails/Filters | Built-in | Native middleware | No |
+| PII Detection | Built-in | Built-in middleware | No |
 | Audit Logging | Built-in | Manual | No |
 | Redis Memory | Built-in | Via extension | No |
 | Provider Failover | Built-in | Manual | No |
@@ -133,7 +133,7 @@ Vercel AI SDK prioritizes developer experience for React applications. If you're
 | Format | NeuroLink | LangChain | Vercel AI SDK |
 |--------|-----------|-----------|---------------|
 | Images | Native | Native | Native |
-| PDF (native) | Native | Via loader | No |
+| PDF (native) | Native | Via loader | Via Files API/preprocessing |
 | CSV | Native | Via loader | No |
 | Audio | Native | Limited | No |
 | Video | Native | Limited | No |
@@ -150,12 +150,12 @@ Vercel AI SDK prioritizes developer experience for React applications. If you're
 | React Hooks | Via adapters | Via integration | **Native** |
 | Next.js Integration | Yes | Yes | **Native** |
 | Setup Wizard | Yes | No | No |
-| Bundle Size | 285KB | 1.2MB | **45KB** |
+| Bundle Size | ~300KB | ~1MB+ | **~186KB** |
 | Learning Curve | Moderate | Steep | **Gentle** |
 
-**Key Insight**: Vercel AI SDK wins on React integration and bundle size. LangChain has the steepest learning curve but most ecosystem depth.
+**Key Insight**: Vercel AI SDK wins on React integration and minimal dependencies. LangChain has the steepest learning curve but most ecosystem depth.
 
-> Bundle sizes measured with tree-shaking enabled. Actual sizes may vary based on import patterns and bundler configuration.
+> **Bundle Size Note:** Sizes shown are approximate ranges based on minimal imports. Actual bundle sizes vary significantly based on which features you import, your bundler configuration, and tree-shaking effectiveness. Always measure your specific build.
 
 ---
 
@@ -172,7 +172,8 @@ import { NeuroLink } from "@juspay/neurolink";
 const ai = new NeuroLink();
 const result = await ai.generate({
   input: { text: "Explain quantum computing" },
-  provider: "anthropic"
+  provider: "anthropic",
+  model: 'claude-sonnet-4-5-20250929',
 });
 console.log(result.content);
 ```
@@ -207,13 +208,15 @@ console.log(text);
 import { NeuroLink } from "@juspay/neurolink";
 
 const ai = new NeuroLink();
-const stream = await ai.stream({
+const result = await ai.stream({
   input: { text: "Write a story about a robot" },
-  provider: "openai"
+  provider: "openai",
 });
 
-for await (const chunk of stream) {
-  process.stdout.write(chunk.content);
+for await (const chunk of result.stream) {
+  if ('content' in chunk) {
+    process.stdout.write(chunk.content);
+  }
 }
 ```
 
@@ -262,7 +265,8 @@ const result = await ai.generate({
     text: "Summarize this document",
     files: ["report.pdf", "data.csv"]
   },
-  provider: "vertex"
+  provider: "vertex",
+  model: 'gemini-2.0-flash-001',
 });
 
 console.log(result.content);
@@ -318,9 +322,15 @@ const ai = new NeuroLink({
         evaluationModel: "gemini-2.5-flash",
         thresholds: { safetyScore: 8 }
       },
-      badWords: {
-        regexPatterns: ["\\d{3}-\\d{2}-\\d{4}"],  // SSN
-        action: "redact"
+      config: {
+        badWords: {
+          list: ["\\d{3}-\\d{2}-\\d{4}"],  // SSN regex pattern
+          action: "redact"
+        },
+        modelFilter: {
+          allowedProviders: ["anthropic", "openai"],
+          blockedModels: []
+        }
       }
     }
   }
@@ -414,31 +424,78 @@ npx create-next-app@latest my-ai-app
 
 ## Performance Benchmarks
 
-*Methodology: 1000 requests, Claude Sonnet 4.5, standardized prompts, Node.js 20*
+> **Disclaimer:** This section presents **architectural comparisons only**, not absolute performance metrics. Framework performance depends heavily on your specific use case, network conditions, provider response latency, hardware, bundler configuration, and which features you import.
+>
+> **Do not use these comparisons for production decisions without measuring your actual implementation.** Always profile your code in your target environment.
 
-> **Note:** Benchmarks may vary based on network conditions and provider response times.
+### Architectural Characteristics
 
-| Metric | NeuroLink | LangChain | Vercel AI SDK |
+| Characteristic | NeuroLink | LangChain | Vercel AI SDK |
 |--------|-----------|-----------|---------------|
-| Cold Start | 45ms | 120ms | **35ms** |
-| TTFB (streaming) | 180ms | 210ms | **165ms** |
-| Memory (idle) | 52MB | 95MB | **38MB** |
-| Bundle Size | 285KB | 1.2MB | **45KB** |
-| Setup Time | **2 min** (wizard) | 5-10 min | 2 min |
-| Provider Switch | **<1ms** | 50-100ms | N/A |
+| **Dependency Philosophy** | Targeted features | Extensive ecosystem | Minimal core |
+| **Cold Start Profile** | Moderate | Slower (dependency resolution) | **Fastest** (minimal initialization) |
+| **Streaming Optimization** | Built-in | Via extensions | **Native priority** |
+| **Memory Footprint** | Moderate | Higher (ecosystem loaded) | **Lowest** (core-focused) |
+| **Setup Complexity** | Simple (wizard) | Moderate (manual config) | Simple (framework-integrated) |
+| **Provider Switching** | **Instant** (unified API) | Requires re-initialization | Limited (few providers) |
 
-### Interpretation
+### Real-World Considerations
 
-- **Vercel AI SDK**: Smallest footprint, fastest cold start—ideal for edge functions
-- **NeuroLink**: Balanced performance with full feature set, fastest provider switching
-- **LangChain**: Larger footprint due to extensive dependencies, slower initialization
+**Vercel AI SDK:**
+- Minimal dependency philosophy results in smallest core footprint
+- Optimized for edge deployments and client-side bundles
+- Best for React/Next.js-only applications
+
+**NeuroLink:**
+- Balanced approach: enterprise features without excessive dependencies
+- Designed for backend services and multi-provider scenarios
+- Instant provider switching reduces development iteration time
+
+**LangChain:**
+- Extensive ecosystem provides value primarily when using integrations
+- Significant benefits for agent systems and vector database integration
+- Full footprint only needed when leveraging ecosystem components
+
+### Why We Don't Include Specific Numbers
+
+We intentionally avoid publishing specific benchmark numbers (e.g., "285KB bundle" or "45ms cold start") because:
+
+1. **Bundle size varies dramatically** based on which features you import and tree-shaking effectiveness
+2. **Performance is environment-specific** (varies by Node.js version, hardware, network conditions)
+3. **Provider latency dominates** (API calls usually take 100-500ms; SDK overhead is negligible)
+4. **Bundler behavior differs** (Webpack, Vite, esbuild optimize differently)
+5. **Quick numbers become outdated** as frameworks update and dependencies change
+
+### How to Measure Your Use Case
+
+1. Install each framework minimally: `npm install [framework]`
+2. Create a simple script using only the features you need
+3. Run `npm run build` and examine the actual bundle output
+4. Benchmark startup time in your target environment
+5. Measure API latency (usually dominates SDK overhead)
+6. Compare your measurements to provider response times
+
+### Bundle Size Notes
+
+When evaluating bundle sizes, consider:
+- Which specific features you actually import
+- Your bundler configuration and optimization settings
+- Provider packages included in your dependencies
+- Minification and compression during build
+- Your application code size alongside framework size
 
 ```mermaid
-xychart-beta
-    title "Bundle Size Comparison (KB)"
-    x-axis ["NeuroLink", "LangChain", "Vercel AI"]
-    y-axis "Size (KB)" 0 --> 1300
-    bar [285, 1200, 45]
+flowchart LR
+    subgraph comparison["Architectural Philosophy"]
+        direction TB
+        NL["NeuroLink<br/>Enterprise-Grade<br/>Full Features"]
+        LC["LangChain<br/>Ecosystem-First<br/>Integrations"]
+        VA["Vercel AI SDK<br/>Minimal-First<br/>Edge Optimized"]
+    end
+
+    style NL fill:#6366f1,stroke:#4f46e5,color:#fff
+    style LC fill:#ef4444,stroke:#dc2626,color:#fff
+    style VA fill:#10b981,stroke:#059669,color:#fff
 ```
 
 ---
@@ -496,7 +553,7 @@ xychart-beta
 
 | If you need... | Choose |
 |----------------|--------|
-| 300+ models via OpenRouter | **NeuroLink** |
+| 400+ models via OpenRouter | **NeuroLink** |
 | Native PDF/CSV processing | **NeuroLink** |
 | Built-in HITL and Guardrails | **NeuroLink** |
 | Complex agent chains | **LangChain** |
@@ -525,7 +582,7 @@ const ai = new NeuroLink();
 const result = await ai.generate({
   input: { text: "Hello" },
   provider: "openai",
-  model: "gpt-4"
+  model: "gpt-4",
 });
 console.log(result.content);
 ```
@@ -554,7 +611,7 @@ const ai = new NeuroLink();
 const { content } = await ai.generate({
   input: { text: "Hello" },
   provider: "openai",
-  model: "gpt-4"
+  model: "gpt-4",
 });
 ```
 
@@ -595,10 +652,10 @@ The setup wizard configures providers automatically. Make your first request in 
 
 ### Related Resources
 
-- **[OpenRouter Integration Guide]({% post_url 2025-12-28-openrouter-integration-guide %})** - Access 300+ models
-- **[Multimodal Processing Tutorial]({% post_url 2025-10-07-multimodal-document-processing %})** - PDF, CSV, documents
+- **[OpenRouter Integration Guide]({% post_url 2025-12-30-openrouter-integration-guide %})** - Access 400+ models
+- **[Multimodal Processing Tutorial]({% post_url 2025-10-14-multimodal-document-processing %})** - PDF, CSV, documents
 - **[Full SDK API Reference](https://docs.neurolink.ink/sdk/api-reference/)** - Complete documentation
 
 ---
 
-*This comparison reflects framework capabilities as of January 2026. We update this article quarterly. Found an error? [Open an issue](https://github.com/juspay/neurolink/issues).*
+*Last verified: January 2026. This comparison reflects framework capabilities as of this date. We update this article quarterly. Found an error? [Open an issue](https://github.com/juspay/neurolink/issues).*

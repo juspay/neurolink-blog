@@ -16,9 +16,9 @@ tagline: AI Integration Made Simple
 # Description for SEO
 description: Technical tutorials and guides for NeuroLink - the unified AI SDK
 
-# Site URL - Update this for production
-url: "https://juspay.github.io"
-baseurl: "/neurolink-blog"
+# Site URL - Custom domain
+url: "https://blog.neurolink.ink"
+baseurl: ""
 
 # GitHub info
 github:
@@ -26,7 +26,7 @@ github:
 
 # Social links
 social:
-  name: NeuroLink Team
+  name: Juspay
   email: # optional
   links:
     - https://github.com/juspay/neurolink
