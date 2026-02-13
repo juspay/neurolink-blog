@@ -1,0 +1,32 @@
+- group: NeuroLink
+  links:
+    - url: https://neurolink.ink
+      label: neurolink.ink
+      icon: fas fa-globe
+    - url: https://docs.neurolink.ink
+      label: docs.neurolink.ink
+      icon: fas fa-book
+
+- group: Juspay
+  links:
+    - url: https://juspay.in
+      label: juspay.in
+      icon: fas fa-building
+    - url: https://juspay.io
+      label: juspay.io
+      icon: fas fa-code
+
+- group: Breeze
+  links:
+    - url: https://breeze.in
+      label: breeze.in
+      icon: fas fa-wind
+    - url: https://breeze.in/neurolink
+      label: breeze.in/neurolink
+      icon: fas fa-brain
+
+- group:
+  links:
+    - url: https://github.com/juspay/neurolink
+      label: GitHub
+      icon: fab fa-github
