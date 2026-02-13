@@ -1,0 +1,13 @@
+<nav aria-label="Breadcrumb" class="breadcrumb-nav mb-3">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ '/' | relative_url }}">Home</a></li>
+    {% if page.categories.size > 0 %}
+      <li class="breadcrumb-item">
+        <a href="{{ site.baseurl }}/categories/{{ page.categories[0] | slugify | url_encode }}/">
+          {{ page.categories[0] }}
+        </a>
+      </li>
+    {% endif %}
+    <li class="breadcrumb-item active" aria-current="page">{{ page.title | truncate: 50 }}</li>
+  </ol>
+</nav>

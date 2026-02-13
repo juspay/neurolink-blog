@@ -1,0 +1,684 @@
+---
+---
+
+/* ============================================================
+   NeuroLink Blog -- Brand Alignment Overrides
+   Target: Match neurolink.ink (landing) and docs.neurolink.ink
+   ============================================================ */
+
+/* === 1. Font Family Overrides === */
+:root {
+  --bs-body-font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --bs-font-monospace: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "calt" 1, "kern" 1;
+}
+
+body {
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.625;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+code, pre, kbd, samp,
+.highlight, .highlighter-rouge {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+}
+
+/* === 2. Light Mode Color Overrides === */
+html:not([data-mode]),
+html[data-mode="light"] {
+  --main-bg: #fafafa;
+  --text-color: #0a0a0a;
+  --text-muted-color: #8f8f8f;
+  --text-muted-highlight-color: inherit;
+  --heading-color: #0a0a0a;
+  --label-color: #5f5f5f;
+  --link-color: #016fb9;
+  --link-underline-color: #cccccc;
+  --blockquote-border-color: #cccccc;
+  --blockquote-text-color: #5f5f5f;
+  --button-bg: #fafafa;
+  --btn-border-color: #cccccc;
+  --btn-backtotop-color: #5f5f5f;
+  --btn-backtotop-border-color: #ebebeb;
+  --checkbox-color: #cccccc;
+  --checkbox-checked-color: #0190e0;
+  --site-title-color: #0a0a0a;
+  --site-subtitle-color: #5f5f5f;
+  --sidebar-bg: #fafafa;
+  --sidebar-border-color: #cccccc;
+  --sidebar-muted-color: #5f5f5f;
+  --sidebar-active-color: #016fb9;
+  --sidebar-hover-bg: #f0f0f0;
+  --sidebar-btn-bg: #fafafa;
+  --sidebar-btn-color: #7f7e7e;
+  --avatar-border-color: #cccccc;
+  --topbar-bg: rgba(255, 255, 255, 0.85);
+  --topbar-text-color: #0a0a0a;
+  --search-border-color: #cccccc;
+  --search-icon-color: #8f8f8f;
+  --input-focus-border-color: #016fb9;
+  --post-list-text-color: #5f5f5f;
+  --btn-patinator-text-color: #5f5f5f;
+  --btn-paginator-hover-color: #f0f0f0;
+  --toc-highlight: #016fb9;
+  --toc-popup-border-color: #cccccc;
+  --btn-share-color: #8f8f8f;
+  --btn-share-hover-color: #016fb9;
+  --card-bg: #fafafa;
+  --card-hover-bg: #f0f0f0;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  --tag-border: #cccccc;
+  --tag-shadow: #cccccc;
+  --tag-hover: #f0f0f0;
+  --search-tag-bg: #f0f0f0;
+  --categories-border: rgb(0 0 0 / 12.5%);
+  --categories-hover-bg: #f0f0f0;
+  --categories-icon-hover-color: #016fb9;
+  --main-border-color: #ebebeb;
+  --tb-odd-bg: #f2f2f2;
+  --tb-border-color: #cccccc;
+  --dash-color: #cccccc;
+  --kbd-wrap-color: #cccccc;
+  --kbd-text-color: #0a0a0a;
+  --kbd-bg-color: #fafafa;
+  --prompt-text-color: rgb(10 10 10 / 77%);
+  --prompt-tip-bg: rgb(34 197 94 / 12%);
+  --prompt-tip-icon-color: #22c55e;
+  --prompt-info-bg: rgb(1 111 185 / 10%);
+  --prompt-info-icon-color: #016fb9;
+  --prompt-warning-bg: rgb(234 179 8 / 15%);
+  --prompt-warning-icon-color: #eab308;
+  --prompt-danger-bg: rgb(239 68 68 / 12%);
+  --prompt-danger-icon-color: #ef4444;
+  --highlight-bg-color: #f6f8fa;
+  --highlighter-rouge-color: #016fb9;
+  --inline-code-bg: rgb(25 25 28 / 5%);
+  --code-color: #24292e;
+  --language-border-color: #cccccc;
+  --highlight-lineno-color: #8f8f8f;
+  --code-header-text-color: #8f8f8f;
+  --code-header-muted-color: #cccccc;
+  --code-header-icon-color: #cccccc;
+  --clipboard-checked-color: #22c55e;
+  --footnote-target-bg: rgb(1 111 185 / 8%);
+  --timeline-color: rgb(0 0 0 / 7.5%);
+  --timeline-node-bg: #cccccc;
+  --timeline-year-dot-color: #fafafa;
+  --mask-bg: #cccccc;
+  --img-bg: radial-gradient(circle, #ffffff 0%, #f0f0f0 100%);
+  --shimmer-bg: linear-gradient(90deg, rgb(250 250 250 / 0%) 0%, rgb(240 240 240 / 100%) 50%, rgb(250 250 250 / 0%) 100%);
+}
+
+/* === Dark Mode Mixin (DRY: used by both explicit toggle + system preference) === */
+@mixin dark-mode-vars {
+  --main-bg: #0a0a0a;
+  --text-color: #e5e5e5;
+  --text-muted-color: #999999;
+  --text-muted-highlight-color: #b0b0b0;
+  --heading-color: #fafafa;
+  --label-color: #a0a0a0;
+  --link-color: #4db5e8;
+  --link-underline-color: #3d3d3d;
+  --blockquote-border-color: #3d3d3d;
+  --blockquote-text-color: #a0a0a0;
+  --button-bg: #111111;
+  --btn-border-color: #2a2a2a;
+  --btn-backtotop-color: #e5e5e5;
+  --btn-backtotop-border-color: #1f1f1f;
+  --card-header-bg: #161616;
+  --checkbox-color: #3d3d3d;
+  --checkbox-checked-color: #4db5e8;
+  --site-title-color: #fafafa;
+  --site-subtitle-color: #a0a0a0;
+  --sidebar-bg: #111111;
+  --sidebar-border-color: #1f1f1f;
+  --sidebar-muted-color: #a0a0a0;
+  --sidebar-active-color: #4db5e8;
+  --sidebar-hover-bg: #1f1f1f;
+  --sidebar-btn-bg: #161616;
+  --sidebar-btn-color: #999999;
+  --avatar-border-color: rgb(206 206 206 / 90%);
+  --topbar-bg: rgba(10, 10, 10, 0.85);
+  --topbar-text-color: #e5e5e5;
+  --search-border-color: #3d3d3d;
+  --search-icon-color: #888888;
+  --input-focus-border-color: #4db5e8;
+  --post-list-text-color: #e5e5e5;
+  --btn-patinator-text-color: #e5e5e5;
+  --btn-paginator-hover-color: #1f1f1f;
+  --toc-highlight: #4db5e8;
+  --toc-popup-border-color: #3d3d3d;
+  --btn-share-color: #888888;
+  --btn-share-hover-color: #4db5e8;
+  --card-bg: #111111;
+  --card-hover-bg: #1f1f1f;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  --tag-border: #3d3d3d;
+  --tag-shadow: #1f1f1f;
+  --tag-hover: #1f1f1f;
+  --search-tag-bg: #161616;
+  --categories-border: rgb(64 66 69 / 50%);
+  --categories-hover-bg: #1f1f1f;
+  --categories-icon-hover-color: #4db5e8;
+  --main-border-color: #2a2a2a;
+  --tb-odd-bg: #111111;
+  --tb-even-bg: #161616;
+  --tb-border-color: #2a2a2a;
+  --footnote-target-bg: rgb(77 181 232 / 20%);
+  --dash-color: #3d3d3d;
+  --kbd-wrap-color: #3d3d3d;
+  --kbd-text-color: #e5e5e5;
+  --kbd-bg-color: #161616;
+  --prompt-text-color: rgb(229 229 229 / 75%);
+  --prompt-tip-bg: rgb(22 60 36 / 64%);
+  --prompt-tip-icon-color: rgb(34 197 94 / 81%);
+  --prompt-info-bg: rgb(1 111 185 / 30%);
+  --prompt-info-icon-color: #016fb9;
+  --prompt-warning-bg: rgb(234 179 8 / 20%);
+  --prompt-warning-icon-color: rgb(234 179 8 / 80%);
+  --prompt-danger-bg: rgb(239 68 68 / 20%);
+  --prompt-danger-icon-color: #ef4444;
+  --highlight-bg-color: #151515;
+  --highlighter-rouge-color: #4db5e8;
+  --highlight-lineno-color: #888888;
+  --inline-code-bg: rgb(255 255 255 / 5%);
+  --code-color: #abb2bf;
+  --language-border-color: #2a2a2a;
+  --code-header-text-color: #888888;
+  --code-header-muted-color: #3d3d3d;
+  --code-header-icon-color: #3d3d3d;
+  --clipboard-checked-color: #22c55e;
+  --timeline-node-bg: #3d3d3d;
+  --timeline-color: #2a2a2a;
+  --timeline-year-dot-color: #2a2a2a;
+  --mask-bg: #3d3d3d;
+  --img-bg: radial-gradient(circle, #111111 0%, #0a0a0a 100%);
+  --shimmer-bg: linear-gradient(90deg, rgb(255 255 255 / 0%) 0%, rgb(58 55 55 / 40%) 50%, rgb(255 255 255 / 0%) 100%);
+}
+
+/* === 3. Dark Mode Color Overrides (explicit toggle) === */
+/* Readability principle (Medium/Substack): muted text >= #999 for 4.5:1+ contrast on dark bg */
+html[data-mode="dark"] {
+  @include dark-mode-vars;
+}
+
+/* === 4. Dark Mode Color Overrides (system preference) === */
+@media (prefers-color-scheme: dark) {
+  html:not([data-mode]) {
+    @include dark-mode-vars;
+  }
+}
+
+/* === 5. Heading Typography === */
+h1, .h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+
+h2, .h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.375;
+  letter-spacing: -0.02em;
+}
+
+h3, .h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.375;
+  letter-spacing: -0.02em;
+}
+
+h4, .h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+h5, .h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+h6, .h6 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Post title on post page */
+.post .post-content h1:first-of-type,
+#post-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+
+/* === 6. Body Typography === */
+.post-content,
+.page-content,
+.post .content {
+  font-size: 1rem;
+  line-height: 1.625;
+}
+
+.post-content p,
+.page-content p {
+  margin-bottom: 1.25rem;
+}
+
+/* Small / meta text */
+.post-meta,
+.post-desc,
+time,
+.updated {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-muted-color);
+}
+
+/* Override Oswald in archives */
+.archives .year {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* === 7. Code Block Font and Styling === */
+code {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.8125rem;
+  font-feature-settings: "liga" 0;
+}
+
+pre {
+  border-radius: 0.5rem;
+}
+
+/* Inline code */
+p code,
+li code,
+td code {
+  padding: 0.15em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+
+/* Code header (language label + copy button) */
+.code-header {
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.code-header + div pre {
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+/* === 8. Syntax Highlighting: Light Mode === */
+html:not([data-mode]),
+html[data-mode="light"] {
+  .highlight, .highlight .w { color: #24292e; }
+
+  .highlight .k,
+  .highlight .kd,
+  .highlight .kn,
+  .highlight .kp,
+  .highlight .kr,
+  .highlight .kt,
+  .highlight .kc { color: #d73a49; }
+
+  .highlight .s,
+  .highlight .s1,
+  .highlight .s2,
+  .highlight .se,
+  .highlight .sh,
+  .highlight .si,
+  .highlight .sx,
+  .highlight .sr,
+  .highlight .sb { color: #0a7d3e; }
+
+  .highlight .na,
+  .highlight .nf,
+  .highlight .nx { color: #6f42c1; }
+
+  .highlight .nb,
+  .highlight .nc,
+  .highlight .no,
+  .highlight .nd,
+  .highlight .ni,
+  .highlight .ne,
+  .highlight .nl,
+  .highlight .nn,
+  .highlight .nt { color: #005cc5; }
+
+  .highlight .m,
+  .highlight .mi,
+  .highlight .mf,
+  .highlight .mh,
+  .highlight .mo,
+  .highlight .mb,
+  .highlight .il { color: #005cc5; }
+
+  .highlight .c,
+  .highlight .c1,
+  .highlight .cm,
+  .highlight .cp,
+  .highlight .cs,
+  .highlight .cd { color: #6a737d; font-style: italic; }
+
+  .highlight .o,
+  .highlight .ow { color: #d73a49; }
+
+  .highlight .p { color: #24292e; }
+
+  .highlight .gd { color: #d73a49; background-color: rgb(215 58 73 / 8%); }
+  .highlight .gi { color: #0a7d3e; background-color: rgb(10 125 62 / 8%); }
+
+  .highlight pre {
+    background-color: #f6f8fa;
+  }
+}
+
+/* === Dark Syntax Highlighting Mixin (DRY: used by both explicit toggle + system preference) === */
+@mixin dark-syntax-highlight {
+  .highlight, .highlight .w { color: #abb2bf; }
+
+  .highlight .k, .highlight .kd, .highlight .kn,
+  .highlight .kp, .highlight .kr, .highlight .kt,
+  .highlight .kc { color: #f87171; }
+
+  .highlight .s, .highlight .s1, .highlight .s2,
+  .highlight .se, .highlight .sh, .highlight .si,
+  .highlight .sx, .highlight .sr, .highlight .sb { color: #4ade80; }
+
+  .highlight .na, .highlight .nf,
+  .highlight .nx { color: #c084fc; }
+
+  .highlight .nb, .highlight .nc, .highlight .no,
+  .highlight .nd, .highlight .ni, .highlight .ne,
+  .highlight .nl, .highlight .nn,
+  .highlight .nt { color: #4db5e8; }
+
+  .highlight .m, .highlight .mi, .highlight .mf,
+  .highlight .mh, .highlight .mo, .highlight .mb,
+  .highlight .il { color: #4db5e8; }
+
+  /* #7f848e passes WCAG AA (4.86:1) on #151515 bg; previous #5c6370 failed (3.02:1) */
+  .highlight .c, .highlight .c1, .highlight .cm,
+  .highlight .cp, .highlight .cs,
+  .highlight .cd { color: #7f848e; font-style: italic; }
+
+  .highlight .o, .highlight .ow { color: #8b949e; }
+  .highlight .p { color: #c9d1d9; }
+
+  .highlight .gd { color: #f87171; background-color: rgb(248 113 113 / 10%); }
+  .highlight .gi { color: #4ade80; background-color: rgb(74 222 128 / 10%); }
+
+  .highlight pre {
+    background-color: #151515;
+  }
+}
+
+/* === 9. Syntax Highlighting: Dark Mode (explicit toggle) === */
+html[data-mode="dark"] {
+  @include dark-syntax-highlight;
+}
+
+/* === 10. Syntax Highlighting: Dark Mode (system preference) === */
+@media (prefers-color-scheme: dark) {
+  html:not([data-mode]) {
+    @include dark-syntax-highlight;
+  }
+}
+
+/* === 11. Card Components === */
+.card,
+.post-preview {
+  border-radius: 0.75rem;
+  border: 1px solid var(--main-border-color);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover,
+.post-preview:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  border-color: var(--link-color);
+}
+
+html[data-mode="dark"] .card:hover,
+html[data-mode="dark"] .post-preview:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+}
+
+/* === 12. Tags and Badges === */
+.tag,
+a.tag,
+.post-tag {
+  border-radius: 9999px;
+  padding: 0.2em 0.75em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--tag-border);
+  transition: all 0.15s ease;
+}
+
+.tag:hover,
+a.tag:hover {
+  background-color: var(--tag-hover);
+  border-color: var(--link-color);
+  color: var(--link-color);
+}
+
+/* === 13. Table Styling === */
+.post-content table {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--tb-border-color);
+}
+
+.post-content table th {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted-color);
+}
+
+.post-content table td {
+  font-size: 0.875rem;
+}
+
+/* === 14. Blockquote Styling === */
+blockquote {
+  border-left: 3px solid var(--link-color);
+  padding: 0.75rem 1.25rem;
+  margin: 1.5rem 0;
+  border-radius: 0 0.375rem 0.375rem 0;
+  background-color: var(--inline-code-bg);
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* === 15. Focus Visible === */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--link-color);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* === 16. Skip Link === */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--link-color);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  border-radius: 0 0 0.5rem 0;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  color: #ffffff;
+}
+
+/* === 17. Branded Wordmark in Sidebar === */
+#sidebar .site-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand-neuro {
+  color: var(--heading-color);
+}
+
+.brand-link {
+  color: #ff9505;
+}
+
+.brand-blog {
+  color: var(--text-muted-color);
+  font-weight: 400;
+  font-size: 0.75em;
+  margin-left: 0.15em;
+}
+
+/* === 18. Cross-Site Navigation === */
+.cross-site-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 1.5rem;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--main-border-color);
+}
+
+.cross-site-nav .nav-link {
+  color: var(--sidebar-muted-color);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.375rem 0;
+  transition: color 0.2s ease;
+  text-decoration: none;
+}
+
+.cross-site-nav .nav-link:hover {
+  color: var(--sidebar-active-color);
+}
+
+.cross-site-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted-color);
+  opacity: 0.7;
+  margin-bottom: 0.1rem;
+}
+
+/* === 19. Breadcrumbs === */
+.breadcrumb-nav {
+  font-size: 0.8125rem;
+}
+
+.breadcrumb-nav .breadcrumb-item a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+.breadcrumb-nav .breadcrumb-item a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-nav .breadcrumb-item.active {
+  color: var(--text-muted-color);
+}
+
+.breadcrumb-nav .breadcrumb-item + .breadcrumb-item::before {
+  color: var(--text-muted-color);
+}
+
+/* === 20. Newsletter CTA === */
+.newsletter-cta {
+  margin: 2.5rem 0;
+  padding: 2rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--main-border-color);
+  background-color: var(--card-bg);
+  text-align: center;
+}
+
+.newsletter-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.newsletter-desc {
+  color: var(--text-muted-color);
+  font-size: 0.875rem;
+  margin-bottom: 0;
+}
+
+/* === 21. Related Posts (styling for theme's built-in component) === */
+#related-posts .post-preview.card {
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+#related-posts .post-preview.card:hover {
+  border-color: var(--link-color);
+}
+
+/* === 22. Share Buttons Enhancement === */
+.share-wrapper .share-icons a,
+.share-wrapper .share-icons button {
+  transition: all 0.15s ease;
+}
+
+.share-wrapper .share-icons a:hover,
+.share-wrapper .share-icons button:hover {
+  color: var(--btn-share-hover-color);
+}
+
+/* === 23. Reduced Motion === */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
