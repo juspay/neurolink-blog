@@ -1,37 +1,34 @@
 ---
 layout: post
-title: "Building AI Slack Bots with NeuroLink"
-date: 2025-11-15 10:00:00 +0530
-categories: [Tutorial, Integration]
-tags: [slack, bot, chatbot, workspace, automation]
-description: "Build intelligent Slack bots with NeuroLink. Commands, conversations, and workspace automation."
+title: Building AI Slack Bots with NeuroLink
+date: '2025-11-15 10:00:00 +0530'
+categories:
+  - Tutorial
+  - Integration
+tags:
+  - slack
+  - bot
+  - chatbot
+  - workspace
+  - automation
+description: >-
+  Build intelligent Slack bots with NeuroLink. Commands, conversations, and
+  workspace automation.
 author: neurolink
 toc: true
-mermaid: true
+mermaid: false
 pin: false
+image:
+  path: /assets/img/posts/slack-bot-tutorial/hero.png
+  alt: Building AI Slack Bots with NeuroLink
 ---
 
-# Building AI Slack Bots with NeuroLink
+You will build an AI-powered Slack bot using the Slack Bolt framework and NeuroLink's generation API. By the end of this tutorial, you will have a production-ready bot that responds to natural language queries, analyzes sentiment, summarizes threads, and routes requests to the right team members.
 
-Slack has become the central nervous system of modern workplaces. Teams collaborate, share updates, and coordinate projects through channels and direct messages. But what if your Slack workspace could do more than just facilitate human communication? What if it could actively assist your team with intelligent responses, automated workflows, and AI-powered insights?
+> **Tip:** This tutorial builds a custom Slack bot from scratch. NeuroLink does not provide a built-in Slack integration -- you will build the webhook handlers and event listeners yourself using Bolt, with NeuroLink handling the AI generation.
+{: .prompt-tip }
 
-In this comprehensive tutorial, we'll build an intelligent Slack bot powered by NeuroLink. You'll learn how to set up a Slack application, integrate the Bolt framework, connect NeuroLink's AI capabilities, and deploy a production-ready bot that can transform how your team works.
-
-> **Note**: This tutorial demonstrates a custom integration pattern using NeuroLink's SDK to build your own Slack bot. NeuroLink does not provide a built-in Slack integration or pre-built Slack app. You'll be building the Slack bot from scratch using the Slack Bolt framework and connecting it to NeuroLink for AI capabilities.
-
-## Why Build AI-Powered Slack Bots?
-
-Before diving into the technical implementation, let's understand the value proposition. Traditional Slack bots respond to specific commands with predetermined outputs. AI-powered bots, on the other hand, can understand natural language queries and provide intelligent responses.
-
-Consider these use cases:
-
-- **Customer Support Escalation**: When support tickets are posted to a channel, your bot can analyze sentiment and urgency, then automatically route critical issues to the right team members.
-- **Code Review Assistant**: Developers can ask the bot to explain code snippets, suggest improvements, or identify potential bugs directly in Slack.
-- **Meeting Summarizer**: After meetings, the bot can process transcripts and generate concise summaries with action items.
-- **Knowledge Base Search**: Team members can ask questions in natural language and receive relevant answers from your documentation.
-- **Data Analysis Helper**: Request quick analyses of metrics and receive formatted responses with insights.
-
-These capabilities transform Slack from a communication tool into an intelligent assistant that augments your team's productivity.
+Now you will set up the Slack application, install dependencies, and configure the Bolt framework.
 
 ## External Dependencies
 
@@ -44,6 +41,7 @@ npm install -D typescript @types/node ts-node nodemon
 ```
 
 **Required Packages:**
+
 - `@juspay/neurolink` - NeuroLink SDK for AI generation
 - `@slack/bolt` - Slack's official framework for building apps
 - `dotenv` - Environment variable management
@@ -73,7 +71,7 @@ After creation, you'll land on the Basic Information page. Keep this tab open as
 
 Navigate to "OAuth & Permissions" in the sidebar. Scroll to "Scopes" and add the following Bot Token Scopes:
 
-```
+```text
 app_mentions:read    - Allows your bot to read messages that mention it
 chat:write           - Enables sending messages
 channels:history     - Read message history in public channels
@@ -93,7 +91,7 @@ These scopes give your bot the permissions it needs to receive messages, respond
 
 Navigate to "Event Subscriptions" and toggle it on. You'll need to provide a Request URL later once your server is running. For now, subscribe to the following bot events:
 
-```
+```text
 app_mention          - When someone mentions your bot
 message.channels     - Messages in public channels
 message.groups       - Messages in private channels
@@ -155,7 +153,7 @@ Replace the placeholder values with your actual credentials. Never commit this f
 
 Organize your project with this structure:
 
-```
+```text
 neurolink-slack-bot/
 ├── src/
 │   ├── index.js
@@ -798,7 +796,7 @@ Update your `package.json` with production scripts:
 Create a `Dockerfile` for containerized deployment:
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -922,11 +920,9 @@ describe('NeuroLink Integration', () => {
 });
 ```
 
-## Conclusion
+## What You Built
 
-You've built a comprehensive AI-powered Slack bot using NeuroLink. Your bot can now handle slash commands, engage in conversations, respond to mentions, and provide AI-powered insights through reactions.
-
-The foundation we've created is extensible. Consider adding features like scheduled messages and reminders, integration with external APIs and databases, custom workflows for your team's specific needs, multi-language support, and analytics and usage tracking.
+You built an AI-powered Slack bot with slash commands, conversation handling, mention responses, and AI-powered reactions using NeuroLink's generation API. The bot processes natural language queries and returns intelligent responses directly in Slack channels and direct messages.
 
 Remember to monitor your bot's performance, gather user feedback, and iterate on the experience. The best bots evolve based on how teams actually use them.
 
@@ -937,3 +933,11 @@ Happy building!
 ---
 
 *Ready to transform your Slack workspace with AI? Sign up for NeuroLink at neurolink.ink and start building intelligent integrations today.*
+
+---
+
+**Related posts:**
+
+- [Building AI Agents with NeuroLink: From Chatbot to Autonomous System](/posts/building-ai-agents/)
+- [Function Calling: AI Tool Use Patterns with NeuroLink](/posts/function-calling-patterns/)
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)

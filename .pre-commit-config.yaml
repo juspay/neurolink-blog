@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        args: ["--config", ".markdownlint.json"]
+        files: _posts/.*\.md$
+  - repo: local
+    hooks:
+      - id: validate-mermaid
+        name: Validate Mermaid Diagrams
+        entry: scripts/validate-mermaid.sh
+        language: script
+        files: _posts/.*\.md$
+        pass_filenames: false

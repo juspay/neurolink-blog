@@ -1,0 +1,53 @@
+name: Validate Blog Content
+
+on:
+  push:
+    branches: [release]
+  pull_request:
+    branches: [release]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install markdownlint-cli
+        run: npm install -g markdownlint-cli@0.43.0
+
+      - name: Run markdownlint
+        run: markdownlint --config .markdownlint.json "_posts/**/*.md"
+
+      - name: Make mermaid validation script executable
+        run: chmod +x scripts/validate-mermaid.sh
+
+      - name: Validate Mermaid diagrams
+        run: ./scripts/validate-mermaid.sh
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Build Jekyll site
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production
+
+      # TODO: Enable after adding html-proofer to Gemfile.lock (requires: bundle lock)
+      # - name: Run link checker
+      #   run: |
+      #     bundle exec htmlproofer ./_site \
+      #       --disable-external \
+      #       --ignore-urls "/docs\.neurolink\.ink/" \
+      #       --assume-extension \
+      #       --checks "Links,Images,Scripts" \
+      #       --no-enforce-https

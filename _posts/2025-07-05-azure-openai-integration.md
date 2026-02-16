@@ -1,21 +1,31 @@
 ---
 layout: post
-title: "Azure OpenAI Integration Guide with NeuroLink"
-date: 2025-07-05 10:00:00 +0530
-categories: [Tutorial, Integration]
-tags: [azure, openai, gpt-4, enterprise, microsoft]
+title: Azure OpenAI Integration Guide with NeuroLink
+date: '2025-07-05 10:00:00 +0530'
+categories:
+  - Tutorial
+  - Integration
+tags:
+  - azure
+  - openai
+  - gpt-4
+  - enterprise
+  - microsoft
 author: neurolink
-description: "Integrate Azure OpenAI with NeuroLink. Enterprise GPT-4 deployment with Azure security."
+description: >-
+  Integrate Azure OpenAI with NeuroLink. Enterprise GPT-4 deployment with Azure
+  security.
 toc: true
-mermaid: true
+mermaid: false
 pin: false
+image:
+  path: /assets/img/posts/azure-openai-integration/hero.png
+  alt: Azure OpenAI Integration Guide with NeuroLink
 ---
 
-# Azure OpenAI Integration Guide with NeuroLink
+By the end of this guide, you'll have Azure OpenAI connected through NeuroLink with enterprise authentication, regional deployments, and compliance-ready configuration.
 
-Enterprise organizations require more than raw AI capabilities. They demand compliance, security, and governance features that align with corporate policies. Azure OpenAI Service delivers enterprise-grade GPT-4 and other advanced models through Microsoft's trusted cloud infrastructure. When combined with NeuroLink's orchestration capabilities, organizations unlock powerful AI workflows while maintaining complete control over their data and deployments.
-
-This comprehensive guide walks through every aspect of integrating Azure OpenAI with NeuroLink, from initial Azure setup to advanced enterprise configurations that satisfy the most stringent compliance requirements.
+You will set up Azure OpenAI Service, configure NeuroLink's Azure provider with Azure Active Directory authentication, and deploy AI capabilities that stay within your organization's compliance boundaries. This guide covers everything from initial Azure resource creation to advanced enterprise patterns.
 
 ## Understanding Azure OpenAI Service
 
@@ -90,7 +100,6 @@ With Azure resources prepared, configure NeuroLink to communicate with your Azur
 Set the following environment variables for your NeuroLink application:
 
 ```bash
-# Required
 export AZURE_OPENAI_API_KEY="your-api-key-here"
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 
@@ -294,12 +303,11 @@ import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Enable streaming by setting stream: true in generate()
-const result = await neurolink.generate({
+// Use the stream() method for streaming responses
+const result = await neurolink.stream({
   input: { text: userQuestion },
   provider: "azure",
   model: "gpt-4o",
-  stream: true
 });
 
 // Process streaming response
@@ -371,10 +379,19 @@ Understand what data flows through Azure OpenAI and apply appropriate protection
 
 ## Conclusion
 
-Integrating Azure OpenAI with NeuroLink delivers enterprise-grade AI capabilities with the security, compliance, and governance features that organizations require. The combination of Azure's trusted cloud infrastructure and NeuroLink's SDK enables sophisticated AI applications while maintaining complete control over data and deployments.
+You now have Azure OpenAI integrated with NeuroLink, complete with enterprise authentication, compliance configuration, and production patterns. Here is what you built:
 
-Starting with proper Azure resource configuration establishes a solid foundation. Configuring NeuroLink with appropriate authentication, whether API keys for development or Azure AD for production, ensures secure connectivity. The SDK examples in this guide demonstrate patterns for document analysis, multimodal capabilities, and structured output that you can adapt to your specific use cases.
+1. Azure resource setup with proper deployment configuration
+2. NeuroLink connection with API key and Azure AD authentication
+3. Generation, streaming, and structured output through the unified API
+4. Enterprise security with content filtering, audit logging, and network isolation
 
-Enterprise considerations including content filtering, usage tracking, rate limiting, and audit logging address the governance requirements that differentiate enterprise AI deployments from simple experiments. High availability strategies and performance optimizations ensure production-ready reliability and responsiveness.
+Your next step: deploy this configuration to your staging environment with Azure AD authentication, validate the compliance boundaries, and run your existing test suite against the Azure provider. From there, add it as a fallback provider alongside your primary.
 
-As your Azure OpenAI integration matures, explore additional capabilities like fine-tuning custom models and integrating with other Azure AI services. The foundation established through this guide supports evolving AI strategies while maintaining the security and governance standards your organization requires.
+---
+
+**Related posts:**
+
+- [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
+- [OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink](/posts/openai-integration-guide/)

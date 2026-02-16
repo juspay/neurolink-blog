@@ -1,0 +1,2908 @@
+[
+  {
+    "slug": "welcome-to-neurolink-blog",
+    "filename": "2025-06-04-welcome-to-neurolink-blog.md",
+    "title": "Welcome to the NeuroLink Blog",
+    "date": "2025-06-04 10:00:00 +0530",
+    "categories": [
+      "Announcements"
+    ],
+    "tags": [
+      "welcome",
+      "introduction",
+      "neurolink"
+    ],
+    "description": "Welcome to the official NeuroLink blog - your source for tutorials, guides, and updates on AI integration.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "what-is-neurolink-unified-sdk",
+    "filename": "2025-06-06-what-is-neurolink-unified-sdk.md",
+    "title": "What is NeuroLink? The Unified AI SDK Explained",
+    "date": "2025-06-06 10:00:00 +0530",
+    "categories": [
+      "Introduction",
+      "SDK"
+    ],
+    "tags": [
+      "neurolink",
+      "unified-ai-sdk",
+      "ai-platform",
+      "multi-provider",
+      "mcp",
+      "model-context-protocol",
+      "juspay",
+      "architecture",
+      "overview"
+    ],
+    "description": "NeuroLink is a unified AI SDK supporting 13+ providers, MCP tools, streaming, RAG, and enterprise features. Learn how it simplifies AI development.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "why-we-built-neurolink",
+    "filename": "2025-06-08-why-we-built-neurolink.md",
+    "title": "Why We Built NeuroLink: Our Origin Story",
+    "date": "2025-06-08 10:00:00 +0530",
+    "categories": [
+      "Company",
+      "Story"
+    ],
+    "tags": [
+      "origin-story",
+      "neurolink",
+      "juspay",
+      "ai-sdk",
+      "founding"
+    ],
+    "description": "The story behind NeuroLink - why we built a unified AI SDK and what problems we're solving.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "getting-started-first-ai-app",
+    "filename": "2025-06-11-getting-started-first-ai-app.md",
+    "title": "Getting Started with NeuroLink: Your First AI App in 5 Minutes",
+    "date": "2025-06-11 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Getting Started"
+    ],
+    "tags": [
+      "neurolink",
+      "getting-started",
+      "quickstart",
+      "ai-sdk",
+      "typescript",
+      "first-app",
+      "hello-world",
+      "npm",
+      "installation"
+    ],
+    "description": "Build your first AI application in under 5 minutes with NeuroLink. Install, configure, and generate AI responses with just a few lines of TypeScript.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "neurolink-quickstart-10-things",
+    "filename": "2025-06-13-neurolink-quickstart-10-things.md",
+    "title": "NeuroLink Quickstart: 10 Things You Can Build Today",
+    "date": "2025-06-13 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Getting Started"
+    ],
+    "tags": [
+      "neurolink",
+      "quickstart",
+      "use-cases",
+      "chatbot",
+      "rag",
+      "structured-output",
+      "streaming",
+      "mcp-tools",
+      "workflow",
+      "multimodal",
+      "tts"
+    ],
+    "description": "Discover 10 real applications you can build today with NeuroLink -- from chatbots and RAG pipelines to multi-model workflows and voice apps.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "streaming-best-practices",
+    "filename": "2025-06-16-streaming-best-practices.md",
+    "title": "Real-Time AI: Streaming Response Patterns with NeuroLink",
+    "date": "2025-06-16 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Patterns"
+    ],
+    "tags": [
+      "streaming",
+      "real-time",
+      "sse",
+      "websockets",
+      "performance"
+    ],
+    "description": "Master streaming responses in AI applications. SSE, WebSockets, and real-time patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "provider-failover-patterns",
+    "filename": "2025-06-18-provider-failover-patterns.md",
+    "title": "Multi-Provider Failover: Never Lose an API Call",
+    "date": "2025-06-18 10:00:00 +0530",
+    "categories": [
+      "Architecture",
+      "Enterprise"
+    ],
+    "tags": [
+      "failover",
+      "reliability",
+      "multi-provider",
+      "resilience",
+      "patterns"
+    ],
+    "description": "Implement robust failover patterns with NeuroLink. Handle outages, rate limits, and errors gracefully using practical manual patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "switch-ai-providers-without-rewriting",
+    "filename": "2025-06-20-switch-ai-providers-without-rewriting.md",
+    "title": "How to Switch AI Providers Without Rewriting Code",
+    "date": "2025-06-20 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "provider-switching",
+      "vendor-independence",
+      "migration",
+      "neurolink",
+      "multi-provider",
+      "typescript",
+      "abstraction-layer"
+    ],
+    "description": "Switch between OpenAI, Claude, Gemini, Bedrock, and 9 more AI providers by changing a single line of code. A practical tutorial on building provider-portable AI applications with NeuroLink.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "typescript-future-of-ai-development",
+    "filename": "2025-06-23-typescript-future-of-ai-development.md",
+    "title": "Why TypeScript is the Future of AI Development",
+    "date": "2025-06-23 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "TypeScript"
+    ],
+    "tags": [
+      "typescript",
+      "ai-development",
+      "javascript",
+      "python",
+      "developer-ecosystem",
+      "neurolink",
+      "full-stack-ai"
+    ],
+    "description": "Why TypeScript is emerging as the leading language for AI application development. Type safety, full-stack unification, ecosystem growth, and the frameworks driving the shift.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "function-calling-patterns",
+    "filename": "2025-06-25-function-calling-patterns.md",
+    "title": "Function Calling: AI Tool Use Patterns with NeuroLink",
+    "date": "2025-06-25 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Advanced"
+    ],
+    "tags": [
+      "function-calling",
+      "tools",
+      "agents",
+      "workflows",
+      "patterns"
+    ],
+    "description": "Implement function calling and tool use with NeuroLink. Define tools, handle calls, and build agentic workflows with real SDK examples.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "openai-integration-guide",
+    "filename": "2025-06-27-openai-integration-guide.md",
+    "title": "OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink",
+    "date": "2025-06-27 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "openai",
+      "gpt-4o",
+      "gpt-5",
+      "o1",
+      "o3",
+      "embeddings",
+      "tool-calling",
+      "neurolink"
+    ],
+    "description": "Connect GPT-4o, GPT-5, o1, o3, and all OpenAI models through NeuroLink's unified TypeScript SDK. Complete guide with streaming, tool calling, and embedding examples.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "mcp-tools-integration",
+    "filename": "2025-06-30-mcp-tools-integration.md",
+    "title": "MCP Tools: Extending AI with External Capabilities",
+    "date": "2025-06-30 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Advanced"
+    ],
+    "tags": [
+      "mcp",
+      "tools",
+      "function-calling",
+      "integration",
+      "extensibility"
+    ],
+    "description": "Integrate MCP tools with NeuroLink. Connect AI to databases, APIs, and external services.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "mcp-usb-c-of-ai",
+    "filename": "2025-07-02-mcp-usb-c-of-ai.md",
+    "title": "MCP is the USB-C of AI: Why Model Context Protocol Changes Everything",
+    "date": "2025-07-02 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "MCP"
+    ],
+    "tags": [
+      "mcp",
+      "model-context-protocol",
+      "ai-tools",
+      "interoperability",
+      "protocol",
+      "anthropic",
+      "neurolink",
+      "ai-agents",
+      "open-standards",
+      "linux-foundation"
+    ],
+    "description": "MCP (Model Context Protocol) is doing for AI tools what USB-C did for charging cables. Learn why this open protocol is becoming the universal standard for connecting AI models to external tools and data, and how NeuroLink implements it with production-grade resilience.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "multi-model-future",
+    "filename": "2025-07-04-multi-model-future.md",
+    "title": "The Multi-Model Future: Why No Single AI Provider Will Win",
+    "date": "2025-07-04 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "AI Industry"
+    ],
+    "tags": [
+      "multi-model",
+      "multi-provider",
+      "ai-strategy",
+      "vendor-diversity",
+      "model-selection",
+      "neurolink",
+      "ai-landscape"
+    ],
+    "description": "Why the future of AI is multi-model, not single-provider. Market dynamics, technical advantages, and architectural patterns for building AI applications that leverage multiple models simultaneously.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "azure-openai-integration",
+    "filename": "2025-07-05-azure-openai-integration.md",
+    "title": "Azure OpenAI Integration Guide with NeuroLink",
+    "date": "2025-07-05 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "azure",
+      "openai",
+      "gpt-4",
+      "enterprise",
+      "microsoft"
+    ],
+    "description": "Integrate Azure OpenAI with NeuroLink. Enterprise GPT-4 deployment with Azure security.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "google-ai-studio-gemini-integration",
+    "filename": "2025-07-08-google-ai-studio-gemini-integration.md",
+    "title": "Google AI Studio: Free-Tier Gemini Access with NeuroLink",
+    "date": "2025-07-08 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "google-ai",
+      "gemini",
+      "gemini-2.5-flash",
+      "gemini-3",
+      "image-generation",
+      "audio",
+      "thinking",
+      "neurolink"
+    ],
+    "description": "Access Google's Gemini models for free through NeuroLink's Google AI Studio provider. Image generation, audio streaming, thinking modes, and native tool calling with full TypeScript support.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "mistral-ai-integration",
+    "filename": "2025-07-10-mistral-ai-integration.md",
+    "title": "Mistral AI Integration: Fast European AI with NeuroLink",
+    "date": "2025-07-10 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "mistral",
+      "mistral-small",
+      "mistral-large",
+      "codestral",
+      "pixtral",
+      "european-ai",
+      "neurolink"
+    ],
+    "description": "Integrate Mistral AI's fast European models into your app with NeuroLink. Covers Mistral Small, Large, Codestral, Pixtral vision, and Voxtral audio models.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ollama-local-llm-guide",
+    "filename": "2025-07-12-ollama-local-llm-guide.md",
+    "title": "Running Local LLMs with NeuroLink and Ollama",
+    "date": "2025-07-12 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Local-AI"
+    ],
+    "tags": [
+      "ollama",
+      "local-llm",
+      "privacy",
+      "llama",
+      "mistral"
+    ],
+    "description": "Complete guide to running local LLMs with Ollama and NeuroLink. Privacy-first AI development.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "litellm-unified-routing",
+    "filename": "2025-07-15-litellm-unified-routing.md",
+    "title": "LiteLLM + NeuroLink: Access 100+ Models via Unified Routing",
+    "date": "2025-07-15 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "litellm",
+      "proxy",
+      "multi-model",
+      "routing",
+      "openai-compatible",
+      "cost-optimization",
+      "neurolink"
+    ],
+    "description": "Route requests to 100+ AI models from OpenAI, Anthropic, Google, and more through LiteLLM's proxy with NeuroLink's TypeScript SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "community-contributions",
+    "filename": "2025-07-18-community-contributions.md",
+    "title": "Contributing to NeuroLink: A Complete Guide",
+    "date": "2025-07-18 10:00:00 +0530",
+    "categories": [
+      "Community",
+      "Guide"
+    ],
+    "tags": [
+      "community",
+      "contributors",
+      "open-source",
+      "contributing",
+      "guide"
+    ],
+    "description": "Learn how to contribute to NeuroLink. From your first pull request to building plugins and integrations.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "provider-comparison-matrix",
+    "filename": "2025-07-21-provider-comparison-matrix.md",
+    "title": "Provider Comparison Matrix: Choosing the Right AI Provider",
+    "date": "2025-07-21 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Providers"
+    ],
+    "tags": [
+      "comparison",
+      "providers",
+      "decision-guide",
+      "cost",
+      "performance",
+      "enterprise",
+      "neurolink"
+    ],
+    "description": "Compare all 12+ AI providers supported by NeuroLink: OpenAI, Google AI, Anthropic, Mistral, Bedrock, SageMaker, and more.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "langchain-migration-guide",
+    "filename": "2025-07-22-langchain-migration-guide.md",
+    "title": "Migrating from LangChain to NeuroLink: A Step-by-Step Guide",
+    "date": "2025-07-22 10:00:00 +0530",
+    "categories": [
+      "Migration",
+      "Tutorial"
+    ],
+    "tags": [
+      "langchain",
+      "migration",
+      "comparison",
+      "typescript",
+      "patterns"
+    ],
+    "description": "Migrate from LangChain to NeuroLink. Code mappings, pattern translations, and migration strategies.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "neurolink-vs-langchain",
+    "filename": "2025-07-25-neurolink-vs-langchain.md",
+    "title": "NeuroLink vs LangChain: When to Use Which (An Honest Comparison)",
+    "date": "2025-07-25 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Frameworks"
+    ],
+    "tags": [
+      "neurolink",
+      "langchain",
+      "ai-sdk",
+      "comparison",
+      "typescript",
+      "python",
+      "framework-comparison",
+      "developer-tools"
+    ],
+    "description": "An honest comparison of NeuroLink and LangChain for AI apps. Code examples, architecture differences, and when each framework is better.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "vercel-ai-migration",
+    "filename": "2025-07-28-vercel-ai-migration.md",
+    "title": "Migrating from Vercel AI SDK to NeuroLink",
+    "date": "2025-07-28 10:00:00 +0530",
+    "categories": [
+      "Migration",
+      "Tutorial"
+    ],
+    "tags": [
+      "vercel-ai",
+      "migration",
+      "nextjs",
+      "streaming"
+    ],
+    "description": "Complete guide to migrating from Vercel AI SDK to NeuroLink. Learn streaming patterns, API routes, and Next.js integration with working code examples.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "performance-benchmarks",
+    "filename": "2025-07-30-performance-benchmarks.md",
+    "title": "Performance Benchmarking Guide for NeuroLink",
+    "date": "2025-07-30 10:00:00 +0530",
+    "categories": [
+      "Technical",
+      "Guide"
+    ],
+    "tags": [
+      "benchmarks",
+      "performance",
+      "latency",
+      "throughput",
+      "testing"
+    ],
+    "description": "A comprehensive guide to benchmarking AI SDK performance, with reproducible methodologies and best practices for measuring latency, throughput, and memory usage.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "hidden-cost-vendor-lock-in",
+    "filename": "2025-08-01-hidden-cost-vendor-lock-in.md",
+    "title": "The Hidden Cost of AI Vendor Lock-In",
+    "date": "2025-08-01 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Strategy"
+    ],
+    "tags": [
+      "vendor-lock-in",
+      "ai-strategy",
+      "multi-provider",
+      "risk-management",
+      "neurolink",
+      "architecture",
+      "enterprise",
+      "cost-optimization",
+      "failover"
+    ],
+    "description": "The hidden costs of AI vendor lock-in go beyond pricing. Discover six risks of single-provider dependency and how to build vendor-independent AI apps.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "hugging-face-integration",
+    "filename": "2025-08-04-hugging-face-integration.md",
+    "title": "Hugging Face Integration: 100,000+ Open Models with NeuroLink",
+    "date": "2025-08-04 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "hugging-face",
+      "open-source",
+      "llama",
+      "hermes",
+      "codellama",
+      "tool-calling",
+      "neurolink"
+    ],
+    "description": "Access 100,000+ open-source AI models through Hugging Face's inference API with NeuroLink. Intelligent tool calling detection and TypeScript examples.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "testing-ai-applications",
+    "filename": "2025-08-05-testing-ai-applications.md",
+    "title": "Testing AI Applications: A Complete Guide",
+    "date": "2025-08-05 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Development"
+    ],
+    "tags": [
+      "testing",
+      "unit-tests",
+      "integration",
+      "mocking",
+      "evaluation"
+    ],
+    "description": "Test AI applications effectively. Unit tests, integration tests, mocking, and evaluation strategies.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "aws-sagemaker-custom-models",
+    "filename": "2025-08-07-aws-sagemaker-custom-models.md",
+    "title": "AWS SageMaker: Custom Model Deployment with NeuroLink",
+    "date": "2025-08-07 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "aws",
+      "sagemaker",
+      "custom-models",
+      "enterprise",
+      "deployment",
+      "llama",
+      "jumpstart",
+      "neurolink"
+    ],
+    "description": "Deploy and access custom AI models on AWS SageMaker through NeuroLink. Covers endpoint config, model types, credentials, and batch inference.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "openai-compatible-endpoints",
+    "filename": "2025-08-08-openai-compatible-endpoints.md",
+    "title": "OpenAI-Compatible Endpoints: Connect Any API to NeuroLink",
+    "date": "2025-08-08 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Providers"
+    ],
+    "tags": [
+      "openai-compatible",
+      "vllm",
+      "openrouter",
+      "custom-api",
+      "auto-discovery",
+      "neurolink"
+    ],
+    "description": "Connect any OpenAI-compatible API endpoint to NeuroLink with automatic model discovery, tool calling, and streaming. Works with vLLM, Groq, and more.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "provider-abstraction",
+    "filename": "2025-08-11-provider-abstraction.md",
+    "title": "How We Built NeuroLink's Provider Abstraction: 13 APIs, One Interface",
+    "date": "2025-08-11 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Architecture"
+    ],
+    "tags": [
+      "architecture",
+      "provider-abstraction",
+      "design-patterns",
+      "typescript",
+      "sdk-design",
+      "ai-providers"
+    ],
+    "description": "Learn how NeuroLink unifies 13 AI provider APIs behind a single TypeScript interface using abstract classes, factory patterns, and dynamic registration.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "cost-optimization-strategies",
+    "filename": "2025-08-12-cost-optimization-strategies.md",
+    "title": "LLM Cost Optimization: Practical Strategies to Reduce Your AI Spend",
+    "date": "2025-08-12 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Enterprise"
+    ],
+    "tags": [
+      "cost-optimization",
+      "pricing",
+      "efficiency",
+      "caching",
+      "model-selection"
+    ],
+    "description": "Practical strategies to reduce LLM costs - model selection, prompt optimization, external caching, and batching patterns with NeuroLink.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "build-vs-buy-ai-abstraction",
+    "filename": "2025-08-15-build-vs-buy-ai-abstraction.md",
+    "title": "Build vs Buy: When to Build Your Own AI Abstraction Layer",
+    "date": "2025-08-15 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Strategy"
+    ],
+    "tags": [
+      "build-vs-buy",
+      "ai-abstraction",
+      "architecture",
+      "decision-framework",
+      "neurolink",
+      "engineering-leadership",
+      "technical-debt"
+    ],
+    "description": "Should your team build a custom AI abstraction layer or adopt an existing SDK like NeuroLink? A decision framework based on real engineering trade-offs.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "conversation-memory-guide",
+    "filename": "2025-08-18-conversation-memory-guide.md",
+    "title": "Conversation Memory: Building Stateful AI Applications",
+    "date": "2025-08-18 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Features"
+    ],
+    "tags": [
+      "memory",
+      "conversation",
+      "stateful",
+      "context",
+      "sessions"
+    ],
+    "description": "Implement conversation memory in AI apps. Session management, context windows, and persistence with NeuroLink SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "middleware-system",
+    "filename": "2025-08-20-middleware-system.md",
+    "title": "The Middleware System: Analytics, Guardrails, and Custom Pipelines",
+    "date": "2025-08-20 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "SDK"
+    ],
+    "tags": [
+      "middleware",
+      "analytics",
+      "guardrails",
+      "content-filtering",
+      "ai-sdk",
+      "pipeline",
+      "neurolink"
+    ],
+    "description": "Build production-grade AI pipelines with NeuroLink's middleware system. Add analytics tracking, content guardrails, and custom processing to any LLM.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "rag-implementation",
+    "filename": "2025-08-22-rag-implementation.md",
+    "title": "Building RAG Applications with NeuroLink SDK",
+    "date": "2025-08-22 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Advanced"
+    ],
+    "tags": [
+      "rag",
+      "retrieval",
+      "generation",
+      "documents",
+      "knowledge-base"
+    ],
+    "description": "Learn how to build RAG applications using NeuroLink SDK for generation and external vector databases for retrieval.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "neurolink-cli-mastery",
+    "filename": "2025-08-25-neurolink-cli-mastery.md",
+    "title": "NeuroLink CLI Mastery: 15 Commands Every AI Developer Should Know",
+    "date": "2025-08-25 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "CLI"
+    ],
+    "tags": [
+      "cli",
+      "developer-tools",
+      "neurolink",
+      "commands",
+      "terminal",
+      "mcp",
+      "rag",
+      "models"
+    ],
+    "description": "Master the 15 essential NeuroLink CLI commands for setup, model discovery, server management, MCP tools, and RAG operations.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "error-handling-patterns",
+    "filename": "2025-08-26-error-handling-patterns.md",
+    "title": "Error Handling Patterns for AI Applications",
+    "date": "2025-08-26 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Patterns"
+    ],
+    "tags": [
+      "error-handling",
+      "retries",
+      "fallbacks",
+      "resilience",
+      "recovery"
+    ],
+    "description": "Handle AI errors gracefully. Retries, fallbacks, user feedback, and recovery patterns.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "factory-registry-pattern",
+    "filename": "2025-08-28-factory-registry-pattern.md",
+    "title": "The Factory + Registry Pattern: How NeuroLink Breaks Circular Dependencies",
+    "date": "2025-08-28 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Architecture"
+    ],
+    "tags": [
+      "design-patterns",
+      "factory-pattern",
+      "registry-pattern",
+      "circular-dependencies",
+      "typescript",
+      "dependency-injection"
+    ],
+    "description": "NeuroLink uses a Factory + Registry pattern with dynamic imports to support 13 AI providers without circular dependencies. Learn the pattern.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "enterprise-security-guide",
+    "filename": "2025-08-30-enterprise-security-guide.md",
+    "title": "Security Best Practices for AI Applications",
+    "date": "2025-08-30 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Enterprise"
+    ],
+    "tags": [
+      "security",
+      "best-practices",
+      "api-keys",
+      "audit"
+    ],
+    "description": "Essential security patterns for AI applications. Input sanitization, output filtering, API key management, and audit logging.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-in-production-juspay-lessons",
+    "filename": "2025-09-01-ai-in-production-juspay-lessons.md",
+    "title": "AI in Production: Lessons from Serving Millions of Requests at Juspay",
+    "date": "2025-09-01 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Production"
+    ],
+    "tags": [
+      "production-ai",
+      "juspay",
+      "lessons-learned",
+      "scale",
+      "reliability",
+      "fintech",
+      "neurolink",
+      "enterprise",
+      "observability"
+    ],
+    "description": "Hard-won lessons from serving millions of AI requests at Juspay. Error handling, fallback strategies, cost management, and observability patterns.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "zero-to-production-neurolink",
+    "filename": "2025-09-02-zero-to-production-neurolink.md",
+    "title": "From Zero to Production: Deploying Your First NeuroLink App",
+    "date": "2025-09-02 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Getting Started"
+    ],
+    "tags": [
+      "neurolink",
+      "deployment",
+      "production",
+      "server-adapters",
+      "hono",
+      "express",
+      "docker",
+      "environment-variables",
+      "rate-limiting",
+      "observability"
+    ],
+    "description": "Take your NeuroLink AI app from local prototype to production deployment. Server adapters, environment config, rate limiting, and Docker.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-ethics-responsible-use",
+    "filename": "2025-09-03-ai-ethics-responsible-use.md",
+    "title": "AI Ethics: Building Responsible AI Applications",
+    "date": "2025-09-03 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Ethics"
+    ],
+    "tags": [
+      "ethics",
+      "responsible-ai",
+      "bias",
+      "transparency",
+      "governance"
+    ],
+    "description": "Ethical AI development practices. Bias mitigation, transparency, and responsible deployment.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "serverless-ai",
+    "filename": "2025-09-05-serverless-ai.md",
+    "title": "Serverless AI: Running NeuroLink on AWS Lambda, Vercel, and Cloudflare Workers",
+    "date": "2025-09-05 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Architecture"
+    ],
+    "tags": [
+      "serverless",
+      "aws-lambda",
+      "vercel",
+      "cloudflare-workers",
+      "edge-computing",
+      "cold-start",
+      "neurolink"
+    ],
+    "description": "Deploy NeuroLink on AWS Lambda, Vercel Edge Functions, and Cloudflare Workers. Cold start optimization, streaming, and provider selection.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-security-checklist-owasp-top-10-llm",
+    "filename": "2025-09-06-ai-security-checklist-owasp-top-10-llm.md",
+    "title": "AI Application Security Checklist: OWASP Top 10 for LLM Applications",
+    "date": "2025-09-06 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Security"
+    ],
+    "tags": [
+      "owasp",
+      "security",
+      "llm-security",
+      "prompt-injection",
+      "guardrails",
+      "hitl",
+      "neurolink",
+      "checklist"
+    ],
+    "description": "Map OWASP Top 10 for LLM Applications to concrete NeuroLink mitigations. Prompt injection, insecure output, excessive agency, and more.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "aws-bedrock-integration",
+    "filename": "2025-09-08-aws-bedrock-integration.md",
+    "title": "AWS Bedrock Integration Guide with NeuroLink",
+    "date": "2025-09-08 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "aws",
+      "bedrock",
+      "claude",
+      "llama",
+      "titan",
+      "enterprise"
+    ],
+    "description": "Integrate AWS Bedrock with NeuroLink. Claude, Llama, and Titan models via AWS infrastructure.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "building-ai-agents",
+    "filename": "2025-09-10-building-ai-agents.md",
+    "title": "Building AI Agents with NeuroLink: From Chatbot to Autonomous System",
+    "date": "2025-09-10 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Agents"
+    ],
+    "tags": [
+      "ai-agents",
+      "tool-calling",
+      "autonomous",
+      "neurolink",
+      "function-calling",
+      "zod",
+      "streaming",
+      "hitl"
+    ],
+    "description": "Build AI agents with NeuroLink from simple chatbot to autonomous system. Tool registration, agent loops, streaming, memory, and HITL safety.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "cli-automation",
+    "filename": "2025-09-12-cli-automation.md",
+    "title": "CLI Automation: Scripting with NeuroLink",
+    "date": "2025-09-12 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "CLI"
+    ],
+    "tags": [
+      "cli",
+      "automation",
+      "scripting",
+      "shell",
+      "workflows"
+    ],
+    "description": "Automate tasks with NeuroLink CLI. Shell scripts, pipelines, Node.js integration, and developer workflows.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "multi-provider-ai-agent-typescript",
+    "filename": "2025-09-15-multi-provider-ai-agent-typescript.md",
+    "title": "How to Build a Multi-Provider AI Agent in TypeScript (Step-by-Step)",
+    "date": "2025-09-15 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Agents"
+    ],
+    "tags": [
+      "ai-agent",
+      "multi-provider",
+      "typescript",
+      "neurolink",
+      "tool-calling",
+      "openai",
+      "anthropic",
+      "vertex",
+      "streaming"
+    ],
+    "description": "Build a multi-provider AI agent in TypeScript that routes tasks across OpenAI, Anthropic, and Google. Step-by-step with tool calling and fallback.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "sdk-vs-gateway",
+    "filename": "2025-09-17-sdk-vs-gateway.md",
+    "title": "SDK vs Gateway: Choosing the Right Abstraction for Multi-Provider AI",
+    "date": "2025-09-17 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Architecture"
+    ],
+    "tags": [
+      "architecture",
+      "sdk-design",
+      "api-gateway",
+      "ai-providers",
+      "system-design",
+      "decision-making",
+      "neurolink"
+    ],
+    "description": "SDK or gateway? We evaluated both architectures for unifying 13 AI providers. Here is why NeuroLink chose SDK-first and what we gained.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "enterprise-customer-support-bot",
+    "filename": "2025-09-19-enterprise-customer-support-bot.md",
+    "title": "Building an Enterprise Customer Support Bot That Never Goes Down",
+    "date": "2025-09-19 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Enterprise"
+    ],
+    "tags": [
+      "customer-support",
+      "chatbot",
+      "high-availability",
+      "circuit-breaker",
+      "fallback",
+      "multi-provider",
+      "neurolink"
+    ],
+    "description": "Build an enterprise customer support bot that never goes down using NeuroLink's multi-provider fallback, circuit breakers, and rate limiting.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "hitl-guardrails-guide",
+    "filename": "2025-09-22-hitl-guardrails-guide.md",
+    "title": "Human-in-the-Loop (HITL) Security Guide for NeuroLink",
+    "date": "2025-09-22 10:00:00 +0530",
+    "categories": [
+      "Tutorials",
+      "Features"
+    ],
+    "tags": [
+      "hitl",
+      "enterprise",
+      "compliance",
+      "security"
+    ],
+    "description": "Build production-ready AI with Human-in-the-Loop (HITL) tool confirmation workflows using NeuroLink's event-based safety system.",
+    "hasMermaid": true,
+    "hasImage": true,
+    "existingImagePath": "/assets/img/og-hitl-guardrails-guide.png"
+  },
+  {
+    "slug": "auditable-ai-pipelines",
+    "filename": "2025-09-24-auditable-ai-pipelines.md",
+    "title": "Building Auditable AI Pipelines: HITL, Guardrails, and Observability for Regulated Industries",
+    "date": "2025-09-24 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Enterprise"
+    ],
+    "tags": [
+      "hitl",
+      "guardrails",
+      "observability",
+      "compliance",
+      "audit",
+      "enterprise",
+      "regulated-industries",
+      "neurolink"
+    ],
+    "description": "Build auditable AI pipelines for regulated industries with HITL approval, guardrails middleware, and OpenTelemetry observability using NeuroLink.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "prompt-engineering-neurolink",
+    "filename": "2025-09-25-prompt-engineering-neurolink.md",
+    "title": "Prompt Engineering with NeuroLink: A Developer's Guide",
+    "date": "2025-09-25 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Fundamentals"
+    ],
+    "tags": [
+      "prompt-engineering",
+      "templates",
+      "optimization",
+      "best-practices"
+    ],
+    "description": "Master prompt engineering with NeuroLink. Learn how to use system prompts, structure inputs, and optimize AI responses across providers.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "prompt-versioning-management",
+    "filename": "2025-09-27-prompt-versioning-management.md",
+    "title": "Prompt Versioning and Management: Treating Prompts as Code",
+    "date": "2025-09-27 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Prompts"
+    ],
+    "tags": [
+      "prompt-engineering",
+      "versioning",
+      "management",
+      "a-b-testing",
+      "quality-gates",
+      "evaluation",
+      "neurolink"
+    ],
+    "description": "Learn how to version, test, and deploy prompts with the same rigor as application code using NeuroLink's evaluation and middleware systems.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-tutoring-platform",
+    "filename": "2025-09-29-ai-tutoring-platform.md",
+    "title": "Building an AI Tutoring Platform with Multi-Agent Orchestration",
+    "date": "2025-09-29 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Education"
+    ],
+    "tags": [
+      "edtech",
+      "tutoring",
+      "multi-agent",
+      "orchestration",
+      "adaptive-learning",
+      "neurolink",
+      "ai-education"
+    ],
+    "description": "Build an AI tutoring platform using NeuroLink's multi-provider orchestration with specialized agents for math, science, and language arts.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "claude-vs-gpt-use-both",
+    "filename": "2025-10-01-claude-vs-gpt-use-both.md",
+    "title": "Claude vs GPT: Why Choose When You Can Use Both?",
+    "date": "2025-10-01 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Providers"
+    ],
+    "tags": [
+      "claude",
+      "gpt",
+      "anthropic",
+      "openai",
+      "multi-provider",
+      "ai-models",
+      "neurolink",
+      "model-comparison"
+    ],
+    "description": "Stop choosing between Claude and GPT. Use both models in the same app with NeuroLink's unified SDK for failover, consensus, and task routing.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "debugging-ai-applications",
+    "filename": "2025-10-03-debugging-ai-applications.md",
+    "title": "Debugging AI Applications: Tools, Techniques, and NeuroLink's Observability Stack",
+    "date": "2025-10-03 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Observability"
+    ],
+    "tags": [
+      "debugging",
+      "observability",
+      "opentelemetry",
+      "monitoring",
+      "telemetry",
+      "middleware",
+      "neurolink"
+    ],
+    "description": "A comprehensive guide to debugging AI applications with NeuroLink's observability stack: OpenTelemetry tracing, analytics middleware, and health monitoring.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-recruitment-pipeline",
+    "filename": "2025-10-06-ai-recruitment-pipeline.md",
+    "title": "AI Recruitment Pipeline: Resume Screening to Interview Scheduling",
+    "date": "2025-10-06 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "HR"
+    ],
+    "tags": [
+      "hr",
+      "recruitment",
+      "resume-screening",
+      "interview-scheduling",
+      "multi-agent",
+      "hitl",
+      "neurolink"
+    ],
+    "description": "Build an AI recruitment pipeline from resume screening to interview scheduling with bias guardrails, HITL approval, and multi-provider orchestration.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "how-we-built-streaming-tool-calls",
+    "filename": "2025-10-08-how-we-built-streaming-tool-calls.md",
+    "title": "How We Built Streaming Tool Calls: Real-Time AI at Scale",
+    "date": "2025-10-08 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Engineering"
+    ],
+    "tags": [
+      "neurolink",
+      "streaming",
+      "tool-calls",
+      "real-time",
+      "architecture",
+      "engineering",
+      "deep-dive"
+    ],
+    "description": "A deep dive into how NeuroLink built streaming tool calls that work across 13 AI providers -- the problems we hit, the architecture we chose, and the results.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "future-of-ai-sdks",
+    "filename": "2025-10-10-future-of-ai-sdks.md",
+    "title": "The Future of AI SDKs: What's Next for Developer Tools",
+    "date": "2025-10-10 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Industry"
+    ],
+    "tags": [
+      "future",
+      "predictions",
+      "ai-sdk",
+      "developer-tools",
+      "trends"
+    ],
+    "description": "Where AI SDKs are heading. Predictions for developer tools, frameworks, and the AI ecosystem.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-sdk-landscape-2026",
+    "filename": "2025-10-13-ai-sdk-landscape-2026.md",
+    "title": "The AI SDK Landscape 2026: NeuroLink, Vercel AI SDK, LangChain, and More",
+    "date": "2025-10-13 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Industry"
+    ],
+    "tags": [
+      "ai-sdk",
+      "vercel-ai-sdk",
+      "langchain",
+      "llamaindex",
+      "neurolink",
+      "framework-comparison",
+      "landscape",
+      "developer-tools"
+    ],
+    "description": "Comprehensive comparison of top AI SDKs in 2026: NeuroLink, Vercel AI SDK, LangChain, LlamaIndex, and Semantic Kernel. Features, architecture, and recommendations.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "multimodal-document-processing",
+    "filename": "2025-10-14-multimodal-document-processing.md",
+    "title": "Multimodal Document Processing with NeuroLink",
+    "date": "2025-10-14 10:00:00 +0530",
+    "categories": [
+      "Tutorials",
+      "Features"
+    ],
+    "tags": [
+      "multimodal",
+      "pdf",
+      "csv",
+      "documents",
+      "processing"
+    ],
+    "description": "Learn how to process PDFs, CSVs, images, and text files using NeuroLink's unified multimodal API.",
+    "hasMermaid": true,
+    "hasImage": true,
+    "existingImagePath": "/assets/img/og-multimodal-tutorial.png"
+  },
+  {
+    "slug": "processing-any-document-50-file-types",
+    "filename": "2025-10-16-processing-any-document-50-file-types.md",
+    "title": "Processing Any Document with AI: 50+ File Types in One SDK",
+    "date": "2025-10-16 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Documents"
+    ],
+    "tags": [
+      "document-processing",
+      "file-types",
+      "processors",
+      "pdf",
+      "excel",
+      "word",
+      "neurolink"
+    ],
+    "description": "Process 50+ file types through one API with NeuroLink's ProcessorRegistry -- PDF, Word, Excel, source code, images, and more with confidence scoring.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "monitoring-observability",
+    "filename": "2025-10-20-monitoring-observability.md",
+    "title": "AI Observability: Monitoring LLM Applications in Production",
+    "date": "2025-10-20 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Operations"
+    ],
+    "tags": [
+      "monitoring",
+      "observability",
+      "metrics",
+      "logging",
+      "production"
+    ],
+    "description": "Monitor AI applications in production. Metrics, logging, tracing, and alerting strategies.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "rag-application-typescript-tutorial",
+    "filename": "2025-10-22-rag-application-typescript-tutorial.md",
+    "title": "Building a RAG Application with TypeScript: Complete Tutorial",
+    "date": "2025-10-22 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "RAG"
+    ],
+    "tags": [
+      "rag",
+      "retrieval-augmented-generation",
+      "typescript",
+      "vector-database",
+      "embeddings",
+      "chunking",
+      "neurolink"
+    ],
+    "description": "Build a production RAG application in TypeScript with document loading, chunking, embeddings, vector search, and LLM generation. Complete tutorial with NeuroLink SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "advanced-rag",
+    "filename": "2025-10-24-advanced-rag.md",
+    "title": "Advanced RAG: 10 Chunking Strategies, Hybrid Search, and Reranking",
+    "date": "2025-10-24 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "RAG"
+    ],
+    "tags": [
+      "rag",
+      "chunking-strategies",
+      "hybrid-search",
+      "reranking",
+      "vector-search",
+      "bm25",
+      "knowledge-graph",
+      "neurolink"
+    ],
+    "description": "Master NeuroLink's advanced RAG subsystem with 10 chunking strategies, hybrid BM25+vector search, reranking, Graph RAG, and resilience patterns for production systems.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "mcp-server-tutorial",
+    "filename": "2025-10-27-mcp-server-tutorial.md",
+    "title": "MCP Server Tutorial: Build Your Own AI Tools in 30 Minutes",
+    "date": "2025-10-27 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "MCP"
+    ],
+    "tags": [
+      "mcp",
+      "model-context-protocol",
+      "ai-tools",
+      "tool-calling",
+      "neurolink",
+      "typescript"
+    ],
+    "description": "Build your own MCP server with custom AI tools in 30 minutes. Step-by-step TypeScript tutorial covering tool creation, validation, and integration with NeuroLink SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "structured-output-json",
+    "filename": "2025-10-28-structured-output-json.md",
+    "title": "Structured Output: JSON Schema Enforcement with NeuroLink",
+    "date": "2025-10-28 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Patterns"
+    ],
+    "tags": [
+      "json",
+      "schema",
+      "structured-output",
+      "validation",
+      "typescript"
+    ],
+    "description": "Get consistent JSON output from LLMs. Schema validation, type safety, and parsing patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "structured-output-llm-json-schema-typescript",
+    "filename": "2025-10-30-structured-output-llm-json-schema-typescript.md",
+    "title": "Structured Output from LLMs: JSON Schema Validation in TypeScript",
+    "date": "2025-10-30 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Structured Output"
+    ],
+    "tags": [
+      "structured-output",
+      "json-schema",
+      "zod",
+      "typescript",
+      "validation",
+      "neurolink"
+    ],
+    "description": "Get structured, validated JSON from LLMs using TypeScript and Zod schemas. Complete tutorial covering schema definition, provider-specific behavior, and error handling.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "how-we-built-rag-pipeline",
+    "filename": "2025-11-01-how-we-built-rag-pipeline.md",
+    "title": "How We Built the RAG Pipeline: 10 Chunking Strategies and Why",
+    "date": "2025-11-01 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Engineering"
+    ],
+    "tags": [
+      "neurolink",
+      "rag",
+      "chunking",
+      "retrieval-augmented-generation",
+      "vector-search",
+      "bm25",
+      "hybrid-search",
+      "graph-rag",
+      "engineering"
+    ],
+    "description": "A Stripe-style deep dive into building NeuroLink's RAG pipeline. Why we built 10 chunking strategies, how hybrid search combines vector and BM25, and the benchmarks that guided every decision.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "compliant-ai-citizen-services-government",
+    "filename": "2025-11-03-compliant-ai-citizen-services-government.md",
+    "title": "Compliant AI Citizen Services: Document Processing with HITL for Government",
+    "date": "2025-11-03 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Government"
+    ],
+    "tags": [
+      "government",
+      "citizen-services",
+      "document-processing",
+      "hitl",
+      "compliance",
+      "audit-logging",
+      "neurolink"
+    ],
+    "description": "Build compliant AI citizen services for government with HITL approval workflows, audit logging, guardrails, and data-sovereign provider routing.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "framework-comparison",
+    "filename": "2025-11-05-framework-comparison.md",
+    "title": "AI SDK Framework Comparison: NeuroLink vs LangChain vs Vercel AI",
+    "date": "2025-11-05 10:00:00 +0530",
+    "categories": [
+      "Comparisons",
+      "Analysis"
+    ],
+    "tags": [
+      "comparison",
+      "langchain",
+      "vercel-ai",
+      "frameworks",
+      "benchmarks"
+    ],
+    "description": "In-depth comparison of NeuroLink, LangChain, and Vercel AI SDK. Benchmarks, features, and use case recommendations.",
+    "hasMermaid": true,
+    "hasImage": true,
+    "existingImagePath": "/assets/img/og-framework-comparison.png"
+  },
+  {
+    "slug": "total-cost-of-ownership",
+    "filename": "2025-11-06-total-cost-of-ownership.md",
+    "title": "Total Cost of Ownership: NeuroLink vs Direct Provider Integration",
+    "date": "2025-11-06 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Strategy"
+    ],
+    "tags": [
+      "total-cost-of-ownership",
+      "tco",
+      "cost-analysis",
+      "neurolink",
+      "direct-integration",
+      "engineering-costs",
+      "roi"
+    ],
+    "description": "A detailed total cost of ownership analysis comparing NeuroLink SDK adoption vs direct provider integration. Engineering hours, maintenance, and hidden expenses.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-claims-processing-insurance",
+    "filename": "2025-11-08-ai-claims-processing-insurance.md",
+    "title": "AI-Powered Claims Processing: Multi-Agent Workflows for Insurance",
+    "date": "2025-11-08 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Insurance"
+    ],
+    "tags": [
+      "insurance",
+      "claims-processing",
+      "multi-agent",
+      "workflow",
+      "hitl",
+      "compliance",
+      "neurolink"
+    ],
+    "description": "Automate insurance claims processing with NeuroLink's multi-agent orchestration, HITL approval for high-value decisions, and full audit trails.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "webhook-integrations",
+    "filename": "2025-11-10-webhook-integrations.md",
+    "title": "Building Webhook Handlers with NeuroLink AI Processing",
+    "date": "2025-11-10 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "webhooks",
+      "events",
+      "async",
+      "integration",
+      "automation"
+    ],
+    "description": "Build webhook handlers that leverage NeuroLink for AI processing. Learn event handling, async processing, and integration patterns using Express.js with NeuroLink as your AI backend.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "event-system",
+    "filename": "2025-11-12-event-system.md",
+    "title": "The Event System: Real-Time Hooks for AI Observability",
+    "date": "2025-11-12 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "SDK"
+    ],
+    "tags": [
+      "events",
+      "event-emitter",
+      "hooks",
+      "real-time",
+      "observability",
+      "neurolink"
+    ],
+    "description": "Hook into every stage of NeuroLink's AI pipeline with typed events. Monitor generations, streams, tool calls, and MCP connections in real-time.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "event-driven-ai",
+    "filename": "2025-11-14-event-driven-ai.md",
+    "title": "Event-Driven AI: Building Reactive Systems with NeuroLink",
+    "date": "2025-11-14 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Architecture"
+    ],
+    "tags": [
+      "event-driven",
+      "reactive-systems",
+      "event-emitter",
+      "streaming",
+      "tools",
+      "real-time",
+      "neurolink"
+    ],
+    "description": "Build reactive AI systems using NeuroLink's event emitter, tool execution events, streaming hooks, and server lifecycle events. Real patterns for production.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "slack-bot-tutorial",
+    "filename": "2025-11-15-slack-bot-tutorial.md",
+    "title": "Building AI Slack Bots with NeuroLink",
+    "date": "2025-11-15 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "slack",
+      "bot",
+      "chatbot",
+      "workspace",
+      "automation"
+    ],
+    "description": "Build intelligent Slack bots with NeuroLink. Commands, conversations, and workspace automation.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "building-slack-bot-with-ai",
+    "filename": "2025-11-17-building-slack-bot-with-ai.md",
+    "title": "Building a Slack Bot with AI: Complete Guide",
+    "date": "2025-11-17 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integrations"
+    ],
+    "tags": [
+      "slack-bot",
+      "ai-bot",
+      "chatbot",
+      "integration",
+      "neurolink",
+      "tool-calling",
+      "typescript"
+    ],
+    "description": "Build an AI-powered Slack bot with TypeScript and NeuroLink SDK. Complete guide covering Slack API setup, message handling, tool calling, and conversation memory.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "neurolink-vs-portkey-helicone",
+    "filename": "2025-11-18-neurolink-vs-portkey-helicone.md",
+    "title": "NeuroLink vs Portkey vs Helicone: Choosing the Right LLM Gateway",
+    "date": "2025-11-18 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Enterprise"
+    ],
+    "tags": [
+      "portkey",
+      "helicone",
+      "llm-gateway",
+      "comparison",
+      "enterprise"
+    ],
+    "description": "Compare NeuroLink, Portkey, and Helicone for LLM gateway needs. Understand each platform's strengths to make the right choice for your use case.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "discord-bot-tutorial",
+    "filename": "2025-11-20-discord-bot-tutorial.md",
+    "title": "Building AI Discord Bots with NeuroLink",
+    "date": "2025-11-20 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "discord",
+      "bot",
+      "chatbot",
+      "community",
+      "automation"
+    ],
+    "description": "Build intelligent Discord bots with NeuroLink. Slash commands, conversations, and server automation.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "multi-tenant-ai-saas",
+    "filename": "2025-11-22-multi-tenant-ai-saas.md",
+    "title": "Building Multi-Tenant AI SaaS with NeuroLink",
+    "date": "2025-11-22 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Enterprise"
+    ],
+    "tags": [
+      "multi-tenant",
+      "saas",
+      "architecture",
+      "ai-providers",
+      "enterprise",
+      "isolation"
+    ],
+    "description": "Build a multi-tenant AI SaaS platform using NeuroLink's provider abstraction, per-tenant configuration, and session isolation. Architecture patterns with working TypeScript code.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "google-vertex-advanced",
+    "filename": "2025-11-25-google-vertex-advanced.md",
+    "title": "Advanced Vertex AI Patterns with NeuroLink",
+    "date": "2025-11-25 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "vertex-ai",
+      "gemini",
+      "google",
+      "multimodal"
+    ],
+    "description": "Advanced Vertex AI integration. Gemini models, multimodal, and enterprise patterns.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "speech-to-text-neurolink",
+    "filename": "2025-11-27-speech-to-text-neurolink.md",
+    "title": "Speech-to-Text and Text-to-Speech with NeuroLink",
+    "date": "2025-11-27 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Audio"
+    ],
+    "tags": [
+      "tts",
+      "speech-to-text",
+      "text-to-speech",
+      "audio",
+      "google-cloud-tts",
+      "voice",
+      "neurolink"
+    ],
+    "description": "Add text-to-speech capabilities to your AI applications with NeuroLink. Google Cloud TTS integration with Neural2 voices, SSML support, and streaming audio in TypeScript.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "anthropic-claude-guide",
+    "filename": "2025-11-28-anthropic-claude-guide.md",
+    "title": "Mastering Claude with NeuroLink: Complete Anthropic Guide",
+    "date": "2025-11-28 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Integration"
+    ],
+    "tags": [
+      "anthropic",
+      "claude",
+      "opus",
+      "sonnet",
+      "haiku"
+    ],
+    "description": "Master Anthropic Claude with NeuroLink. Opus, Sonnet, Haiku - features, prompting, and patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "real-estate-lease-abstraction-ai",
+    "filename": "2025-11-30-real-estate-lease-abstraction-ai.md",
+    "title": "Automating Real Estate Document Processing: Lease Abstraction with AI",
+    "date": "2025-11-30 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Real Estate"
+    ],
+    "tags": [
+      "real-estate",
+      "lease-abstraction",
+      "document-processing",
+      "structured-output",
+      "evaluation",
+      "neurolink"
+    ],
+    "description": "Automate commercial lease abstraction with NeuroLink's AI SDK. Extract rent schedules, clauses, and key terms from complex lease documents using multi-provider orchestration and evaluation quality gates.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "typescript-best-practices",
+    "filename": "2025-12-01-typescript-best-practices.md",
+    "title": "TypeScript Best Practices for AI Development",
+    "date": "2025-12-01 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Development"
+    ],
+    "tags": [
+      "typescript",
+      "best-practices",
+      "types",
+      "generics",
+      "patterns"
+    ],
+    "description": "TypeScript patterns for AI apps. Type safety, generics, and NeuroLink integration patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "microservices-with-ai",
+    "filename": "2025-12-03-microservices-with-ai.md",
+    "title": "Microservices with AI: Integrating NeuroLink into Distributed Systems",
+    "date": "2025-12-03 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Architecture"
+    ],
+    "tags": [
+      "microservices",
+      "distributed-systems",
+      "ai-integration",
+      "server-adapters",
+      "api-design",
+      "production"
+    ],
+    "description": "Integrate NeuroLink into microservices with server adapters for Express, Fastify, Hono, and Koa. Health checks, graceful shutdown, connection draining, and observability included.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "reduce-llm-costs-smart-model-routing",
+    "filename": "2025-12-04-reduce-llm-costs-smart-model-routing.md",
+    "title": "How to Reduce LLM Costs by 60% with Smart Model Routing",
+    "date": "2025-12-04 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Cost Optimization"
+    ],
+    "tags": [
+      "llm-costs",
+      "model-routing",
+      "cost-optimization",
+      "task-classification",
+      "neurolink",
+      "multi-model"
+    ],
+    "description": "Reduce LLM API costs by 60% using smart model routing. Route simple tasks to cheap models and complex tasks to premium models. TypeScript tutorial with NeuroLink SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "case-study-fintech",
+    "filename": "2025-12-05-case-study-fintech.md",
+    "title": "Building Cost-Effective AI for FinTech: A Multi-Provider Routing Guide",
+    "date": "2025-12-05 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Enterprise"
+    ],
+    "tags": [
+      "fintech",
+      "architecture",
+      "cost-reduction",
+      "enterprise",
+      "multi-provider"
+    ],
+    "description": "Learn how financial services companies can reduce LLM costs with intelligent multi-provider routing using NeuroLink.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "caching-strategies",
+    "filename": "2025-12-08-caching-strategies.md",
+    "title": "Caching LLM Responses: Performance Optimization with NeuroLink",
+    "date": "2025-12-08 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Performance"
+    ],
+    "tags": [
+      "caching",
+      "performance",
+      "redis",
+      "optimization",
+      "cost-reduction"
+    ],
+    "description": "Implement external caching strategies for NeuroLink SDK. Exact match, normalized, and semantic caching patterns for cost reduction.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "healthcare-ai-assistant-guide",
+    "filename": "2025-12-10-healthcare-ai-assistant-guide.md",
+    "title": "Building a Healthcare AI Assistant with NeuroLink",
+    "date": "2025-12-10 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Enterprise"
+    ],
+    "tags": [
+      "healthcare",
+      "privacy",
+      "compliance",
+      "enterprise",
+      "architecture"
+    ],
+    "description": "An implementation guide demonstrating technical patterns for building privacy-conscious healthcare AI applications with NeuroLink.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "rate-limiting-strategies",
+    "filename": "2025-12-12-rate-limiting-strategies.md",
+    "title": "Rate Limiting and Quota Management for AI Applications",
+    "date": "2025-12-12 10:00:00 +0530",
+    "categories": [
+      "Architecture",
+      "Enterprise"
+    ],
+    "tags": [
+      "rate-limiting",
+      "quota",
+      "backoff",
+      "multi-tenant",
+      "scaling"
+    ],
+    "description": "Handle rate limits gracefully. Quota management, backoff strategies, and multi-tenant patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "context-compaction",
+    "filename": "2025-12-14-context-compaction.md",
+    "title": "Context Compaction: Managing Long Conversations Without Losing Information",
+    "date": "2025-12-14 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Memory"
+    ],
+    "tags": [
+      "context-compaction",
+      "conversation-memory",
+      "token-management",
+      "summarization",
+      "long-conversations",
+      "neurolink"
+    ],
+    "description": "Manage long AI conversations with NeuroLink's context compaction. Automatic summarization, importance-based filtering, and key information preservation for conversations that span hours.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ecommerce-recommendation-guide",
+    "filename": "2025-12-15-ecommerce-recommendation-guide.md",
+    "title": "Building an E-commerce Recommendation Engine with NeuroLink",
+    "date": "2025-12-15 10:00:00 +0530",
+    "categories": [
+      "Guides",
+      "Enterprise"
+    ],
+    "tags": [
+      "ecommerce",
+      "content-generation",
+      "scale",
+      "automation",
+      "batch-processing"
+    ],
+    "description": "Technical patterns for building AI-powered product recommendation systems using NeuroLink's batch processing and generation capabilities.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "configuration-deep-dive",
+    "filename": "2025-12-17-configuration-deep-dive.md",
+    "title": "Configuration Deep-Dive: neurolink.config.ts and Environment Hierarchy",
+    "date": "2025-12-17 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "SDK"
+    ],
+    "tags": [
+      "configuration",
+      "config-manager",
+      "backup",
+      "providers",
+      "performance",
+      "neurolink",
+      "typescript",
+      "devops"
+    ],
+    "description": "Master NeuroLink's configuration system: provider setup, performance tuning, cache strategies, analytics, and automatic backup/restore. Complete guide to neurolink.config.ts with code examples.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-content-localization-media",
+    "filename": "2025-12-19-ai-content-localization-media.md",
+    "title": "AI Content Localization: Dubbing, Subtitling, and Video Generation",
+    "date": "2025-12-19 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Media"
+    ],
+    "tags": [
+      "media",
+      "localization",
+      "dubbing",
+      "subtitling",
+      "content-generation",
+      "multi-provider",
+      "tts",
+      "neurolink"
+    ],
+    "description": "Build an AI content localization pipeline for dubbing, subtitling, and multi-language video generation using NeuroLink. Orchestrate translation, TTS, and quality evaluation across multiple AI providers.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "tts-integration-guide",
+    "filename": "2025-12-20-tts-integration-guide.md",
+    "title": "Text-to-Speech Integration: Build Voice-Enabled AI Apps with NeuroLink",
+    "date": "2025-12-20 10:00:00 +0530",
+    "categories": [
+      "Tutorials",
+      "Features"
+    ],
+    "tags": [
+      "tts",
+      "text-to-speech",
+      "voice",
+      "audio",
+      "google-cloud-tts"
+    ],
+    "description": "Add natural text-to-speech to your AI applications using NeuroLink's built-in TTS integration with Google Cloud voices.",
+    "hasMermaid": true,
+    "hasImage": true,
+    "existingImagePath": "/assets/img/og-tts-guide.png"
+  },
+  {
+    "slug": "legal-document-analysis-guide",
+    "filename": "2025-12-22-legal-document-analysis-guide.md",
+    "title": "Building a Legal Document Analysis System with NeuroLink",
+    "date": "2025-12-22 10:00:00 +0530",
+    "categories": [
+      "Guide",
+      "Enterprise"
+    ],
+    "tags": [
+      "legal",
+      "documents",
+      "analysis",
+      "multimodal",
+      "tutorial"
+    ],
+    "description": "A practical guide to building contract analysis systems using NeuroLink's multimodal processing capabilities.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "model-evaluation-scoring",
+    "filename": "2025-12-24-model-evaluation-scoring.md",
+    "title": "Model Evaluation and Scoring: RAGAS-Style Quality Assessment",
+    "date": "2025-12-24 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Evaluation"
+    ],
+    "tags": [
+      "evaluation",
+      "ragas",
+      "quality-assurance",
+      "llm-as-judge",
+      "scoring",
+      "neurolink"
+    ],
+    "description": "Automatically score AI response quality with NeuroLink's RAGAS-style evaluation system. Relevance, accuracy, and completeness scoring with LLM-as-judge, alert severity, and retry logic.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "how-we-built-mcp-integration",
+    "filename": "2025-12-26-how-we-built-mcp-integration.md",
+    "title": "How We Built MCP Integration: Supporting 4 Transport Protocols",
+    "date": "2025-12-26 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Engineering"
+    ],
+    "tags": [
+      "neurolink",
+      "mcp",
+      "model-context-protocol",
+      "transport",
+      "stdio",
+      "sse",
+      "websocket",
+      "http",
+      "oauth",
+      "circuit-breaker"
+    ],
+    "description": "A deep dive into building NeuroLink's MCP integration with 4 transport protocols, OAuth 2.1, circuit breakers, and rate limiting.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-maintenance-knowledge-base-manufacturing",
+    "filename": "2025-12-28-ai-maintenance-knowledge-base-manufacturing.md",
+    "title": "AI-Powered Maintenance Knowledge Base for Manufacturing",
+    "date": "2025-12-28 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Manufacturing"
+    ],
+    "tags": [
+      "manufacturing",
+      "maintenance",
+      "knowledge-base",
+      "rag",
+      "tool-calling",
+      "conversation-memory",
+      "neurolink"
+    ],
+    "description": "Build an AI maintenance knowledge base for manufacturing with NeuroLink. Combine RAG, tool calling for sensor data, and conversation memory.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "openrouter-integration-guide",
+    "filename": "2025-12-30-openrouter-integration-guide.md",
+    "title": "OpenRouter Integration Guide: Access 300+ AI Models with NeuroLink",
+    "date": "2025-12-30 10:00:00 +0530",
+    "categories": [
+      "Tutorials",
+      "Providers"
+    ],
+    "tags": [
+      "openrouter",
+      "providers",
+      "integration",
+      "api",
+      "models"
+    ],
+    "description": "Complete guide to integrating OpenRouter with NeuroLink SDK. Access Claude, GPT-4, Gemini, and 300+ models from dozens of providers through a single API.",
+    "hasMermaid": true,
+    "hasImage": true,
+    "existingImagePath": "/assets/img/og-openrouter-guide.png"
+  },
+  {
+    "slug": "rise-of-ai-engineering",
+    "filename": "2026-01-01-rise-of-ai-engineering.md",
+    "title": "The Rise of AI Engineering: Why Every Backend Developer Should Learn AI SDKs",
+    "date": "2026-01-01 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Industry"
+    ],
+    "tags": [
+      "ai-engineering",
+      "career",
+      "backend-development",
+      "developer-skills",
+      "ai-sdk",
+      "neurolink",
+      "industry-trends"
+    ],
+    "description": "AI engineering is the fastest-growing discipline. Learn why backend developers are perfectly positioned to become AI engineers.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "how-we-built-multi-provider-failover",
+    "filename": "2026-01-03-how-we-built-multi-provider-failover.md",
+    "title": "How We Built Multi-Provider Failover: Never Losing an API Call",
+    "date": "2026-01-03 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Engineering"
+    ],
+    "tags": [
+      "neurolink",
+      "failover",
+      "multi-provider",
+      "resilience",
+      "high-availability",
+      "production",
+      "bedrock",
+      "vertex"
+    ],
+    "description": "A deep dive into how NeuroLink built multi-provider failover across 13 AI providers with automatic fallback and response normalization.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "neurolink-2025-roadmap",
+    "filename": "2026-01-05-neurolink-2025-roadmap.md",
+    "title": "NeuroLink 2025: Year in Review and Future Directions",
+    "date": "2026-01-05 10:00:00 +0530",
+    "categories": [
+      "Announcement",
+      "Roadmap"
+    ],
+    "tags": [
+      "roadmap",
+      "2025",
+      "features",
+      "announcement",
+      "planning"
+    ],
+    "description": "A transparent look at what NeuroLink has shipped in 2025 and our thinking about potential future directions.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "cicd-for-ai-applications",
+    "filename": "2026-01-07-cicd-for-ai-applications.md",
+    "title": "CI/CD for AI Applications: Testing, Building, and Deploying with Confidence",
+    "date": "2026-01-07 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "DevOps"
+    ],
+    "tags": [
+      "cicd",
+      "testing",
+      "deployment",
+      "devops",
+      "github-actions",
+      "docker",
+      "neurolink"
+    ],
+    "description": "Set up CI/CD pipelines for AI applications built with NeuroLink. Unit testing, integration testing, evaluation gates, and deployment.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "extended-thinking",
+    "filename": "2026-01-09-extended-thinking.md",
+    "title": "Extended Thinking: Reasoning Modes with Gemini 3 and Claude",
+    "date": "2026-01-09 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Features"
+    ],
+    "tags": [
+      "extended-thinking",
+      "reasoning",
+      "gemini-3",
+      "claude",
+      "thinking-level",
+      "chain-of-thought",
+      "neurolink"
+    ],
+    "description": "Unlock advanced reasoning with NeuroLink's extended thinking support. Configure thinking levels for Gemini 3 and budget tokens for Claude.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "server-adapters",
+    "filename": "2026-01-12-server-adapters.md",
+    "title": "Server Adapters: Building AI APIs with Hono, Express, Fastify, or Koa",
+    "date": "2026-01-12 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "SDK"
+    ],
+    "tags": [
+      "server-adapters",
+      "hono",
+      "express",
+      "fastify",
+      "koa",
+      "openapi",
+      "api",
+      "http",
+      "streaming",
+      "sse",
+      "neurolink"
+    ],
+    "description": "Expose NeuroLink AI capabilities as production HTTP APIs using Hono, Express, Fastify, or Koa with CORS, rate limiting, and SSE streaming.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "openapi-generation",
+    "filename": "2026-01-14-openapi-generation.md",
+    "title": "OpenAPI Generation: Auto-Documenting Your AI API",
+    "date": "2026-01-14 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "API"
+    ],
+    "tags": [
+      "openapi",
+      "api-docs",
+      "swagger",
+      "rest-api",
+      "documentation",
+      "server",
+      "neurolink"
+    ],
+    "description": "Auto-generate OpenAPI 3.1 documentation for your NeuroLink AI API with route-based spec generation and Swagger UI integration.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "full-stack-ai-chatbot-nextjs-neurolink",
+    "filename": "2026-01-16-full-stack-ai-chatbot-nextjs-neurolink.md",
+    "title": "Building a Full-Stack AI Chatbot with Next.js and NeuroLink",
+    "date": "2026-01-16 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Full Stack"
+    ],
+    "tags": [
+      "nextjs",
+      "chatbot",
+      "full-stack",
+      "streaming",
+      "react",
+      "neurolink",
+      "ai-chatbot"
+    ],
+    "description": "Build a production AI chatbot with Next.js and NeuroLink. Streaming API routes, React chat UI, tool calling, and conversation memory.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-streaming-react-sse-websockets",
+    "filename": "2026-01-19-ai-streaming-react-sse-websockets.md",
+    "title": "AI Streaming in React: Server-Sent Events and WebSockets",
+    "date": "2026-01-19 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Frontend"
+    ],
+    "tags": [
+      "streaming",
+      "react",
+      "sse",
+      "websockets",
+      "server-sent-events",
+      "real-time",
+      "neurolink"
+    ],
+    "description": "Implement AI streaming in React using SSE and WebSockets. Complete tutorial comparing both approaches with NeuroLink SDK code examples.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "powerpoint-generation-ai",
+    "filename": "2026-01-21-powerpoint-generation-ai.md",
+    "title": "PowerPoint Generation with AI: From Text Prompt to Complete Presentation",
+    "date": "2026-01-21 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Documents"
+    ],
+    "tags": [
+      "ppt",
+      "powerpoint",
+      "presentation",
+      "slides",
+      "ai-generation",
+      "pptxgenjs",
+      "neurolink"
+    ],
+    "description": "Generate complete PowerPoint presentations from a text prompt using NeuroLink's AI pipeline. Content planning, AI image generation, 30+ slide types, and custom themes in TypeScript.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "embeddings-vector-operations",
+    "filename": "2026-01-23-embeddings-vector-operations.md",
+    "title": "Embeddings and Vector Operations with NeuroLink",
+    "date": "2026-01-23 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Embeddings"
+    ],
+    "tags": [
+      "embeddings",
+      "vectors",
+      "similarity-search",
+      "rag",
+      "semantic-search",
+      "neurolink"
+    ],
+    "description": "Generate embeddings, compute vector similarity, and build semantic search with NeuroLink's unified embedding API. Supports OpenAI, Google, and Vertex AI embedding models.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "vector-database-guide",
+    "filename": "2026-01-25-vector-database-guide.md",
+    "title": "Vector Database Guide: Pinecone vs Qdrant vs pgvector with NeuroLink",
+    "date": "2026-01-25 10:00:00 +0530",
+    "categories": [
+      "Comparison",
+      "Databases"
+    ],
+    "tags": [
+      "vector-database",
+      "pinecone",
+      "qdrant",
+      "pgvector",
+      "embeddings",
+      "rag",
+      "neurolink"
+    ],
+    "description": "Compare Pinecone, Qdrant, and pgvector for your RAG application. Hands-on TypeScript examples showing how to integrate each vector database with NeuroLink SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "voice-first-hotel-concierge",
+    "filename": "2026-01-27-voice-first-hotel-concierge.md",
+    "title": "Voice-First Hotel Concierge with Multi-Provider Routing",
+    "date": "2026-01-27 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Hospitality"
+    ],
+    "tags": [
+      "travel",
+      "hospitality",
+      "voice-ai",
+      "concierge",
+      "multi-provider",
+      "tool-calling",
+      "neurolink"
+    ],
+    "description": "Build a voice-first hotel concierge with NeuroLink's multi-provider routing, tool calling for bookings, and conversation memory for guest context. Complete TypeScript guide.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "image-generation-neurolink",
+    "filename": "2026-01-29-image-generation-neurolink.md",
+    "title": "Image Generation with NeuroLink: Gemini Imagen and Beyond",
+    "date": "2026-01-29 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Multimodal"
+    ],
+    "tags": [
+      "image-generation",
+      "gemini",
+      "imagen",
+      "multimodal",
+      "ai-images",
+      "neurolink"
+    ],
+    "description": "Generate images programmatically using NeuroLink's unified API backed by Gemini Imagen models. Control size, style, and build production image pipelines in TypeScript.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "batch-processing",
+    "filename": "2026-01-31-batch-processing.md",
+    "title": "Batch Processing: Thousands of AI Responses Efficiently",
+    "date": "2026-01-31 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "SDK"
+    ],
+    "tags": [
+      "batch-processing",
+      "concurrency",
+      "throughput",
+      "p-limit",
+      "parallel",
+      "neurolink"
+    ],
+    "description": "Process thousands of AI requests efficiently with NeuroLink's batch processing patterns. Concurrency control, error resilience, and throughput optimization for production workloads.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "video-generation-veo",
+    "filename": "2026-02-02-video-generation-veo.md",
+    "title": "Video Generation with Veo 3.1: AI-Powered Video Synthesis",
+    "date": "2026-02-02 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Multimodal"
+    ],
+    "tags": [
+      "video-generation",
+      "veo",
+      "multimodal",
+      "ai-video",
+      "vertex-ai",
+      "neurolink"
+    ],
+    "description": "Generate videos from text prompts using NeuroLink and Google Veo 3.1. Control duration, aspect ratio, and build automated video content pipelines in TypeScript.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "orchestrating-supply-chain-ai",
+    "filename": "2026-02-04-orchestrating-supply-chain-ai.md",
+    "title": "Orchestrating Supply Chain AI: Multi-Agent Logistics",
+    "date": "2026-02-04 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Logistics"
+    ],
+    "tags": [
+      "supply-chain",
+      "logistics",
+      "multi-agent",
+      "orchestration",
+      "tool-calling",
+      "evaluation",
+      "neurolink"
+    ],
+    "description": "Orchestrate supply chain AI with NeuroLink's multi-agent framework. Build agents for demand forecasting, inventory optimization, route planning, and supplier evaluation.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "eu-ai-act-compliance",
+    "filename": "2026-02-06-eu-ai-act-compliance.md",
+    "title": "EU AI Act Compliance: Building Regulation-Ready AI Applications",
+    "date": "2026-02-06 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Compliance"
+    ],
+    "tags": [
+      "eu-ai-act",
+      "compliance",
+      "regulation",
+      "governance",
+      "observability",
+      "audit",
+      "neurolink"
+    ],
+    "description": "Build EU AI Act compliant AI applications with TypeScript. Technical guide covering risk assessment, audit logging, human oversight, and transparency requirements with NeuroLink SDK.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "workflow-engine",
+    "filename": "2026-02-08-workflow-engine.md",
+    "title": "The Workflow Engine: Multi-Model Orchestration with Judge Scoring",
+    "date": "2026-02-08 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "SDK"
+    ],
+    "tags": [
+      "workflow-engine",
+      "multi-model",
+      "orchestration",
+      "judge-scoring",
+      "consensus",
+      "ensemble",
+      "neurolink"
+    ],
+    "description": "Deep dive into NeuroLink's workflow engine for multi-model orchestration. Ensemble, chain, and adaptive strategies with judge scoring and consensus mechanisms.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "multi-agent-networks",
+    "filename": "2026-02-10-multi-agent-networks.md",
+    "title": "Multi-Agent Networks: Orchestrating AI Teams with NeuroLink",
+    "date": "2026-02-10 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Agents"
+    ],
+    "tags": [
+      "multi-agent",
+      "orchestration",
+      "routing-agent",
+      "message-bus",
+      "agent-topologies",
+      "neurolink"
+    ],
+    "description": "Learn how to build multi-agent AI networks with NeuroLink -- topologies, routing, inter-agent communication, and production patterns.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "multi-model-consensus",
+    "filename": "2026-02-12-multi-model-consensus.md",
+    "title": "When One Model Isn't Enough: Multi-Model Consensus for High-Stakes Decisions",
+    "date": "2026-02-12 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Patterns"
+    ],
+    "tags": [
+      "multi-model",
+      "consensus",
+      "voting",
+      "high-stakes",
+      "ensemble",
+      "neurolink"
+    ],
+    "description": "Implement multi-model consensus patterns with NeuroLink for high-stakes AI decisions using voting strategies and disagreement analysis.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "generating-10k-descriptions-cost-optimized-pipelines",
+    "filename": "2026-02-14-generating-10k-descriptions-cost-optimized-pipelines.md",
+    "title": "Generating 10,000 Descriptions a Day: Cost-Optimized Content Pipelines",
+    "date": "2026-02-14 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Cost Optimization"
+    ],
+    "tags": [
+      "content-generation",
+      "cost-optimization",
+      "batch-processing",
+      "auto-evaluation",
+      "tiered-models",
+      "neurolink"
+    ],
+    "description": "Build a production content pipeline that generates 10K+ AI descriptions daily while keeping costs under control with NeuroLink.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "raw-data-to-reports-automating-bi-with-ai",
+    "filename": "2026-02-01-raw-data-to-reports-automating-bi-with-ai.md",
+    "title": "From Raw Data to Reports: Automating Business Intelligence with AI",
+    "date": "2026-02-01 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Business Intelligence"
+    ],
+    "tags": [
+      "business-intelligence",
+      "data-analysis",
+      "file-processing",
+      "rag",
+      "streaming",
+      "auto-evaluation",
+      "neurolink"
+    ],
+    "description": "Build an automated BI pipeline with NeuroLink that ingests raw data, generates AI-powered insights, and produces formatted reports.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "open-source-neurolink",
+    "filename": "2026-02-03-open-source-neurolink.md",
+    "title": "Open Source AI Infrastructure: Why We Open-Sourced NeuroLink",
+    "date": "2026-02-03 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Open Source"
+    ],
+    "tags": [
+      "open-source",
+      "neurolink",
+      "juspay",
+      "apache-2",
+      "community",
+      "ai-infrastructure",
+      "transparency"
+    ],
+    "description": "Why Juspay open-sourced NeuroLink, their production AI SDK serving millions of requests. Strategy, lessons, and community vision.",
+    "hasMermaid": false,
+    "hasImage": false
+  },
+  {
+    "slug": "ai-farm-advisory-agricultural-rag",
+    "filename": "2026-02-05-ai-farm-advisory-agricultural-rag.md",
+    "title": "AI Farm Advisory: Agricultural Knowledge Bases with RAG",
+    "date": "2026-02-05 10:00:00 +0530",
+    "categories": [
+      "Use Case",
+      "Agriculture"
+    ],
+    "tags": [
+      "agtech",
+      "agriculture",
+      "rag",
+      "knowledge-base",
+      "offline-ai",
+      "ollama",
+      "multi-provider",
+      "neurolink"
+    ],
+    "description": "Build an AI farm advisory system with NeuroLink using RAG, offline mode via Ollama, and safety guardrails for agronomic advice.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "version-migration-guide",
+    "filename": "2026-02-07-version-migration-guide.md",
+    "title": "Version Migration Guide: Upgrading Between NeuroLink Releases",
+    "date": "2026-02-07 10:00:00 +0530",
+    "categories": [
+      "Tutorial",
+      "Migration"
+    ],
+    "tags": [
+      "migration",
+      "upgrade",
+      "versioning",
+      "breaking-changes",
+      "neurolink",
+      "typescript"
+    ],
+    "description": "Step-by-step guide for upgrading between NeuroLink releases with before/after code examples and troubleshooting tips.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "community-showcase",
+    "filename": "2026-02-09-community-showcase.md",
+    "title": "Built with NeuroLink: Community Showcase",
+    "date": "2026-02-09 10:00:00 +0530",
+    "categories": [
+      "Community",
+      "Showcase"
+    ],
+    "tags": [
+      "neurolink",
+      "community",
+      "showcase",
+      "open-source",
+      "projects",
+      "integrations",
+      "developer-stories"
+    ],
+    "description": "Discover what developers are building with NeuroLink -- from production AI agents to creative experiments. A curated community showcase.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "v9-release-migration-guide",
+    "filename": "2026-02-11-v9-release-migration-guide.md",
+    "title": "NeuroLink v9.0 Release: What's New and Migration Guide",
+    "date": "2026-02-11 10:00:00 +0530",
+    "categories": [
+      "Announcement",
+      "Release"
+    ],
+    "tags": [
+      "neurolink",
+      "v9",
+      "release",
+      "migration",
+      "breaking-changes",
+      "modular-architecture",
+      "rag-pipeline",
+      "mcp"
+    ],
+    "description": "NeuroLink v9.0 brings modular architecture, RAG pipeline orchestration, and 4 MCP transports. Complete migration guide included.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "how-we-scaled-provider-registry",
+    "filename": "2026-02-13-how-we-scaled-provider-registry.md",
+    "title": "How We Scaled to 13 Providers: The Provider Registry Story",
+    "date": "2026-02-13 10:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Engineering"
+    ],
+    "tags": [
+      "neurolink",
+      "providers",
+      "registry",
+      "factory-pattern",
+      "scaling",
+      "architecture",
+      "open-closed-principle"
+    ],
+    "description": "A deep dive into how NeuroLink scaled from 2 providers to 13 without a single switch statement. Registry/factory pattern, lazy loading, and the Open-Closed Principle.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "contributor-to-maintainer",
+    "filename": "2026-02-14-contributor-to-maintainer.md",
+    "title": "From Contributor to Maintainer: My Journey with NeuroLink",
+    "date": "2026-02-14 10:00:00 +0530",
+    "categories": [
+      "Thought Leadership",
+      "Community"
+    ],
+    "tags": [
+      "neurolink",
+      "open-source",
+      "contributor",
+      "maintainer",
+      "community",
+      "career",
+      "developer-experience"
+    ],
+    "description": "A first-person narrative of going from a first issue to NeuroLink maintainer. Lessons on open-source contribution, code review culture, and growing as an engineer.",
+    "hasMermaid": true,
+    "hasImage": false
+  },
+  {
+    "slug": "neurolink-docusaurus",
+    "filename": "2026-02-14-neurolink-docusaurus.md",
+    "title": "NeuroLink + Docusaurus: How We Document an AI SDK",
+    "date": "2026-02-14 14:00:00 +0530",
+    "categories": [
+      "Deep Dive",
+      "Documentation"
+    ],
+    "tags": [
+      "neurolink",
+      "docusaurus",
+      "documentation",
+      "developer-experience",
+      "api-reference",
+      "jsdoc",
+      "typedoc",
+      "open-source"
+    ],
+    "description": "How NeuroLink uses Docusaurus to document a 13-provider AI SDK with 200+ exports. API reference generation, versioning, and developer experience.",
+    "hasMermaid": true,
+    "hasImage": false
+  }
+]

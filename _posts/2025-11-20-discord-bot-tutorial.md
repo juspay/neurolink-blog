@@ -1,24 +1,33 @@
 ---
 layout: post
-title: "Building AI Discord Bots with NeuroLink"
-description: "Build intelligent Discord bots with NeuroLink. Slash commands, conversations, and server automation."
-date: 2025-11-20 10:00:00 +0530
-last_updated: 2026-01-15
-categories: [Tutorial, Integration]
-tags: [discord, bot, chatbot, community, automation]
+title: Building AI Discord Bots with NeuroLink
+description: >-
+  Build intelligent Discord bots with NeuroLink. Slash commands, conversations,
+  and server automation.
+date: '2025-11-20 10:00:00 +0530'
+last_updated: 2026-01-15T00:00:00.000Z
+categories:
+  - Tutorial
+  - Integration
+tags:
+  - discord
+  - bot
+  - chatbot
+  - community
+  - automation
 author: neurolink
 toc: true
-mermaid: true
+mermaid: false
 pin: false
+image:
+  path: /assets/img/posts/discord-bot-tutorial/hero.png
+  alt: Building AI Discord Bots with NeuroLink
 ---
 
-# Building AI Discord Bots with NeuroLink
+You will build a fully-featured AI Discord bot using Discord.js and NeuroLink's generation API. By the end of this tutorial, you will have slash commands, multi-turn conversations, AI-powered moderation, and production deployment -- all using NeuroLink as the AI backend.
 
-Discord has evolved from a gaming communication platform into a thriving ecosystem for communities of all kinds. With over 150 million monthly active users, Discord servers have become hubs for developers, creators, businesses, and enthusiasts. Adding an intelligent AI bot to your server can transform user engagement, automate moderation, provide instant support, and create unique interactive experiences.
-
-In this comprehensive tutorial, we'll walk through building a fully-featured AI Discord bot powered by NeuroLink. You'll learn how to set up Discord.js, implement slash commands, integrate NeuroLink's AI capabilities, handle multi-turn conversations, and deploy your bot to production.
-
-> **Note**: This tutorial demonstrates a custom integration pattern using NeuroLink's API with Discord.js. This is not a built-in NeuroLink feature - you'll be building your own bot infrastructure that leverages NeuroLink for AI capabilities.
+> **Tip:** This tutorial builds a custom Discord bot from scratch. NeuroLink does not provide a built-in Discord integration -- you will build the bot infrastructure yourself using Discord.js, with NeuroLink handling AI generation.
+{: .prompt-tip }
 
 ## External Dependencies
 
@@ -31,6 +40,7 @@ npm install -D typescript @types/node ts-node nodemon
 ```
 
 **Required Packages:**
+
 - `@juspay/neurolink` - NeuroLink SDK for AI generation
 - `discord.js` (v14.x) - Discord's official JavaScript library
 - `dotenv` - Environment variable management
@@ -65,7 +75,7 @@ First, we need to create a Discord application and bot user through the Discord 
 
 Under the Bot section, configure these essential settings:
 
-```
+```text
 Privileged Gateway Intents:
 - MESSAGE CONTENT INTENT: Enabled (required for reading messages)
 - SERVER MEMBERS INTENT: Enabled (if tracking member events)
@@ -129,7 +139,7 @@ Update your `tsconfig.json`:
 
 Organize your project with a clean structure:
 
-```
+```text
 neurolink-discord-bot/
 ├── src/
 │   ├── index.ts           # Main entry point
@@ -962,6 +972,7 @@ services:
 ### Cloud Deployment Options
 
 **Railway:**
+
 ```bash
 railway login
 railway init
@@ -969,6 +980,7 @@ railway up
 ```
 
 **Fly.io:**
+
 ```bash
 fly launch
 fly secrets set DISCORD_TOKEN=xxx NEUROLINK_API_KEY=xxx
@@ -976,6 +988,7 @@ fly deploy
 ```
 
 **DigitalOcean App Platform:**
+
 1. Connect your GitHub repository
 2. Set environment variables in the dashboard
 3. Deploy with automatic scaling
@@ -1044,19 +1057,15 @@ test().catch(console.error);
 
 Run with: `npx ts-node src/test.ts`
 
-## Conclusion
+## What You Built
 
-You've now built a fully-featured AI Discord bot powered by NeuroLink! Your bot can handle one-off questions, maintain conversation context, summarize channel discussions, and respond to mentions.
+You built an AI Discord bot with slash commands, multi-turn conversations, thread summarization, and mention responses using Discord.js and NeuroLink's generation API. The bot handles natural language queries, maintains conversation context per thread, and provides AI-powered moderation and analysis.
 
-From here, you can extend your bot with additional features:
+Continue with these related tutorials:
 
-- **Moderation capabilities** - Use AI to detect inappropriate content
-- **Custom personalities** - Create different bot personas per channel
-- **Knowledge bases** - Integrate with NeuroLink's RAG features for server-specific information
-- **Image generation** - Add commands for AI image creation
-- **Voice integration** - Use text-to-speech in voice channels
-
-The combination of Discord.js and NeuroLink opens up endless possibilities for creating engaging, intelligent community experiences. Happy building!
+- [Building a Slack Bot with AI](/posts/building-slack-bot-with-ai/) for similar patterns on a different platform
+- [MCP Server Tutorial](/posts/mcp-server-tutorial/) for exposing your bot's capabilities as reusable AI tools
+- Speech-to-Text with NeuroLink for adding voice capabilities to voice channels
 
 ## Resources
 
@@ -1068,3 +1077,11 @@ The combination of Discord.js and NeuroLink opens up endless possibilities for c
 ---
 
 *Have questions about building Discord bots with NeuroLink? Join our [Discord community](https://discord.gg/neurolink) or reach out on [Twitter](https://twitter.com/neurolink).*
+
+---
+
+**Related posts:**
+
+- [Building AI Slack Bots with NeuroLink](/posts/slack-bot-tutorial/)
+- [Building a Slack Bot with AI: Complete Guide](/posts/building-slack-bot-with-ai/)
+- [Function Calling: AI Tool Use Patterns with NeuroLink](/posts/function-calling-patterns/)

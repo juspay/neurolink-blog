@@ -1,0 +1,274 @@
+<!-- JS selector for site. (Local override of Chirpy gem to inject NeuroLink mermaid theme) -->
+
+<!-- commons -->
+
+{% assign urls = site.data.origin[type].search.js %}
+
+<!-- layout specified -->
+
+{% if page.layout == 'post' or page.layout == 'page' or page.layout == 'home' %}
+  {% assign urls = urls | append: ',' | append: site.data.origin[type]['lazy-polyfill'].js %}
+
+  {% unless page.layout == 'home' %}
+    <!-- image lazy-loading & popup & clipboard -->
+    {% assign urls = urls
+      | append: ','
+      | append: site.data.origin[type].glightbox.js
+      | append: ','
+      | append: site.data.origin[type].clipboard.js
+    %}
+  {% endunless %}
+{% endif %}
+
+{% if page.layout == 'home'
+  or page.layout == 'post'
+  or page.layout == 'archives'
+  or page.layout == 'category'
+  or page.layout == 'tag'
+%}
+  {% assign locale = include.lang | split: '-' | first %}
+
+  {% assign urls = urls
+    | append: ','
+    | append: site.data.origin[type].dayjs.js.common
+    | append: ','
+    | append: site.data.origin[type].dayjs.js.locale
+    | replace: ':LOCALE', locale
+    | append: ','
+    | append: site.data.origin[type].dayjs.js.relativeTime
+    | append: ','
+    | append: site.data.origin[type].dayjs.js.localizedFormat
+  %}
+{% endif %}
+
+{% assign has_headings = false %}
+{% if page.content contains '<h2' %}{% assign has_headings = true %}{% endif %}
+{% if page.content contains '<h3' %}{% assign has_headings = true %}{% endif %}
+{% if has_headings and site.toc and page.toc %}
+  {% assign urls = urls | append: ',' | append: site.data.origin[type].toc.js %}
+{% endif %}
+
+{% if page.mermaid %}
+  {% assign urls = urls | append: ',' | append: site.data.origin[type].mermaid.js %}
+{% endif %}
+
+{% include jsdelivr-combine.html urls=urls %}
+
+{% if page.mermaid %}
+<!-- NeuroLink branded mermaid theme.
+     This inline script runs synchronously during HTML parsing, BEFORE any
+     deferred scripts execute.
+
+     Problem:  Mermaid v11 exports a frozen API object (Object.freeze), so we
+               cannot overwrite mermaid.initialize() in place.
+     Solution: We use Object.defineProperty to intercept when the mermaid CDN
+               sets globalThis.mermaid.  In our setter we create a thin wrapper
+               object that delegates every property to the real (frozen) mermaid
+               object, except 'initialize' which we replace with a version that
+               forces our brand theme config.  We then store the wrapper — not
+               the frozen original — as window.mermaid.
+
+     Execution order (all scripts in <head>):
+       1. This inline <script> — sets up the property trap (sync, immediate)
+       2. jsdelivr combined bundle (defer) — mermaid CDN sets globalThis.mermaid
+          -> our setter fires, wraps the frozen object, stores wrapper
+       3. post.min.js / page.min.js (defer) — calls mermaid.initialize({theme:…})
+          -> hits our wrapper, which injects brand themeVariables
+       4. On dark/light toggle, Chirpy re-calls mermaid.initialize()
+          -> again intercepted by the wrapper -->
+<script>
+(function () {
+  var BRAND_THEME = {
+    theme: 'base',
+    themeVariables: {
+      /* Canvas */
+      background: '#151515',
+      fontFamily: '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontSize: '14px',
+
+      /* Core palette */
+      primaryColor: '#016fb9',
+      secondaryColor: '#ff9505',
+      tertiaryColor: '#1a2332',
+
+      /* Text */
+      primaryTextColor: '#e5e5e5',
+      secondaryTextColor: '#e5e5e5',
+      tertiaryTextColor: '#e5e5e5',
+      textColor: '#e5e5e5',
+      nodeTextColor: '#ffffff',
+
+      /* Borders */
+      primaryBorderColor: '#016fb9',
+      secondaryBorderColor: '#ff9505',
+      tertiaryBorderColor: '#3d3d3d',
+      nodeBorder: '#016fb9',
+      border1: '#016fb9',
+      border2: '#ff9505',
+
+      /* Backgrounds */
+      mainBkg: '#016fb9',
+      secondBkg: '#ff9505',
+
+      /* Lines and edges */
+      lineColor: '#4db5e8',
+      arrowheadColor: '#4db5e8',
+      edgeLabelBackground: '#151515',
+
+      /* Notes */
+      noteBkgColor: '#1a2332',
+      noteTextColor: '#e5e5e5',
+      noteBorderColor: '#016fb9',
+
+      /* Clusters / subgraphs */
+      clusterBkg: '#111111',
+      clusterBorder: '#3d3d3d',
+
+      /* Sequence diagrams */
+      actorBkg: '#016fb9',
+      actorTextColor: '#ffffff',
+      actorBorder: '#016fb9',
+      actorLineColor: '#4db5e8',
+      signalColor: '#e5e5e5',
+      labelBoxBkgColor: '#151515',
+      labelBoxBorderColor: '#016fb9',
+      labelTextColor: '#e5e5e5',
+      loopTextColor: '#e5e5e5',
+      activationBkgColor: '#1a2332',
+      activationBorderColor: '#016fb9',
+      sequenceNumberColor: '#ffffff',
+      labelColor: '#e5e5e5',
+      altBackground: '#111111',
+
+      /* Class diagrams */
+      classText: '#e5e5e5',
+
+      /* Git graphs */
+      git0: '#016fb9', git1: '#ff9505', git2: '#ec4e20', git3: '#22c55e',
+      git4: '#4db5e8', git5: '#c084fc', git6: '#f87171', git7: '#facc15',
+      gitBranchLabel0: '#ffffff', gitBranchLabel1: '#ffffff',
+      gitBranchLabel2: '#ffffff', gitBranchLabel3: '#ffffff',
+      gitInv0: '#151515',
+
+      /* Pie charts */
+      pie1: '#016fb9', pie2: '#ff9505', pie3: '#ec4e20', pie4: '#22c55e',
+      pie5: '#4db5e8', pie6: '#c084fc', pie7: '#f87171', pie8: '#facc15',
+      pieTitleTextColor: '#e5e5e5',
+      pieSectionTextColor: '#ffffff',
+      pieLegendTextColor: '#e5e5e5',
+      pieSectionTextSize: '14px',
+      pieStrokeColor: '#151515',
+      pieStrokeWidth: '2px',
+      pieOuterStrokeColor: '#151515',
+      pieOuterStrokeWidth: '2px',
+      pieOpacity: '1',
+
+      /* Journey / timeline color scale */
+      cScale0: '#016fb9', cScale1: '#ff9505', cScale2: '#ec4e20',
+      cScale3: '#22c55e', cScale4: '#4db5e8', cScale5: '#c084fc',
+
+      /* ER diagrams */
+      entityBorder: '#016fb9',
+      entityBkg: '#1a2332',
+      entityTextColor: '#e5e5e5',
+
+      /* Requirement diagrams */
+      requirementBackground: '#1a2332',
+      requirementBorderColor: '#016fb9',
+      requirementTextColor: '#e5e5e5',
+      relationColor: '#4db5e8',
+      relationLabelColor: '#e5e5e5'
+    }
+  };
+
+  /**
+   * Build a wrapper object around the (frozen) mermaid API.
+   * All properties delegate to the original except 'initialize',
+   * which is replaced with a function that forces BRAND_THEME.
+   */
+  function createBrandedWrapper(original) {
+    var wrapper = {};
+    var keys = Object.getOwnPropertyNames(original);
+    for (var i = 0; i < keys.length; i++) {
+      (function (key) {
+        if (key === 'initialize') {
+          wrapper.initialize = function (conf) {
+            var merged = {};
+            if (conf) {
+              var ck = Object.keys(conf);
+              for (var j = 0; j < ck.length; j++) merged[ck[j]] = conf[ck[j]];
+            }
+            var isDark = document.documentElement.getAttribute('data-mode') !== 'light';
+            if (isDark) {
+              merged.theme = BRAND_THEME.theme;
+              merged.themeVariables = BRAND_THEME.themeVariables;
+            } else {
+              merged.theme = 'default';
+            }
+            return original.initialize(merged);
+          };
+        } else {
+          Object.defineProperty(wrapper, key, {
+            configurable: true,
+            enumerable: true,
+            get: function () { return original[key]; }
+          });
+        }
+      })(keys[i]);
+    }
+    /* Preserve identity checks that Chirpy may do */
+    wrapper.__nlBranded = true;
+    return wrapper;
+  }
+
+  /* Intercept the assignment of globalThis.mermaid by the CDN script. */
+  var _store;
+  Object.defineProperty(window, 'mermaid', {
+    configurable: true,
+    enumerable: true,
+    get: function () { return _store; },
+    set: function (val) {
+      if (val && typeof val.initialize === 'function' && !val.__nlBranded) {
+        _store = createBrandedWrapper(val);
+      } else {
+        _store = val;
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+
+{% case page.layout %}
+  {% when 'home', 'categories', 'post', 'page' %}
+    {% assign js = page.layout %}
+  {% when 'archives', 'category', 'tag' %}
+    {% assign js = 'misc' %}
+  {% else %}
+    {% assign js = 'commons' %}
+{% endcase %}
+
+{% capture script %}/assets/js/dist/{{ js }}.min.js{% endcapture %}
+
+<script defer src="{{ script | relative_url }}"></script>
+
+{% if page.math %}
+  <!-- MathJax -->
+  <script src="{{ '/assets/js/data/mathjax.js' | relative_url }}"></script>
+  <script async src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="{{ site.data.origin[type].mathjax.js | relative_url }}"></script>
+{% endif %}
+
+<!-- Pageviews -->
+{% if page.layout == 'post' %}
+  {% assign provider = site.pageviews.provider %}
+
+  {% if provider and provider != empty %}
+    {% case provider %}
+      {% when 'goatcounter' %}
+        {% if site.analytics[provider].id != empty and site.analytics[provider].id %}
+          {% include pageviews/{{ provider }}.html %}
+        {% endif %}
+    {% endcase %}
+  {% endif %}
+{% endif %}

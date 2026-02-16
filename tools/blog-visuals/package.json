@@ -1,0 +1,36 @@
+{
+  "name": "blog-visuals",
+  "version": "1.0.0",
+  "description": "Remotion-based visual content generation for NeuroLink blog",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render:hero": "ts-node scripts/render-heroes.ts",
+    "render:gifs": "ts-node scripts/render-gifs.ts",
+    "generate:manifest": "ts-node scripts/generate-manifest.ts",
+    "generate:prompts": "ts-node scripts/generate-hero-prompts.ts",
+    "update:frontmatter": "ts-node scripts/update-frontmatter.ts",
+    "rewrite:tones": "ts-node scripts/rewrite-tones.ts",
+    "pipeline": "ts-node scripts/run-pipeline.ts"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.0",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/gif": "^4.0.0",
+    "@remotion/layout-utils": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
+    "canvas": "^3.2.1",
+    "gif-encoder-2": "^1.0.5",
+    "gray-matter": "^4.0.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  }
+}

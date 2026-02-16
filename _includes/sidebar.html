@@ -7,7 +7,7 @@
         {%- capture avatar_url -%}
           {% include media-url.html src=site.avatar %}
         {%- endcapture -%}
-        <img src="{{- avatar_url -}}" width="112" height="112" alt="avatar" onerror="this.style.display='none'">
+        <img src="{{- avatar_url -}}" width="112" height="112" alt="{{ site.title }} logo" onerror="this.style.display='none'">
       {%- endif -%}
     </a>
 
@@ -23,7 +23,7 @@
       <!-- home -->
       <li class="nav-item{% if page.layout == 'home' %}{{ " active" }}{% endif %}">
         <a href="{{ '/' | relative_url }}" class="nav-link">
-          <i class="fa-fw fas fa-home"></i>
+          <i class="fa-fw fas fa-home" aria-hidden="true"></i>
           <span>{{ site.data.locales[include.lang].tabs.home | upcase }}</span>
         </a>
       </li>
@@ -31,7 +31,7 @@
       {% for tab in site.tabs %}
         <li class="nav-item{% if tab.url == page.url %}{{ " active" }}{% endif %}">
           <a href="{{ tab.url | relative_url }}" class="nav-link">
-            <i class="fa-fw {{ tab.icon }}"></i>
+            <i class="fa-fw {{ tab.icon }}" aria-hidden="true"></i>
             {% capture tab_name %}{{ tab.url | split: '/' }}{% endcapture %}
 
             <span>{{ site.data.locales[include.lang].tabs.[tab_name] | default: tab.title | upcase }}</span>
@@ -49,8 +49,8 @@
         <span class="cross-site-label{% unless forloop.first %} mt-2{% endunless %}">{{ group.group }}</span>
       {% endif %}
       {% for link in group.links %}
-        <a href="{{ link.url }}" class="nav-link{% unless group.group %} mt-2{% endunless %}" target="_blank" rel="noopener">
-          <i class="{{ link.icon }} me-1"></i> {{ link.label }}
+        <a href="{{ link.url }}" class="nav-link{% unless group.group %} mt-2{% endunless %}" target="_blank" rel="noopener" aria-label="{{ link.label }} (opens in new tab)">
+          <i class="{{ link.icon }} me-1" aria-hidden="true"></i> {{ link.label }}
         </a>
       {% endfor %}
     {% endfor %}
@@ -58,8 +58,8 @@
 
   <div class="sidebar-bottom d-flex flex-wrap align-items-center w-100">
     {% unless site.theme_mode %}
-      <button type="button" class="btn btn-link nav-link" aria-label="Switch Mode" id="mode-toggle">
-        <i class="fas fa-adjust"></i>
+      <button type="button" class="btn btn-link nav-link" aria-label="Switch between dark and light mode" id="mode-toggle">
+        <i class="fas fa-adjust" aria-hidden="true"></i>
       </button>
 
       {% if site.data.contact.size > 0 %}
@@ -95,7 +95,7 @@
       {% if url %}
         <a
           href="{{ url }}"
-          aria-label="{{ entry.type }}"
+          aria-label="{{ entry.type | capitalize }}{% unless entry.noblank %} (opens in new tab){% endunless %}"
           {% assign link_types = '' %}
 
           {% unless entry.noblank %}
@@ -111,7 +111,7 @@
             rel="{{ link_types }}"
           {% endunless %}
         >
-          <i class="{{ entry.icon }}"></i>
+          <i class="{{ entry.icon }}" aria-hidden="true"></i>
         </a>
       {% endif %}
     {% endfor %}

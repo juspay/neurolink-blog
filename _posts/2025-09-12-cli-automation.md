@@ -1,21 +1,31 @@
 ---
 layout: post
-title: "CLI Automation: Scripting with NeuroLink"
-description: "Automate tasks with NeuroLink CLI. Shell scripts, pipelines, Node.js integration, and developer workflows."
-date: 2025-09-12 10:00:00 +0530
-categories: [Tutorial, CLI]
-tags: [cli, automation, scripting, shell, workflows]
+title: 'CLI Automation: Scripting with NeuroLink'
+description: >-
+  Automate tasks with NeuroLink CLI. Shell scripts, pipelines, Node.js
+  integration, and developer workflows.
+date: '2025-09-12 10:00:00 +0530'
+categories:
+  - Tutorial
+  - CLI
+tags:
+  - cli
+  - automation
+  - scripting
+  - shell
+  - workflows
 author: neurolink
 toc: true
 mermaid: true
 pin: false
+image:
+  path: /assets/img/posts/cli-automation/hero.png
+  alt: 'CLI Automation: Scripting with NeuroLink'
 ---
 
-# CLI Automation: Scripting with NeuroLink
+You will automate AI tasks directly from the command line using NeuroLink's CLI. By the end of this tutorial, you will have shell scripts that generate code reviews, CI/CD pipelines that run AI analysis on every PR, and Node.js automation scripts with structured output.
 
-The NeuroLink CLI provides powerful AI generation capabilities directly from the command line. Whether you're building automated pipelines, integrating AI into shell scripts, or creating Node.js automation tools, mastering CLI automation with NeuroLink transforms how you work with AI.
-
-This comprehensive tutorial covers real CLI commands, practical shell scripts, and programmatic SDK integration for building robust automation workflows.
+This tutorial covers CLI commands, shell integration, Node.js SDK usage, and CI/CD workflows.
 
 ## CLI Automation Architecture
 
@@ -60,7 +70,7 @@ flowchart TB
 
 ## Getting Started with NeuroLink CLI
 
-The NeuroLink CLI is included with the `@juspay/neurolink` package and provides direct access to AI generation without writing code.
+Start by installing the NeuroLink CLI, which is included with the `@juspay/neurolink` package.
 
 ### Installation
 
@@ -81,7 +91,6 @@ npm install @juspay/neurolink
 Before using the CLI, set up at least one AI provider:
 
 ```bash
-# Interactive setup wizard
 neurolink setup
 
 # Setup specific provider (positional argument)
@@ -104,7 +113,7 @@ The setup wizard guides you through configuring API keys and environment variabl
 
 ## Essential CLI Commands
 
-NeuroLink CLI provides three core commands for AI generation.
+You will use three core commands for AI generation.
 
 ### Generate Command
 
@@ -156,7 +165,7 @@ These options work with `generate` and `stream` commands:
 |--------|-------|-------------|---------|
 | `--provider` | `-p` | AI provider (auto, openai, anthropic, vertex, etc.) | auto |
 | `--model` | `-m` | Specific model to use | provider default |
-| `--temperature` | `-t` | Creativity level (0.0-1.0) | 0.7 |
+| `--temperature` | `-t` | Creativity level (0.0-2.0) | 0.7 |
 | `--maxTokens` | `--max` | Maximum tokens to generate | 1000 |
 | `--system` | `-s` | System prompt for context | none |
 | `--output` | `-o` | Output file path | stdout |
@@ -190,9 +199,9 @@ neurolink gen "Describe what happens in this video" --video clip.mp4
 neurolink gen "Analyze video" --video demo.mp4 --video-frames 16 --video-quality 90
 ```
 
-## Shell Integration and Piping
+## Shell integration and Piping
 
-NeuroLink CLI integrates seamlessly with Unix shell commands.
+Next, you will pipe data in and out of the CLI using standard Unix patterns.
 
 ### Input from Stdin
 
@@ -229,7 +238,7 @@ neurolink gen "Write a React component" | prettier --parser typescript
 neurolink stream "Write documentation" | tee docs.md
 ```
 
-## Creating Automation Scripts
+## Creating automation scripts
 
 ### Daily Analysis Script
 
@@ -332,7 +341,7 @@ esac
 
 ## Node.js SDK Integration
 
-For more control, use the NeuroLink SDK directly in Node.js scripts.
+For programmatic control, you will use the NeuroLink SDK directly in Node.js scripts.
 
 ### Basic SDK Usage
 
@@ -384,7 +393,6 @@ console.log('\n\nStream complete!');
 console.log(`Provider: ${result.provider}`);
 ```
 
-
 ### Multimodal Analysis Script
 
 > **Important Note**: The CSV and multimodal examples below demonstrate conceptual patterns. Before implementing these features in production, please verify the exact API interfaces, parameter names, and supported options against the current [NeuroLink SDK documentation](https://juspay.in/neurolink) and [test examples](https://github.com/juspay/neurolink/tree/main/tests). Feature availability and implementation details may vary by provider and SDK version.
@@ -426,7 +434,7 @@ const imageAnalysis = await analyzeImage(
 console.log('Image Analysis:', imageAnalysis);
 ```
 
-> **Note:** For complete CSV processing examples with verified APIs, see the [Multimodal Document Processing Guide](./multimodal-document-processing.md) or refer to the [NeuroLink test examples](https://github.com/juspay/neurolink/tree/main/tests).
+> **Note:** For complete CSV processing examples with verified APIs, refer to the [NeuroLink test examples](https://github.com/juspay/neurolink/tree/main/tests).
 
 ## CI/CD Integration
 
@@ -485,6 +493,7 @@ jobs:
       - name: Install NeuroLink
         run: npm install -g @juspay/neurolink
 
+{% raw %}
       - name: Get changed files
         id: changed
         run: |
@@ -500,6 +509,7 @@ jobs:
           echo "" >> review.md
 
           echo "${{ steps.changed.outputs.files }}" | tr ' ' '\n' | while read file; do
+{% endraw %}
             if [ -f "$file" ]; then
               echo "## $file" >> review.md
               cat "$file" | neurolink gen "Review this code for bugs, security issues, and improvements. Be concise." --quiet >> review.md
@@ -575,7 +585,7 @@ neurolink-report:
     - merge_requests
 ```
 
-## Shell Aliases
+## Shell aliases
 
 Add these to your `.bashrc` or `.zshrc`:
 
@@ -637,7 +647,7 @@ nlpr() {
 }
 ```
 
-## Environment Variables
+## Environment variables
 
 Configure NeuroLink behavior with environment variables:
 
@@ -677,7 +687,7 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    redis: { url: 'redis://localhost:6379' }
+    redisConfig: { host: 'localhost', port: 6379 }
   }
 });
 
@@ -772,7 +782,7 @@ if (result.toolCalls) {
 }
 ```
 
-## Best Practices
+## Best practices
 
 ### Error Handling
 
@@ -858,23 +868,27 @@ try {
 }
 ```
 
-## Conclusion
+## What you built
 
-NeuroLink's CLI and SDK provide flexible options for AI automation:
+You now have a complete CLI automation toolkit:
 
 - **CLI commands** (`generate`, `stream`) for shell scripting
 - **Shell integration** with stdin/stdout piping for batch processing
-- **Node.js SDK** for programmatic control and batch operations
-- **CI/CD integration** for automated workflows
+- **Node.js SDK** for programmatic control and structured output
+- **CI/CD integration** for automated code review on every PR
 
-Start with simple CLI commands and gradually build more sophisticated automation as your needs evolve. The combination of shell scripts for orchestration and the SDK for complex logic provides the flexibility to handle any automation challenge.
-
----
-
-*Ready to automate? Install NeuroLink and start building powerful AI workflows today:*
+Start with the CLI commands, then add SDK scripts as your automation needs grow. Install NeuroLink and try it now:
 
 ```bash
 npm install -g @juspay/neurolink
 neurolink setup
 neurolink generate "Hello, AI automation!"
 ```
+
+---
+
+**Related posts:**
+
+- [NeuroLink CLI Mastery: 15 Commands Every AI Developer Should Know](/posts/neurolink-cli-mastery/)
+- [Testing AI Applications: A Complete Guide](/posts/testing-ai-applications/)
+- [Performance Benchmarking Guide for NeuroLink](/posts/performance-benchmarks/)

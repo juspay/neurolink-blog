@@ -1,21 +1,31 @@
 ---
 layout: post
-title: "Running Local LLMs with NeuroLink and Ollama"
-date: 2025-07-12 10:00:00 +0530
-categories: [Tutorial, Local-AI]
-tags: [ollama, local-llm, privacy, llama, mistral]
+title: Running Local LLMs with NeuroLink and Ollama
+date: '2025-07-12 10:00:00 +0530'
+categories:
+  - Tutorial
+  - Local-AI
+tags:
+  - ollama
+  - local-llm
+  - privacy
+  - llama
+  - mistral
 author: neurolink
-description: "Complete guide to running local LLMs with Ollama and NeuroLink. Privacy-first AI development."
+description: >-
+  Complete guide to running local LLMs with Ollama and NeuroLink. Privacy-first
+  AI development.
 toc: true
 mermaid: true
 pin: false
+image:
+  path: /assets/img/posts/ollama-local-llm-guide/hero.png
+  alt: Running Local LLMs with NeuroLink and Ollama
 ---
 
-# Running Local LLMs with NeuroLink and Ollama
+By the end of this guide, you'll have local LLMs running on your own machine with Ollama, integrated into NeuroLink for zero-cost, zero-latency, privacy-first AI development.
 
-The rise of capable open-source language models has fundamentally changed how developers approach AI integration. No longer are you locked into cloud-only solutions with their associated costs, latency, and privacy concerns. With tools like Ollama and NeuroLink working together, you can run powerful LLMs entirely on your own hardware while maintaining the flexibility to scale to cloud providers when needed.
-
-This comprehensive guide walks you through everything you need to know about setting up local LLM infrastructure with Ollama and integrating it seamlessly with NeuroLink for production-ready AI applications.
+You will install Ollama, pull models, configure NeuroLink's Ollama provider, and build hybrid architectures that use local models for development and sensitive workloads while scaling to cloud providers for production. No API keys required -- everything runs on your hardware.
 
 ## Architecture Overview
 
@@ -29,7 +39,7 @@ flowchart TB
 
     subgraph Local["Local Infrastructure"]
         Ollama[Ollama Server]
-        Models[(Local Models)]
+        Models[("Local Models")]
         Ollama --> Models
     end
 
@@ -114,16 +124,19 @@ Let's walk through the complete Ollama setup process across different platforms.
 ### Installation
 
 **macOS (Homebrew)**:
+
 ```bash
 brew install ollama
 ```
 
 **macOS (Direct Download)**:
+
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 **Linux**:
+
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ```
@@ -132,6 +145,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 Download the installer from [ollama.com/download](https://ollama.com/download) and run the setup wizard.
 
 **Docker**:
+
 ```bash
 docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 ```
@@ -147,7 +161,6 @@ ollama serve
 On macOS and Windows, Ollama typically runs as a background service automatically. On Linux, you may want to configure it as a systemd service:
 
 ```ini
-# /etc/systemd/system/ollama.service
 [Unit]
 Description=Ollama Service
 After=network-online.target
@@ -164,6 +177,7 @@ WantedBy=default.target
 ```
 
 Enable and start the service:
+
 ```bash
 sudo systemctl enable ollama
 sudo systemctl start ollama
@@ -185,11 +199,13 @@ ollama pull codellama:latest
 ```
 
 Verify the model is available:
+
 ```bash
 ollama list
 ```
 
 Test it with a quick prompt:
+
 ```bash
 ollama run llama3.1:latest "Explain quantum computing in simple terms"
 ```
@@ -288,18 +304,21 @@ Choosing the right model for your use case is crucial for balancing capability w
 ### General Purpose Models
 
 **Llama 3.1 8B** (4.7GB)
+
 - Best for: General chat, summarization, simple reasoning
 - VRAM: 8GB minimum
 - Speed: Fast, suitable for interactive applications
 - Quality: Excellent for its size
 
 **Llama 3.1 70B** (40GB)
+
 - Best for: Complex reasoning, nuanced tasks, near-GPT-4 quality
 - VRAM: 48GB+ (or CPU with 64GB+ RAM)
 - Speed: Slower, better for batch processing
 - Quality: State-of-the-art open source
 
 **Mistral 7B** (4.1GB)
+
 - Best for: Quick tasks, high throughput requirements
 - VRAM: 6GB minimum
 - Speed: Very fast
@@ -308,11 +327,13 @@ Choosing the right model for your use case is crucial for balancing capability w
 ### Coding Models
 
 **CodeLlama 13B** (7.4GB)
+
 - Best for: Code generation, debugging, explanation
 - VRAM: 12GB minimum
 - Languages: Strong in Python, JavaScript, C++, Java
 
 **DeepSeek Coder 33B** (19GB)
+
 - Best for: Complex programming tasks, multi-file contexts
 - VRAM: 24GB minimum
 - Quality: Approaches GPT-4 for coding
@@ -320,11 +341,13 @@ Choosing the right model for your use case is crucial for balancing capability w
 ### Specialized Models
 
 **Phi-3 Mini** (2.3GB)
+
 - Best for: Edge deployment, resource-constrained environments
 - VRAM: 4GB minimum
 - Quality: Impressive for its tiny size
 
 **Mixtral 8x7B** (26GB)
+
 - Best for: Tasks requiring broad knowledge
 - VRAM: 32GB minimum
 - Architecture: Mixture of experts for efficiency
@@ -361,7 +384,7 @@ For optimal performance, use a GPU with sufficient VRAM:
 ollama ps
 
 # Force CPU-only mode (if needed)
-OLLAMA_GPU_LAYERS=0 ollama serve
+CUDA_VISIBLE_DEVICES="" ollama serve  # Force CPU-only mode
 ```
 
 NVIDIA GPUs require the CUDA toolkit. AMD GPUs need ROCm. Apple Silicon uses Metal automatically.
@@ -374,12 +397,25 @@ Configure system resources appropriately:
 # Set maximum loaded models
 export OLLAMA_MAX_LOADED_MODELS=2
 
-# Set VRAM limit (in bytes)
-export OLLAMA_GPU_MEMORY=8589934592  # 8GB
+# Control how long models stay loaded in memory (default: 5m)
+export OLLAMA_KEEP_ALIVE=10m
 
-# Configure context window (affects memory usage)
-export OLLAMA_NUM_CTX=4096
+# Enable flash attention for better memory efficiency
+export OLLAMA_FLASH_ATTENTION=1
 ```
+
+To configure the **context window** (which affects memory usage), set it per-model in a Modelfile rather than via environment variable:
+
+```dockerfile
+# Modelfile.custom
+FROM llama3.1:8b
+PARAMETER num_ctx 4096
+```
+
+Or pass it via the API's `num_ctx` parameter at request time. See the [Ollama FAQ](https://github.com/ollama/ollama/blob/main/docs/faq.md) for the full list of supported environment variables (`OLLAMA_HOST`, `OLLAMA_MODELS`, `OLLAMA_KEEP_ALIVE`, `OLLAMA_NUM_PARALLEL`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_FLASH_ATTENTION`, `OLLAMA_ORIGINS`, etc.).
+
+> **Note:** Ollama does not have `OLLAMA_GPU_OVERHEAD` or `OLLAMA_CONTEXT_LENGTH` environment variables. Context length is set per-model via `PARAMETER num_ctx` in a Modelfile or via the `num_ctx` API parameter. GPU memory allocation is managed automatically by Ollama.
+{: .prompt-info }
 
 ### Ollama Server Tuning
 
@@ -405,6 +441,7 @@ SYSTEM """You are a helpful assistant optimized for technical questions."""
 ```
 
 Build and use the optimized model:
+
 ```bash
 ollama create llama-optimized -f Modelfile.optimized
 ollama run llama-optimized
@@ -427,7 +464,9 @@ const result = await neurolink.stream({
 });
 
 for await (const chunk of result.stream) {
-  process.stdout.write(chunk.content);
+  if ('content' in chunk) {
+    process.stdout.write(chunk.content);
+  }
 }
 ```
 
@@ -850,6 +889,7 @@ async function loggedGenerate(prompt: string): Promise<string> {
 **Symptom**: "Error: model not found" or slow initial response
 
 **Solutions**:
+
 ```bash
 # Verify model is downloaded
 ollama list
@@ -867,15 +907,17 @@ df -h ~/.ollama
 **Symptom**: "CUDA out of memory" or system freeze
 
 **Solutions**:
+
 ```bash
 # Use smaller quantized model
 ollama pull llama3.1:latest
 
-# Reduce context window
-export OLLAMA_NUM_CTX=2048
+# Reduce context window per-model via Modelfile:
+#   PARAMETER num_ctx 2048
+# Or pass num_ctx in the API request
 
-# Limit GPU memory
-export OLLAMA_GPU_MEMORY=6442450944  # 6GB
+# Limit concurrent models to free memory
+export OLLAMA_MAX_LOADED_MODELS=1
 ```
 
 ### Slow Inference
@@ -883,6 +925,7 @@ export OLLAMA_GPU_MEMORY=6442450944  # 6GB
 **Symptom**: Response times exceeding expectations
 
 **Solutions**:
+
 ```bash
 # Verify GPU is being used
 ollama ps
@@ -900,6 +943,7 @@ PARAMETER num_batch 1024
 **Symptom**: NeuroLink cannot connect to Ollama
 
 **Solutions**:
+
 ```bash
 # Verify Ollama is running
 curl http://localhost:11434/api/tags
@@ -912,6 +956,7 @@ sudo systemctl restart ollama
 ```
 
 **TypeScript Error Handling**:
+
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 
@@ -959,6 +1004,7 @@ ssh -L 11434:localhost:11434 your-server
 ### Model Provenance
 
 Only use models from trusted sources:
+
 - Official Ollama library
 - Hugging Face verified models
 - Models you've trained yourself
@@ -982,12 +1028,12 @@ interface RateLimiter {
 
 const rateLimiter: RateLimiter = {
   requests: [],
-  tokensUsed: []
+  tokensUsed: [] // Simplified: populate from response.usage.totalTokens after each request
 };
 
 const RATE_LIMIT = {
   requestsPerMinute: 60,
-  tokensPerMinute: 100000
+  tokensPerMinute: 100000 // Not enforced in this example — implement token tracking for production use
 };
 
 function checkRateLimit(): boolean {
@@ -996,6 +1042,14 @@ function checkRateLimit(): boolean {
   // Clean old entries
   rateLimiter.requests = rateLimiter.requests.filter(t => t > oneMinuteAgo);
   rateLimiter.tokensUsed = rateLimiter.tokensUsed.filter(t => t > oneMinuteAgo);
+
+  // Token rate limiting (implement for production):
+  // const recentTokens = rateLimiter.tokensUsed
+  //   .filter(t => t.timestamp > oneMinuteAgo)
+  //   .reduce((sum, t) => sum + t.count, 0);
+  // if (recentTokens >= RATE_LIMIT.tokensPerMinute) {
+  //   throw new Error('Token rate limit exceeded');
+  // }
 
   return rateLimiter.requests.length < RATE_LIMIT.requestsPerMinute;
 }
@@ -1030,21 +1084,25 @@ async function secureGenerate(prompt: string, maxTokens: number = 1000): Promise
 
 ## Conclusion
 
-Running local LLMs with Ollama and NeuroLink provides a powerful, flexible, and privacy-preserving approach to AI integration. By following this guide, you've learned how to:
+You now have local LLMs running with Ollama and NeuroLink. Here is what you built:
 
-1. Set up and configure Ollama for local inference
-2. Integrate Ollama with NeuroLink for seamless model access
-3. Select appropriate models for your use cases
-4. Optimize performance for your hardware
-5. Implement hybrid cloud and local patterns
-6. Monitor and troubleshoot your deployment
+1. Ollama installation and model setup
+2. NeuroLink integration for local inference
+3. Model selection for different use cases
+4. Performance optimization for your hardware
+5. Hybrid cloud-local deployment patterns
+6. Monitoring and troubleshooting
 
-The combination of local and cloud inference gives you unprecedented flexibility in how you deploy AI capabilities. Start with local models for development and privacy-sensitive tasks, scale to cloud providers when you need additional capacity or capabilities, and let NeuroLink handle the complexity of managing multiple providers.
-
-As open-source models continue to improve, the gap between local and cloud capabilities narrows. Today's local setup might handle tasks that required expensive cloud APIs just months ago. By investing in local infrastructure now, you're building a foundation that will only become more valuable over time.
-
-Ready to get started? Install Ollama, configure NeuroLink, and experience the freedom of local LLM inference. Your data stays yours, your costs stay predictable, and your AI capabilities remain under your control.
+Your next step: install Ollama, pull `llama3.1:latest`, and run your first local generation with NeuroLink. Then add it as a fallback provider behind your primary cloud provider for zero-cost resilience.
 
 ---
 
-*Have questions about local LLM deployment? Join our community Discord or open an issue on GitHub. We're here to help you build privacy-first AI applications.*
+*Have questions about local LLM deployment? Join our community Discord or open an issue on GitHub.*
+
+---
+
+**Related posts:**
+
+- [Getting Started with NeuroLink: Your First AI App in 5 Minutes](/posts/getting-started-first-ai-app/)
+- [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)
+- [Mistral AI Integration: Fast European AI with NeuroLink](/posts/mistral-ai-integration/)
