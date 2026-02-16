@@ -66,7 +66,7 @@ html[data-mode="light"] {
   --search-icon-color: #8f8f8f;
   --input-focus-border-color: #016fb9;
   --post-list-text-color: #5f5f5f;
-  --btn-patinator-text-color: #5f5f5f;
+  --btn-paginator-text-color: #5f5f5f;
   --btn-paginator-hover-color: #f0f0f0;
   --toc-highlight: #016fb9;
   --toc-popup-border-color: #cccccc;
@@ -152,7 +152,7 @@ html[data-mode="light"] {
   --search-icon-color: #888888;
   --input-focus-border-color: #4db5e8;
   --post-list-text-color: #e5e5e5;
-  --btn-patinator-text-color: #e5e5e5;
+  --btn-paginator-text-color: #e5e5e5;
   --btn-paginator-hover-color: #1f1f1f;
   --toc-highlight: #4db5e8;
   --toc-popup-border-color: #3d3d3d;
@@ -671,7 +671,88 @@ textarea:focus-visible,
   color: var(--btn-share-hover-color);
 }
 
-/* === 23. Reduced Motion === */
+/* === 23. Mermaid Diagram Styling === */
+/* Container: #151515 background matches code blocks and GIF backgrounds */
+pre.mermaid {
+  background-color: #151515;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  overflow-x: auto;
+  position: relative;
+}
+
+/* Mermaid accessibility: text alternative */
+pre.mermaid[role="img"][aria-label] {
+  /* Screen readers will read the aria-label */
+}
+
+pre.mermaid svg {
+  max-width: 100%;
+}
+
+/* Edge labels */
+pre.mermaid .edgeLabel {
+  background-color: #151515;
+  color: #e5e5e5;
+}
+
+/* Cluster (subgraph) labels */
+pre.mermaid .cluster-label .nodeLabel {
+  color: #e5e5e5;
+}
+
+/* Node labels */
+pre.mermaid .nodeLabel {
+  color: #ffffff;
+}
+
+/* Note styling */
+pre.mermaid .note {
+  fill: #1a2332;
+  stroke: #016fb9;
+}
+
+/* Sequence diagram: actor boxes and lines */
+pre.mermaid .actor {
+  stroke: #016fb9;
+}
+
+pre.mermaid text.actor > tspan {
+  fill: #ffffff;
+}
+
+/* Ensure span labels inside foreignObject are visible */
+pre.mermaid .label {
+  color: #e5e5e5;
+}
+
+/* Gantt chart: section titles */
+pre.mermaid .sectionTitle {
+  fill: #e5e5e5;
+}
+
+/* Hide the raw source code block that Chirpy keeps as a hidden sibling */
+pre.mermaid + .d-none,
+.d-none + pre.mermaid {
+  /* Already hidden by Chirpy; no extra rules needed */
+}
+
+/* === 24. Screen Reader Only Utility === */
+.sr-only,
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* === 25. Reduced Motion === */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

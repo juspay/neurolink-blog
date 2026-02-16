@@ -7,22 +7,16 @@ tags: [multimodal, pdf, csv, documents, processing]
 author: neurolink
 description: "Learn how to process PDFs, CSVs, images, and text files using NeuroLink's unified multimodal API."
 image:
-  path: /assets/img/og-multimodal-tutorial.png
+  path: /assets/img/posts/multimodal-document-processing/hero.png
   alt: Multimodal Document Processing Tutorial
 toc: true
 mermaid: true
 pin: false
 ---
 
-# Processing PDFs, CSVs, Images, and Text with AI
+You will process PDFs, CSVs, images, and text files through a single TypeScript interface using NeuroLink's unified multimodal API. By the end of this tutorial, you will have auto-detection that identifies file types, smart routing that selects the right provider, and a production pipeline that handles any document your users upload.
 
-Document processing sits at the heart of enterprise AI adoption. Financial reports, contracts, invoices, spreadsheets, and more. Your business runs on documents. NeuroLink's unified API processes the most common formats with native support.
-
-The challenge? Each format requires different parsing. PDFs need visual analysis. CSVs need tabular understanding. Images need vision capabilities. Different APIs. Different libraries. Different headaches.
-
-NeuroLink solves this with a unified multimodal API. One interface handles every format. Auto-detection identifies file types. Smart routing selects the right provider. You write one code path for all documents.
-
-This tutorial walks you through complete document processing with NeuroLink. You will learn PDF analysis, CSV data extraction, and production pipeline patterns. By the end, you will process documents through a single, type-safe TypeScript interface.
+Each document format requires different parsing: PDFs need visual analysis, CSVs need tabular understanding, images need vision capabilities. You will handle all of them through one code path instead of maintaining separate libraries for each format.
 
 > **Note:** Currently supported file types are **PDF, CSV, images, and plain text**. Office document support (.xlsx, .docx, .pptx) is defined in the type system but not yet implemented.
 
@@ -63,7 +57,7 @@ flowchart LR
 
 ---
 
-## Why Unified Document Processing Matters
+## Why unified document processing matters
 
 Traditional document AI requires juggling multiple tools:
 
@@ -92,6 +86,7 @@ const result = await ai.generate({
 ```
 
 The SDK handles everything:
+
 - **Format Detection**: Magic bytes identify file type accurately
 - **Provider Selection**: Routes PDFs to vision-capable providers
 - **Text Optimization**: Formats tabular data for LLM consumption
@@ -99,7 +94,7 @@ The SDK handles everything:
 
 ---
 
-## Document Processing Architecture
+## Document processing architecture
 
 ### FileDetector: Automatic Format Recognition
 
@@ -122,6 +117,7 @@ flowchart TB
 ```
 
 This multi-layer approach handles edge cases like:
+
 - Renamed files (`.txt` containing CSV data)
 - Missing extensions (cloud storage downloads)
 - Corrupted headers (partial uploads)
@@ -257,7 +253,6 @@ The model maintains context across documents, enabling meaningful comparisons.
 Process PDFs directly from the command line using the `--file` flag (auto-detects file type):
 
 ```bash
-# Basic PDF analysis
 npx @juspay/neurolink generate "Summarize this contract" \
   --file contract.pdf \
   --provider vertex
@@ -296,6 +291,7 @@ flowchart LR
 ```
 
 The process:
+
 1. **Streaming parser** handles large files without memory issues
 2. **LLM-optimized formatting** presents data as markdown tables or JSON
 3. **Works with ALL providers** (not just vision-capable ones)
@@ -701,6 +697,7 @@ async function analyzeWithStreaming(filePath: string) {
 ```
 
 Streaming is particularly valuable for:
+
 - **User experience**: Display results as they generate rather than waiting for completion
 - **Timeout prevention**: Long-running analysis stays active with continuous data flow
 - **Progress indication**: Users see immediate feedback that processing is occurring
@@ -753,7 +750,7 @@ async function batchProcess(files: string[]) {
 
 ---
 
-## Provider Comparison for Documents
+## Provider comparison for Documents
 
 Not all providers handle documents equally:
 
@@ -772,14 +769,14 @@ Not all providers handle documents equally:
 *Excel and Word support is defined in the type system but not yet implemented. Mistral and Ollama do not currently support PDF input.
 
 > **Note:** LiteLLM limits depend on upstream model configuration.
-
+>
 > **Note:** Pricing changes frequently. Check provider documentation for current rates.
 
 **Recommendation:** Use Vertex AI or Anthropic for PDF-heavy workloads with native support. Fall back to Anthropic for its reasoning quality on complex documents.
 
 ---
 
-## Performance Optimization
+## Performance optimization
 
 Optimizing document processing involves balancing speed, cost, and quality. These patterns help you achieve production-grade performance.
 
@@ -1001,7 +998,7 @@ const structured = await ai.generate({
 
 ---
 
-## Next Steps
+## Next steps
 
 You now have everything needed to process any business document with AI. Here's where to go next:
 
@@ -1030,24 +1027,15 @@ The setup wizard guides you through configuration. You'll analyze your first PDF
 
 ---
 
-## Summary
+## What you built
 
-Document processing is simplified. NeuroLink's unified API handles PDFs, CSVs, images, and text files through a single interface. Auto-detection identifies formats. Smart routing selects providers. Type-safe Zod schemas extract structured data.
+You built a complete document processing pipeline: PDF analysis with native vision, CSV data extraction with streaming parsers, production error handling with provider fallback, and cost optimization through intelligent provider selection. Every document type flows through a single API with auto-detection and smart routing.
 
-You learned how to:
+Continue with these related tutorials:
 
-- Process PDFs with native visual analysis
-- Extract insights from CSV data
-- Build production pipelines with error handling
-- Optimize for performance and cost
-
-Office document support (Excel, Word, PowerPoint) is defined in the type system and coming soon.
-
-Stop juggling document libraries. Start extracting insights. One API. Supported documents. Real intelligence.
-
----
-
-*Have questions about document processing? Join our [Discord community](https://discord.gg/neurolink) or [open an issue on GitHub](https://github.com/juspay/neurolink/issues). We're here to help you build.*
+- Processing Any Document: 50+ File Types for the full `ProcessorRegistry` architecture
+- [Enterprise HITL and Guardrails Guide](https://docs.neurolink.ink/features/hitl/) for adding human review to high-stakes documents
+- OpenRouter Integration Guide for accessing 500+ models through a single API
 
 ```mermaid
 flowchart LR
@@ -1077,3 +1065,11 @@ flowchart LR
 ```
 
 **One API. Supported Documents. Real Intelligence.**
+
+---
+
+**Related posts:**
+
+- [Building RAG Applications with NeuroLink SDK](/posts/rag-implementation/)
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
+- [LLM Cost Optimization: Practical Strategies to Reduce Your AI Spend](/posts/cost-optimization-strategies/)

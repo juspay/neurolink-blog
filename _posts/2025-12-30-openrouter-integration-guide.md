@@ -7,16 +7,14 @@ tags: [openrouter, providers, integration, api, models]
 author: neurolink
 description: "Complete guide to integrating OpenRouter with NeuroLink SDK. Access Claude, GPT-4, Gemini, and 300+ models from dozens of providers through a single API."
 image:
-  path: /assets/img/og-openrouter-guide.png
+  path: /assets/img/posts/openrouter-integration-guide/hero.png
   alt: OpenRouter Integration Guide
 toc: true
 mermaid: true
 pin: false
 ---
 
-# 300+ Models with One API: The Complete OpenRouter Integration Guide
-
-You manage five different AI SDKs. You juggle five billing accounts. You handle five sets of rate limits. Sound familiar?
+In this guide, you will connect NeuroLink to OpenRouter, giving you access to 300+ AI models through a single API key. You will configure the OpenRouter provider, implement model selection strategies, set up fallback routing, and optimize costs by choosing the right model for each task.
 
 Model fragmentation across OpenAI, Anthropic, Google, Meta, and Mistral creates real problems. Your codebase grows tangled. Your invoices multiply. Your team loses hours switching between provider dashboards.
 
@@ -75,7 +73,7 @@ NeuroLink adds capabilities OpenRouter cannot provide alone. Redis-backed conver
 
 Streaming works identically across all 300+ models. No provider-specific handling required. NeuroLink normalizes the streaming interface so your code stays clean.
 
-**Related:** [Enterprise HITL and Guardrails Guide](https://docs.neurolink.ink/features/hitl/) | [Example Code](https://docs.neurolink.ink/features/enterprise-hitl/)
+**Related:** [Enterprise HITL and Guardrails Guide](https://docs.neurolink.ink/features/hitl/) - [Example Code](https://docs.neurolink.ink/features/enterprise-hitl/)
 
 ### Combined Benefits at a Glance
 
@@ -111,7 +109,6 @@ Optional: Configure attribution settings. Your app name and URL appear in the Op
 Create or update your environment file with the OpenRouter credentials:
 
 ```bash
-# Required - Your OpenRouter API key
 OPENROUTER_API_KEY=sk-or-v1-...
 
 # Optional - Attribution for dashboard tracking
@@ -273,7 +270,7 @@ const comprehensionModel = "anthropic/claude-3-5-sonnet";
 
 Gemini 2.0 Flash leads with a 1 million token context window. Claude 3.5 Sonnet offers 200K tokens with superior comprehension.
 
-**Related:** [Multimodal Processing Tutorial]({% post_url 2025-10-14-multimodal-document-processing %}) - Add PDFs, CSVs, and more to your AI workflows | [Examples](https://docs.neurolink.ink/features/multimodal/)
+**Related:** [Multimodal Processing Tutorial](/posts/multimodal-document-processing/) - Add PDFs, CSVs, and more to your AI workflows - [Examples](https://docs.neurolink.ink/features/multimodal/)
 
 ### Model Comparison Table
 
@@ -403,8 +400,8 @@ async function compareModels(prompt: string) {
   return results.map((r, i) => ({
     model: models[i],
     response: r.content,
-    tokens: r.usage?.totalTokens,
-    latency: r.metadata?.latency
+    tokens: r.usage?.total,
+    latency: r.responseTime
   }));
 }
 
@@ -442,7 +439,7 @@ const result = await ai.generate({
 });
 
 console.log(`Model used: ${result.model}`);
-console.log(`Tokens: ${result.usage?.totalTokens}`);
+console.log(`Tokens: ${result.usage?.total}`);
 
 // Use capable models only for complex tasks
 const complexResult = await ai.generate({
@@ -751,20 +748,20 @@ If you see authentication errors:
 
 You now have everything needed to build with 300+ AI models through one unified interface. Here's where to go next:
 
-### Expand Your Capabilities
+### Expand your capabilities
 
-- **[Multimodal Processing Tutorial]({% post_url 2025-10-14-multimodal-document-processing %})** - Add PDF, CSV, and image processing to your AI workflows
+- **[Multimodal Processing Tutorial](/posts/multimodal-document-processing/)** - Add PDF, CSV, and image processing to your AI workflows
 - **[Enterprise HITL & Guardrails Guide](https://docs.neurolink.ink/features/hitl/)** - Implement governance and safety controls
 - **[Redis Memory Configuration](https://docs.neurolink.ink/conversation-memory/)** - Set up persistent conversation memory for production
 - **[MCP Tools Integration](https://docs.neurolink.ink/advanced/mcp-integration/)** - Add 58+ external tool capabilities to your AI applications
 
-### Reference Documentation
+### Reference documentation
 
 - **[Full SDK API Reference](https://docs.neurolink.ink/sdk/api-reference/)** - Complete TypeScript API documentation
 - **[Provider Configuration Options](https://docs.neurolink.ink/getting-started/provider-setup/)** - Detailed setup for all 13 supported providers
 - **[CLI Command Reference](https://docs.neurolink.ink/cli/commands/)** - Every CLI command with examples
 
-### Get Started Now
+### Get started now
 
 Install NeuroLink and start building:
 
@@ -777,23 +774,26 @@ The setup wizard guides you through configuration. You'll make your first OpenRo
 
 ---
 
-## Summary
+## What's Next
 
-OpenRouter provides access to 300+ models from dozens of providers through one API. NeuroLink adds type-safe TypeScript, a professional CLI, and enterprise features. Together, they eliminate the complexity of multi-model AI development.
+You have completed all the steps in this guide. To continue building on what you have learned:
 
-You learned how to:
-
-- Configure OpenRouter with NeuroLink in minutes
-- Select the right model for each use case
-- Implement streaming, comparison, and cost optimization patterns
-- Use CLI workflows for rapid prototyping
-- Control costs through smart model selection and monitoring
-
-Stop managing five SDKs. Start shipping features. One interface. Any model. Zero lock-in.
+1. Review the code examples and adapt them for your specific use case
+2. Start with the simplest pattern first and add complexity as your requirements grow
+3. Monitor performance metrics to validate that each change improves your system
+4. Consult the NeuroLink documentation for advanced configuration options
 
 ---
 
 *Have questions about OpenRouter integration? Join our [Discord community](https://discord.gg/neurolink) or [open an issue on GitHub](https://github.com/juspay/neurolink/issues). We're here to help you build.*
+
+---
+
+**Related posts:**
+
+- [Model Evaluation and Scoring: RAGAS-Style Quality Assessment](/posts/model-evaluation-scoring/)
+- [LLM Cost Optimization: Practical Strategies to Reduce Your AI Spend](/posts/cost-optimization-strategies/)
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
 
 ```mermaid
 flowchart LR

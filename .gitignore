@@ -73,3 +73,8 @@ Gemfile.lock.bak
 /test/tmp/
 /test/version_tmp/
 /tmp/
+
+# Development artifacts
+docs/archive/
+docs/verification/
+tools/blog-visuals/output/

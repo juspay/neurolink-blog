@@ -1,21 +1,32 @@
 ---
 layout: post
-title: "Contributing to NeuroLink: A Complete Guide"
-date: 2025-07-18 10:00:00 +0530
+title: 'Contributing to NeuroLink: A Complete Guide'
+date: '2025-07-18 10:00:00 +0530'
 author: neurolink
-description: "Learn how to contribute to NeuroLink. From your first pull request to building plugins and integrations."
-categories: [Community, Guide]
-tags: [community, contributors, open-source, contributing, guide]
+description: >-
+  Learn how to contribute to NeuroLink. From your first pull request to building
+  plugins and integrations.
+categories:
+  - Community
+  - Guide
+tags:
+  - community
+  - contributors
+  - open-source
+  - contributing
+  - guide
 toc: true
 mermaid: true
 pin: false
+image:
+  path: /assets/img/posts/community-contributions/hero.png
+  alt: 'Contributing to NeuroLink: A Complete Guide'
 ---
 
-# Contributing to NeuroLink: A Complete Guide
-
-Open source thrives on community contributions. Whether you are an experienced developer or just getting started, this guide will help you make meaningful contributions to NeuroLink. Every contribution matters, from fixing typos in documentation to implementing new features.
+By the end of this guide, you'll know how to contribute to NeuroLink -- from filing your first issue to submitting pull requests, building plugins, and adding new provider integrations.
 
 > **Note**: This guide outlines the NeuroLink contribution framework and best practices. Our community is actively growing! To see real community discussions and current contribution opportunities, check out:
+>
 > - **GitHub Issues**: [github.com/juspay/neurolink/issues](https://github.com/juspay/neurolink/issues) - Browse open issues and submit bug reports
 > - **GitHub Discussions**: [github.com/juspay/neurolink/discussions](https://github.com/juspay/neurolink/discussions) - Ask questions, share ideas, and connect with other contributors
 > - **Contributors List**: [github.com/juspay/neurolink/graphs/contributors](https://github.com/juspay/neurolink/graphs/contributors) - See who has already contributed
@@ -38,7 +49,6 @@ NeuroLink is a unified AI SDK that simplifies working with multiple AI providers
 Before making contributions, you will need to set up a local development environment.
 
 ```bash
-# Clone the repository
 git clone https://github.com/juspay/neurolink.git
 cd neurolink
 
@@ -314,11 +324,12 @@ async function reviewPullRequest(
 
 All commits must follow the semantic commit format:
 
-```
+```text
 type(scope): description
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -328,6 +339,7 @@ type(scope): description
 - `chore`: Maintenance tasks, dependency updates
 
 **Examples:**
+
 ```bash
 feat(providers): add support for Mistral AI
 fix(streaming): resolve memory leak in long-running streams
@@ -340,14 +352,17 @@ test(generate): add edge case tests for structured output
 All contributions are automatically validated through our CI pipeline:
 
 **ESLint**: Code is checked for style and potential issues
+
 - Run locally with `pnpm lint`
 - Fix auto-fixable issues with `pnpm lint:fix`
 
 **Security Scanning**: Dependencies and code are scanned for vulnerabilities
+
 - Automated security checks run on every PR
 - High-severity issues will block merging
 
 **Pre-commit Hooks**: Local validation before commits
+
 - Runs linting and type checking automatically
 - Ensures consistent code formatting
 - Install hooks with `pnpm prepare`
@@ -496,3 +511,11 @@ Every contribution, no matter how small, helps make NeuroLink better for everyon
 ---
 
 *Have questions about contributing? Open a GitHub Discussion or reach out through the issue tracker. We are here to help you succeed.*
+
+---
+
+**Related posts:**
+
+- [Getting Started with NeuroLink: Your First AI App in 5 Minutes](/posts/getting-started-first-ai-app/)
+- [What is NeuroLink? The Unified AI SDK Explained](/posts/what-is-neurolink-unified-sdk/)
+- [Why TypeScript is the Future of AI Development](/posts/typescript-future-of-ai-development/)

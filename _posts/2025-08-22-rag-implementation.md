@@ -1,25 +1,36 @@
 ---
 layout: post
-title: "Building RAG Applications with NeuroLink SDK"
-date: 2025-08-22 10:00:00 +0530
-categories: [Tutorial, Advanced]
-tags: [rag, retrieval, generation, documents, knowledge-base]
+title: Building RAG Applications with NeuroLink SDK
+date: '2025-08-22 10:00:00 +0530'
+categories:
+  - Tutorial
+  - Advanced
+tags:
+  - rag
+  - retrieval
+  - generation
+  - documents
+  - knowledge-base
 author: neurolink
-description: "Learn how to build RAG applications using NeuroLink SDK for generation and external vector databases for retrieval."
+description: >-
+  Learn how to build RAG applications using NeuroLink SDK for generation and
+  external vector databases for retrieval.
 toc: true
 mermaid: true
 pin: false
+image:
+  path: /assets/img/posts/rag-implementation/hero.png
+  alt: Building RAG Applications with NeuroLink SDK
 ---
 
-# Building RAG Applications with NeuroLink SDK
+By the end of this guide, you will have a working RAG pipeline that ingests documents, retrieves relevant context via vector search, and generates cited answers through NeuroLink's unified `generate()` and `stream()` interface -- with the ability to swap between OpenAI, Anthropic, Vertex, or any other provider for the generation step without changing your retrieval code.
 
-Retrieval-Augmented Generation (RAG) combines the power of information retrieval with large language model generation. This tutorial shows you how to build production-ready RAG applications using NeuroLink SDK for the generation component, integrated with external embedding providers and vector databases for retrieval.
+## What NeuroLink provides vs external tools
 
-## What NeuroLink Provides vs External Tools
-
-Before diving in, let's be clear about what each component provides:
+Before diving in, here is what each component provides:
 
 **NeuroLink SDK provides:**
+
 - Unified LLM generation across 13 providers (OpenAI, Anthropic, Google Vertex, AWS Bedrock, etc.)
 - Streaming responses with real-time token delivery
 - Multi-provider fallback and retry logic
@@ -27,6 +38,7 @@ Before diving in, let's be clear about what each component provides:
 - Conversation memory management
 
 **External tools required for RAG:**
+
 - Embedding generation (OpenAI, Cohere, Voyage AI, or provider-specific APIs)
 - Vector databases (Pinecone, Qdrant, Weaviate, Chroma, pgvector, etc.)
 - Document processing libraries (pdf-parse, mammoth, etc.)
@@ -40,8 +52,8 @@ flowchart TB
     end
 
     subgraph NeuroLink["NeuroLink SDK"]
-        Generate[generate() Method<br/>LLM Generation]
-        Stream[stream() Method<br/>Streaming Responses]
+        Generate["generate() Method<br/>LLM Generation"]
+        Stream["stream() Method<br/>Streaming Responses"]
         Providers[13 AI Providers]
     end
 
@@ -60,7 +72,9 @@ flowchart TB
     Generate --> Providers
 ```
 
-## Understanding RAG Architecture
+![RAG Pipeline Flow](/assets/img/posts/rag-implementation/rag-pipeline.gif)
+
+## Understanding RAG architecture
 
 A RAG pipeline consists of three main phases:
 
@@ -68,7 +82,7 @@ A RAG pipeline consists of three main phases:
 2. **Retrieval**: Finding relevant documents based on user queries
 3. **Generation**: Using NeuroLink to synthesize answers from retrieved context
 
-### Why RAG Over Fine-Tuning?
+### Why RAG over fine-tuning?
 
 | Aspect | RAG | Fine-Tuning |
 |--------|-----|-------------|
@@ -78,12 +92,13 @@ A RAG pipeline consists of three main phases:
 | Freshness | Real-time updates | Training cutoff |
 | Scale | Unlimited documents | Limited by context |
 
-## Setting Up Your RAG Environment
+![How RAG Works](/assets/img/posts/rag-implementation/rag-concept.gif)
+
+## Setting up your RAG environment
 
 ### Installation
 
 ```bash
-# NeuroLink SDK for generation
 npm install @juspay/neurolink
 
 # External dependencies for RAG
@@ -92,7 +107,7 @@ npm install @pinecone-database/pinecone  # Vector database (or Qdrant, Weaviate,
 npm install pdf-parse mammoth         # Document processing
 ```
 
-### Basic Configuration
+### Basic configuration
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -111,14 +126,14 @@ const openai = new OpenAI({
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY
 });
-const index = pinecone.Index('knowledge-base');
+const index = pinecone.index('knowledge-base');
 ```
 
-## Document Ingestion Pipeline
+## Document ingestion pipeline
 
 The ingestion pipeline is built entirely with external tools. NeuroLink is not involved until the generation step.
 
-### Document Processing
+### Document processing
 
 ```typescript
 import * as fs from 'fs/promises';
@@ -184,7 +199,7 @@ class DocumentProcessor {
 }
 ```
 
-### Chunking Strategies
+### Chunking strategies
 
 Proper chunking is critical for RAG performance.
 
@@ -262,7 +277,7 @@ class SemanticChunker {
 }
 ```
 
-### Embedding Generation (External Service)
+### Embedding generation (external service)
 
 Embeddings are generated using external APIs, not NeuroLink.
 
@@ -315,7 +330,7 @@ class EmbeddingGenerator {
 }
 ```
 
-### Vector Store Integration (External Service)
+### Vector store integration (external service)
 
 Store embeddings in your vector database of choice.
 
@@ -371,7 +386,7 @@ class VectorStoreManager {
 }
 ```
 
-### Complete Ingestion Pipeline
+### Complete ingestion pipeline
 
 ```typescript
 class IngestionPipeline {
@@ -424,9 +439,9 @@ class IngestionPipeline {
 }
 ```
 
-## Retrieval Strategies
+## Retrieval strategies
 
-### Basic Vector Search
+### Basic vector search
 
 ```typescript
 interface RetrievedDocument {
@@ -464,7 +479,7 @@ class VectorRetriever {
 }
 ```
 
-### Multi-Query Retrieval with NeuroLink
+### Multi-query retrieval with NeuroLink
 
 Use NeuroLink to generate query variations for better recall.
 
@@ -531,7 +546,7 @@ Query: ${query}`
 }
 ```
 
-### Contextual Compression with NeuroLink
+### Contextual compression with NeuroLink
 
 Use NeuroLink to extract only relevant portions from retrieved documents.
 
@@ -582,7 +597,7 @@ Relevant portions:`
 
 This is where NeuroLink shines. Use its `generate()` method to synthesize answers from retrieved context.
 
-### Context Assembly
+### Context assembly
 
 ```typescript
 class ContextAssembler {
@@ -638,7 +653,7 @@ ${doc.text}
 }
 ```
 
-### RAG Generation with NeuroLink
+### RAG generation with NeuroLink
 
 ```typescript
 interface RAGResponse {
@@ -752,7 +767,7 @@ Answer:`;
 }
 ```
 
-### Streaming RAG Responses
+### Streaming RAG responses
 
 Use NeuroLink's streaming capability for real-time responses.
 
@@ -812,7 +827,7 @@ Answer:`;
 }
 ```
 
-## Complete RAG Application
+## Complete RAG application
 
 Bringing everything together into a production-ready application.
 
@@ -905,7 +920,7 @@ class RAGApplication {
 }
 ```
 
-### Usage Example
+### Usage example
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -922,7 +937,7 @@ async function main() {
   const rag = new RAGApplication({
     neurolink,
     openai,
-    pineconeIndex: pinecone.Index('knowledge-base'),
+    pineconeIndex: pinecone.index('knowledge-base'),
     generationProvider: 'openai',
     generationModel: 'gpt-4-turbo'
   });
@@ -946,7 +961,7 @@ async function main() {
 main().catch(console.error);
 ```
 
-## Using Different Providers with NeuroLink
+## Using different providers with NeuroLink
 
 One of NeuroLink's strengths is provider flexibility. Use different providers for generation.
 
@@ -979,11 +994,14 @@ const bedrockRAG = new RAGApplication({
 });
 ```
 
-## Alternative Vector Databases
+> **Note:** Model names and IDs in code examples reflect versions available at time of writing. Model availability, naming conventions, and pricing change frequently. Always verify current model IDs with your provider's documentation before deploying to production.
+{: .prompt-info }
+
+## Alternative vector databases
 
 The examples use Pinecone, but you can easily swap in other vector databases.
 
-### Qdrant Example
+### Qdrant example
 
 ```typescript
 import { QdrantClient } from '@qdrant/js-client-rest';
@@ -1024,7 +1042,7 @@ class QdrantVectorStore {
 }
 ```
 
-### Weaviate Example
+### Weaviate example
 
 ```typescript
 import weaviate from 'weaviate-ts-client';
@@ -1072,9 +1090,9 @@ class WeaviateVectorStore {
 }
 ```
 
-## Production Considerations
+## Production considerations
 
-### Error Handling
+### Error handling
 
 ```typescript
 class ResilientRAGApplication {
@@ -1144,19 +1162,13 @@ class CachedRAGApplication {
 
 ## Summary
 
-Building RAG applications with NeuroLink involves:
+This guide covers a complete working RAG pipeline: document processing, semantic chunking, embedding generation, vector storage, multi-query retrieval, contextual compression, and generation with citations. The architecture is:
 
-1. **External tools for ingestion and retrieval**: Document processing libraries, embedding APIs (OpenAI, Cohere, etc.), and vector databases (Pinecone, Qdrant, Weaviate, etc.)
+1. **External tools for ingestion and retrieval** -- document processing libraries, embedding APIs (OpenAI, Cohere), and vector databases (Pinecone, Qdrant, Weaviate)
+2. **NeuroLink for generation** -- `generate()` or `stream()` to synthesize answers from retrieved context
+3. **NeuroLink for query enhancement** -- generate query variations and compress retrieved context
 
-2. **NeuroLink for generation**: Use the `generate()` or `stream()` methods to synthesize answers from retrieved context
-
-3. **NeuroLink for query enhancement**: Optionally use NeuroLink to generate query variations or compress retrieved context
-
-**Key points:**
-- NeuroLink does NOT provide built-in embedding generation, vector storage, or document processing
-- NeuroLink excels at the generation step with its unified multi-provider interface
-- Mix and match embedding providers and vector databases based on your needs
-- Use NeuroLink's provider fallback for resilient generation
+NeuroLink does not provide built-in embedding generation or vector storage. It excels at the generation step, where its unified multi-provider interface and provider fallback make your RAG pipeline resilient.
 
 ## Resources
 
@@ -1165,3 +1177,11 @@ Building RAG applications with NeuroLink involves:
 - [Pinecone Documentation](https://docs.pinecone.io)
 - [Qdrant Documentation](https://qdrant.tech/documentation)
 - [Weaviate Documentation](https://weaviate.io/developers/weaviate)
+
+---
+
+**Related posts:**
+
+- [Conversation Memory: Building Stateful AI Applications](/posts/conversation-memory-guide/)
+- [LLM Cost Optimization: Practical Strategies to Reduce Your AI Spend](/posts/cost-optimization-strategies/)
+- [The Middleware System: Analytics, Guardrails, and Custom Pipelines](/posts/middleware-system/)

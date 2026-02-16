@@ -1,7 +1,7 @@
 ---
 layout: post
-title: "Testing AI Applications: A Complete Guide"
-date: 2025-08-05 10:00:00 +0530
+title: 'Testing AI Applications: A Complete Guide'
+date: '2025-08-05 10:00:00 +0530'
 categories:
   - Guide
   - Development
@@ -12,15 +12,18 @@ tags:
   - mocking
   - evaluation
 author: neurolink
-description: "Test AI applications effectively. Unit tests, integration tests, mocking, and evaluation strategies."
+description: >-
+  Test AI applications effectively. Unit tests, integration tests, mocking, and
+  evaluation strategies.
 toc: true
 mermaid: true
 pin: false
+image:
+  path: /assets/img/posts/testing-ai-applications/hero.png
+  alt: 'Testing AI Applications: A Complete Guide'
 ---
 
-# Testing AI Applications: A Complete Guide
-
-Building AI applications is exciting. Testing them? That's where many teams struggle. Unlike traditional software where outputs are deterministic, AI applications introduce probabilistic behavior that challenges conventional testing approaches. This comprehensive guide walks you through everything you need to know about testing AI applications built with NeuroLink.
+By the end of this guide, you'll have a complete testing strategy for AI applications -- unit tests, integration tests, mocking, evaluation metrics, and CI/CD patterns that handle non-deterministic LLM outputs.
 
 ## Why Testing AI Applications Is Different
 
@@ -79,7 +82,6 @@ Before writing tests, let's set up a proper testing environment for a NeuroLink 
 
 ```bash
 npm install --save-dev vitest @vitest/coverage-v8
-# or with Jest
 npm install --save-dev jest @types/jest ts-jest
 ```
 
@@ -445,7 +447,7 @@ export class PatternMockProvider implements AIProvider {
   }
 
   async generate(options: GenerateOptions): Promise<GenerateResult> {
-    const input = options.input.text;
+    const input = options.input.text ?? '';
 
     for (const { pattern, response } of this.patterns) {
       const match = input.match(pattern);
@@ -764,7 +766,12 @@ class ReplayProvider implements AIProvider {
   }
 
   private hashOptions(options: GenerateOptions): string {
-    return JSON.stringify(options);
+    const key = JSON.stringify({
+      input: options.input,
+      provider: options.provider,
+      model: options.model,
+    });
+    return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
   }
 
   async generate(options: GenerateOptions): Promise<GenerateResult> {
@@ -1022,12 +1029,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+{% raw %}
       - name: Run evaluation tests
         run: npm run test:eval
         env:
           # NeuroLink reads provider-specific API keys from environment
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+{% endraw %}
 ```
 
 ### Package.json Test Scripts
@@ -1189,18 +1198,23 @@ describe('Edge Cases', () => {
 
 ## Conclusion
 
-Testing AI applications requires adapting traditional testing practices to handle non-determinism, external dependencies, and qualitative evaluation. With NeuroLink's clean `AIProvider` interface and TypeScript's type safety, you can build a comprehensive test suite that maintains confidence in your application's behavior.
+By now you have working test patterns for every layer of an AI application: mock providers for unit tests, sequence and pattern mocks for integration tests, golden datasets for regression, recording/replay for deterministic integration tests, and evaluation strategies for quality.
 
-The key principles to remember:
+The key principles:
 
-1. **Use the AIProvider interface** for dependency injection and easy mocking
-2. **Mock providers in most tests** to ensure speed, determinism, and cost control
-3. **Use mock providers to validate configuration** without making real API calls
-4. **Separate test tiers** - unit, integration, and evaluation tests have different purposes
-5. **Maintain golden datasets** for regression testing
-6. **Test edge cases thoroughly** because AI applications can fail in unexpected ways
-7. **Use flexible assertions** that check intent, not exact strings
+1. Use the `AIProvider` interface for dependency injection and easy mocking
+2. Mock providers in most tests for speed, determinism, and cost control
+3. Separate test tiers -- unit, integration, and evaluation tests serve different purposes
+4. Maintain golden datasets for regression testing
+5. Test edge cases (empty input, long input, special characters)
+6. Use flexible assertions that check intent, not exact strings
 
-With Vitest or Jest, the mocking patterns shown here, and NeuroLink's clean architecture, you have everything you need to build reliable, well-tested AI applications. Start with unit tests for your prompt templates and parsers, add integration tests with mock providers, and run evaluation tests periodically against real models.
+Start with unit tests for your prompt templates and parsers, add integration tests with mock providers, and run evaluation tests periodically against real models.
 
-Your future self (and your users) will thank you for investing in a robust test suite.
+---
+
+**Related posts:**
+
+- [Performance Benchmarking Guide for NeuroLink](/posts/performance-benchmarks/)
+- [Getting Started with NeuroLink: Your First AI App in 5 Minutes](/posts/getting-started-first-ai-app/)
+- [Why TypeScript is the Future of AI Development](/posts/typescript-future-of-ai-development/)

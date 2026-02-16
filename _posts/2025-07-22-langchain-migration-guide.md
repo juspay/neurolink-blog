@@ -1,18 +1,30 @@
 ---
 layout: post
-title: "Migrating from LangChain to NeuroLink: A Step-by-Step Guide"
-date: 2025-07-22 10:00:00 +0530
-last_updated: 2026-01-15
-categories: [Migration, Tutorial]
-tags: [langchain, migration, comparison, typescript, patterns]
+title: 'Migrating from LangChain to NeuroLink: A Step-by-Step Guide'
+date: '2025-07-22 10:00:00 +0530'
+last_updated: 2026-01-15T00:00:00.000Z
+categories:
+  - Migration
+  - Tutorial
+tags:
+  - langchain
+  - migration
+  - comparison
+  - typescript
+  - patterns
 author: neurolink
-description: "Migrate from LangChain to NeuroLink. Code mappings, pattern translations, and migration strategies."
+description: >-
+  Migrate from LangChain to NeuroLink. Code mappings, pattern translations, and
+  migration strategies.
 toc: true
-mermaid: true
+mermaid: false
 pin: false
+image:
+  path: /assets/img/posts/langchain-migration-guide/hero.png
+  alt: 'Migrating from LangChain to NeuroLink: A Step-by-Step Guide'
 ---
 
-If you've built applications with LangChain and are considering a move to NeuroLink, you're not alone. Many teams are discovering that NeuroLink's unified, provider-agnostic approach offers significant advantages for production AI applications. This comprehensive guide walks you through the migration process with side-by-side code comparisons, pattern translations, and strategies for a smooth transition.
+By the end of this guide, you'll have migrated your LangChain application to NeuroLink with side-by-side code comparisons, pattern translations, and a step-by-step migration strategy.
 
 **Verification Details:** This guide was verified with NeuroLink v8.32.0 released January 5, 2026.
 
@@ -676,7 +688,6 @@ describe("Migration Validation", () => {
 Once all components are migrated and validated, remove LangChain dependencies:
 
 ```bash
-# Remove LangChain packages
 npm uninstall langchain @langchain/core @langchain/openai @langchain/anthropic
 
 # Verify no imports remain
@@ -865,17 +876,22 @@ The NeuroLink version is more explicit, easier to understand, and gives you full
 
 ## Conclusion
 
-Migrating from LangChain to NeuroLink simplifies your codebase while maintaining all the functionality you need. The unified API design means less code, fewer abstractions, and easier debugging.
+By now you have a working migration path for every major LangChain pattern: providers, chains, memory, streaming, and tools. The key steps are:
 
-The key benefits are:
+1. Install NeuroLink alongside LangChain
+2. Migrate one route or feature at a time using `generate()` and `stream()`
+3. Replace chain patterns with direct NeuroLink calls or direct API calls
+4. Swap LangChain memory for NeuroLink's built-in session memory
+5. Remove LangChain once all routes are validated
 
-1. **Simplicity**: One API for all providers
-2. **Flexibility**: Switch providers with a parameter change
-3. **Control**: Standard JavaScript patterns, no hidden magic
-4. **Maintainability**: Less framework-specific code to maintain
+The result is a simpler codebase with fewer abstractions, standard JavaScript patterns, and the ability to switch providers with a single parameter change.
 
-Start by adding NeuroLink alongside your existing LangChain code, migrate incrementally, and remove LangChain once you've validated everything works. Your team will appreciate the cleaner, more maintainable codebase.
+For the full API reference and additional migration examples, see the [NeuroLink documentation](https://github.com/juspay/neurolink).
 
 ---
 
-*Ready to start your migration? Check out the [NeuroLink documentation](https://github.com/juspay/neurolink) for more examples and API details.*
+**Related posts:**
+
+- [What is NeuroLink? The Unified AI SDK Explained](/posts/what-is-neurolink-unified-sdk/)
+- [Getting Started with NeuroLink: Your First AI App in 5 Minutes](/posts/getting-started-first-ai-app/)
+- [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)

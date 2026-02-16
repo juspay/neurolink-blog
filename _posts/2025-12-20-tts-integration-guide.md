@@ -7,7 +7,7 @@ tags: [tts, text-to-speech, voice, audio, google-cloud-tts]
 author: neurolink
 description: "Add natural text-to-speech to your AI applications using NeuroLink's built-in TTS integration with Google Cloud voices."
 image:
-  path: /assets/img/og-tts-guide.png
+  path: /assets/img/posts/tts-integration-guide/hero.png
   alt: TTS Integration Guide
 toc: true
 mermaid: true
@@ -17,13 +17,7 @@ pin: false
 > **Note:** This guide covers the built-in TTS integration available in NeuroLink SDK. TTS uses Google Cloud Text-to-Speech under the hood.
 {: .prompt-info }
 
-# Text-to-Speech Integration: Build Voice-Enabled AI Apps with NeuroLink
-
-Your users want voice. They want to listen while commuting, hear responses while cooking, and interact hands-free while multitasking. But adding text-to-speech to your AI application means wrestling with audio encoding, managing voice configurations, and handling provider APIs.
-
-Voice integration should take minutes, not weeks. NeuroLink makes it happen. Pass a single `tts` option to your existing `generate()` call and receive both text and audio in one response. No separate API calls. No audio processing libraries. No voice configuration headaches.
-
-This guide walks you through complete TTS integration with NeuroLink. You will learn voice selection, multi-speaker podcasts, and voice assistant patterns. By the end, you will add natural speech to any AI response with a few lines of TypeScript.
+In this guide, you will add text-to-speech to your NeuroLink applications. You will configure Google Cloud TTS, generate audio from AI responses, select the right voice tier for your use case, build multi-speaker podcast episodes, and create conversational voice assistants. By the end, you will produce both text and audio output from a single `generate()` call with a few lines of TypeScript.
 
 ```mermaid
 flowchart LR
@@ -159,8 +153,8 @@ async function main() {
   });
 
   // Save the audio file
-  if (result.tts?.buffer) {
-    fs.writeFileSync("welcome.mp3", result.tts.buffer);
+  if (result.audio?.buffer) {
+    fs.writeFileSync("welcome.mp3", result.audio.buffer);
     console.log("Audio saved to welcome.mp3");
   }
 
@@ -244,6 +238,7 @@ graph TD
 Google Cloud TTS voice names follow a pattern: `{language}-{region}-{type}-{variant}`. Here are commonly used voices:
 
 **Neural2 Voices (Recommended for production):**
+
 - `en-US-Neural2-A` - Female
 - `en-US-Neural2-C` - Female
 - `en-US-Neural2-D` - Male
@@ -251,6 +246,7 @@ Google Cloud TTS voice names follow a pattern: `{language}-{region}-{type}-{vari
 - `en-US-Neural2-J` - Male
 
 **WaveNet Voices:**
+
 - `en-US-Wavenet-A` - Male
 - `en-US-Wavenet-B` - Male
 - `en-US-Wavenet-C` - Female
@@ -258,6 +254,7 @@ Google Cloud TTS voice names follow a pattern: `{language}-{region}-{type}-{vari
 - `en-US-Wavenet-F` - Female
 
 **Standard Voices (Cost-effective for development):**
+
 - `en-US-Standard-A` - Male
 - `en-US-Standard-B` - Male
 - `en-US-Standard-C` - Female
@@ -307,10 +304,10 @@ async function synthesizeText() {
     },
   });
 
-  if (result.tts?.buffer) {
-    fs.writeFileSync("narration.mp3", result.tts.buffer);
-    console.log(`Audio saved: ${result.tts.size} bytes`);
-    console.log(`Format: ${result.tts.format}`);
+  if (result.audio?.buffer) {
+    fs.writeFileSync("narration.mp3", result.audio.buffer);
+    console.log(`Audio saved: ${result.audio.size} bytes`);
+    console.log(`Format: ${result.audio.format}`);
   }
 }
 
@@ -377,9 +374,9 @@ async function generatePodcastEpisode(script: PodcastSection[]) {
       },
     });
 
-    if (result.tts?.buffer) {
-      audioSegments.push(result.tts.buffer);
-      console.log(`  Generated ${result.tts.buffer.length} bytes of audio`);
+    if (result.audio?.buffer) {
+      audioSegments.push(result.audio.buffer);
+      console.log(`  Generated ${result.audio.buffer.length} bytes of audio`);
     }
   }
 
@@ -481,7 +478,7 @@ async function runVoiceAssistantDemo() {
     });
 
     console.log(`Assistant: ${result.content}`);
-    console.log(`  [Audio: ${result.tts?.buffer ? `${result.tts.size} bytes` : "None"}]`);
+    console.log(`  [Audio: ${result.audio?.buffer ? `${result.audio.size} bytes` : "None"}]`);
   }
 }
 
@@ -529,7 +526,7 @@ async function conditionalTTSDemo() {
     });
 
     console.log(`Response: ${result.content.substring(0, 100)}...`);
-    console.log(`Audio generated: ${!!result.tts}`);
+    console.log(`Audio generated: ${!!result.audio}`);
   }
 }
 
@@ -642,7 +639,7 @@ You now have everything needed to add voice to your AI applications. Here's wher
 
 ### Expand Your Capabilities
 
-- **[Multimodal Document Processing]({% post_url 2025-10-14-multimodal-document-processing %})** - Add PDF, CSV, and image processing
+- [Multimodal Document Processing](/posts/multimodal-document-processing/) - Add PDF, CSV, and image processing
 - **[NeuroLink Getting Started](https://docs.neurolink.ink/docs/getting-started)** - Complete SDK setup guide
 - **[Google Cloud TTS Documentation](https://cloud.google.com/text-to-speech/docs)** - Voice options and pricing details
 
@@ -672,23 +669,29 @@ export GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
 
 ## Summary
 
-Voice transforms AI applications from tools into companions. Users engage hands-free, accessibility improves, and emotional connection deepens. NeuroLink makes this transformation effortless.
+You have added text-to-speech to your NeuroLink applications. Here is what you built:
 
-You learned how to:
+- Generated audio output with a single `tts` option in `generate()`
+- Chose between synthesizing input text directly (`useAiResponse: false`) or AI-generated responses (`useAiResponse: true`)
+- Selected Google Cloud voice tiers matched to your use case and budget
+- Built multi-speaker podcast episodes with distinct host and guest voices
+- Created conversational voice assistants with TTS output
+- Used CLI workflows for rapid TTS prototyping
+- Fine-tuned audio quality with speed, pitch, and volume settings
 
-- Generate audio output with a single `tts` option in `generate()`
-- Choose between synthesizing input text directly or AI-generated responses
-- Select the right Google Cloud voice tier for your use case and budget
-- Build multi-speaker content like podcasts with distinct voices
-- Create conversational voice assistants with TTS output
-- Use CLI workflows for rapid TTS prototyping
-- Fine-tune audio quality with speed, pitch, and volume settings
-
-Stop building separate audio pipelines. Start shipping voice features. One configuration option. Google Cloud voices. Natural speech.
+Next, explore multimodal document processing to combine voice output with PDF, CSV, and image inputs in a single pipeline.
 
 ---
 
 *Have questions about TTS integration? Join our [Discord community](https://discord.gg/neurolink) or [open an issue on GitHub](https://github.com/juspay/neurolink/issues). We're here to help you build.*
+
+---
+
+**Related posts:**
+
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
+- [Speech-to-Text and Text-to-Speech with NeuroLink](/posts/speech-to-text-neurolink/)
+- [Multimodal Document Processing with NeuroLink](/posts/multimodal-document-processing/)
 
 ```mermaid
 flowchart LR

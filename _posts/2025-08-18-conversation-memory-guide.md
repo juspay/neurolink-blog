@@ -1,7 +1,7 @@
 ---
 layout: post
-title: "Conversation Memory: Building Stateful AI Applications"
-date: 2025-08-18 10:00:00 +0530
+title: 'Conversation Memory: Building Stateful AI Applications'
+date: '2025-08-18 10:00:00 +0530'
 categories:
   - Tutorial
   - Features
@@ -12,17 +12,20 @@ tags:
   - context
   - sessions
 author: neurolink
-description: "Implement conversation memory in AI apps. Session management, context windows, and persistence with NeuroLink SDK."
+description: >-
+  Implement conversation memory in AI apps. Session management, context windows,
+  and persistence with NeuroLink SDK.
 toc: true
 mermaid: true
 pin: false
+image:
+  path: /assets/img/posts/conversation-memory-guide/hero.png
+  alt: 'Conversation Memory: Building Stateful AI Applications'
 ---
 
-# Conversation Memory: Building Stateful AI Applications
+By the end of this guide, you will have conversation memory working in your NeuroLink application -- from simple in-memory session tracking to persistent cross-session recall with Mem0 integration.
 
-One of the most significant challenges in building AI-powered applications is managing conversation state. Unlike traditional software where state is explicit and deterministic, AI conversations require sophisticated memory systems that can maintain context, recall relevant information, and provide coherent responses across extended interactions.
-
-In this comprehensive guide, we will explore conversation memory approaches, from simple manual management to NeuroLink's built-in memory features and advanced persistent storage with Mem0 integration.
+You will implement three approaches: manual conversation history management for full control, NeuroLink's built-in session memory for automatic context tracking, and Mem0-backed persistent memory for applications that need to remember users across sessions. Each approach includes working TypeScript examples you can deploy today.
 
 ```mermaid
 flowchart TD
@@ -49,7 +52,8 @@ Conversation memory is the mechanism that allows AI applications to maintain awa
 Consider a simple customer support scenario:
 
 **Without Memory:**
-```
+
+```text
 User: I want to return my order
 AI: I'd be happy to help with your return. Which order would you like to return?
 
@@ -58,7 +62,8 @@ AI: I'd be happy to help with your return. Which order would you like to return?
 ```
 
 **With Memory:**
-```
+
+```text
 User: I want to return my order
 AI: I'd be happy to help with your return. Which order would you like to return?
 
@@ -222,12 +227,12 @@ const neurolink = new NeuroLink({
 });
 ```
 
-> **Note:** The `maxTurnsPerSession` parameter was deprecated in favor of `tokenThreshold`, which provides more precise memory management based on actual token usage rather than turn count.
+> **Note**: `maxTurnsPerSession` is deprecated. Use `tokenThreshold` instead to control when oldest messages are pruned.
+{: .prompt-info }
 
 You can also configure via environment variables:
 
 ```bash
-# Enable conversation memory
 NEUROLINK_MEMORY_ENABLED=true
 
 # Maximum number of sessions to keep in memory
@@ -337,8 +342,10 @@ const streamResult = await neurolink.stream({
 // Consume the stream for real-time display
 let response = "";
 for await (const chunk of streamResult.stream) {
-  response += chunk.content;
-  process.stdout.write(chunk.content);
+  if ('content' in chunk) {
+    response += chunk.content;
+    process.stdout.write(chunk.content);
+  }
 }
 
 // Memory is saved automatically - both user input AND AI response
@@ -376,7 +383,9 @@ const streamResult = await neurolink.stream({
 });
 
 for await (const chunk of streamResult.stream) {
-  process.stdout.write(chunk.content);
+  if ('content' in chunk) {
+    process.stdout.write(chunk.content);
+  }
 }
 
 // Back to generate - AI remembers both previous messages
@@ -660,17 +669,17 @@ await neurolink.generate({
 When building memory-intensive applications, keep these performance tips in mind:
 
 1. **Use appropriate memory limits**: Set `tokenThreshold` based on your use case
-2. **Consider memory indexing time**: Mem0 requires time for vector indexing (typically 10-30 seconds)
+2. **Consider memory indexing time**: Mem0 requires time for vector indexing — performance varies by backend configuration, so benchmark your specific deployment
 3. **Session cleanup**: Regularly clear unused sessions to prevent memory bloat
 4. **Async operations**: Memory storage operations are non-blocking by design
 5. **User ID consistency**: Always use consistent user IDs for proper isolation
 
 ```typescript
-// Memory performance characteristics
+// Memory performance characteristics — actual values depend on backend and deployment
 const performanceNotes = {
-  lookupTime: "O(1) for session retrieval",
-  storagePerTurn: "~1KB per conversation turn",
-  cleanupTime: "O(n) for session limit enforcement",
+  lookupTime: "Fast for session retrieval (depends on store backend)",
+  storagePerTurn: "Varies by conversation turn content",
+  cleanupTime: "Linear in number of sessions for limit enforcement",
   concurrency: "Thread-safe in-memory operations",
 };
 ```
@@ -691,16 +700,20 @@ const performanceNotes = {
 
 ## Conclusion
 
-Conversation memory is the foundation of truly intelligent AI applications. NeuroLink provides multiple approaches to suit different needs:
+By now you have three working memory approaches: manual history management for full control, built-in session memory for automatic context within sessions, and Mem0 integration for persistent cross-session memory with semantic search.
 
-1. **Manual management** for full control and simple use cases
-2. **Built-in session memory** for automatic context management within sessions
-3. **Mem0 integration** for persistent, cross-session memory with semantic search
+The right choice depends on your application:
 
-By understanding these approaches and choosing the right one for your application, you can build AI experiences that are coherent, personalized, and contextually aware.
+- **One-shot queries:** No memory needed
+- **Multi-turn conversations:** Built-in session memory with Redis (when configured with AOF or RDB persistence)
+- **Persistent agents:** Mem0 for cross-session semantic recall
 
-Start with the built-in session memory for most applications, and graduate to Mem0 when you need persistence across sessions or semantic memory retrieval. The manual approach remains useful for custom requirements or when you need complete control over the conversation history.
+Start with session memory for most applications and graduate to Mem0 when you need memory that spans sessions or semantic retrieval. For the complete API reference and additional examples, see the [NeuroLink documentation](https://github.com/juspay/neurolink).
 
 ---
 
-*Ready to build stateful AI applications? Check out the [NeuroLink documentation](https://github.com/juspay/neurolink) for more examples and the complete API reference.*
+**Related posts:**
+
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
+- [Function Calling: AI Tool Use Patterns with NeuroLink](/posts/function-calling-patterns/)
+- [Build vs Buy: When to Build Your Own AI Abstraction Layer](/posts/build-vs-buy-ai-abstraction/)

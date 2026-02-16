@@ -1,0 +1,4654 @@
+[
+  {
+    "slug": "what-is-neurolink-unified-sdk",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "unified-sdk-architecture",
+        "title": "NeuroLink Unified SDK",
+        "nodes": [
+          {
+            "id": "app",
+            "label": "Your App",
+            "x": 80,
+            "y": 225,
+            "color": "#016fb9",
+            "appearFrame": 0
+          },
+          {
+            "id": "sdk",
+            "label": "NeuroLink SDK",
+            "x": 300,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "openai",
+            "label": "OpenAI",
+            "x": 550,
+            "y": 80,
+            "color": "#10b981",
+            "appearFrame": 16
+          },
+          {
+            "id": "anthropic",
+            "label": "Anthropic",
+            "x": 550,
+            "y": 175,
+            "color": "#8b5cf6",
+            "appearFrame": 20
+          },
+          {
+            "id": "google",
+            "label": "Google",
+            "x": 550,
+            "y": 270,
+            "color": "#3b82f6",
+            "appearFrame": 24
+          },
+          {
+            "id": "bedrock",
+            "label": "Bedrock",
+            "x": 550,
+            "y": 365,
+            "color": "#f59e0b",
+            "appearFrame": 28
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 370,
+            "fromY": 200,
+            "toX": 480,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 32,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 370,
+            "fromY": 215,
+            "toX": 480,
+            "toY": 185,
+            "color": "#8b5cf6",
+            "appearFrame": 34,
+            "particleFrame": 38
+          },
+          {
+            "fromX": 370,
+            "fromY": 240,
+            "toX": 480,
+            "toY": 275,
+            "color": "#3b82f6",
+            "appearFrame": 36,
+            "particleFrame": 40
+          },
+          {
+            "fromX": 370,
+            "fromY": 255,
+            "toX": 480,
+            "toY": 365,
+            "color": "#f59e0b",
+            "appearFrame": 38,
+            "particleFrame": 42
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "neurolink-feature-surface",
+        "concept": "NeuroLink Feature Surface",
+        "steps": [
+          {
+            "label": "Providers",
+            "icon": "\ud83d\udd0c",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Streaming",
+            "icon": "\u26a1",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "MCP Tools",
+            "icon": "\ud83d\udd27",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "RAG",
+            "icon": "\ud83d\udcda",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Middleware",
+            "icon": "\ud83d\udee1\ufe0f",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "getting-started-first-ai-app",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "quickstart-flow",
+        "title": "First AI App Flow",
+        "nodes": [
+          {
+            "id": "install",
+            "label": "npm install",
+            "x": 80,
+            "y": 225,
+            "color": "#0f4c75",
+            "appearFrame": 0
+          },
+          {
+            "id": "config",
+            "label": "Configure .env",
+            "x": 230,
+            "y": 225,
+            "color": "#0f4c75",
+            "appearFrame": 8
+          },
+          {
+            "id": "import",
+            "label": "Import SDK",
+            "x": 380,
+            "y": 225,
+            "color": "#3282b8",
+            "appearFrame": 16
+          },
+          {
+            "id": "generate",
+            "label": "generate()",
+            "x": 530,
+            "y": 225,
+            "color": "#3282b8",
+            "appearFrame": 24
+          },
+          {
+            "id": "response",
+            "label": "AI Response",
+            "x": 680,
+            "y": 225,
+            "color": "#00b4d8",
+            "appearFrame": 32
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 160,
+            "toY": 225,
+            "color": "#3282b8",
+            "appearFrame": 6,
+            "particleFrame": 8
+          },
+          {
+            "fromX": 300,
+            "fromY": 225,
+            "toX": 310,
+            "toY": 225,
+            "color": "#3282b8",
+            "appearFrame": 14,
+            "particleFrame": 16
+          },
+          {
+            "fromX": 450,
+            "fromY": 225,
+            "toX": 460,
+            "toY": 225,
+            "color": "#00b4d8",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 600,
+            "fromY": 225,
+            "toX": 610,
+            "toY": 225,
+            "color": "#00b4d8",
+            "appearFrame": 30,
+            "particleFrame": 32
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "name": "first-generate-call",
+        "filename": "index.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "import",
+                "type": "keyword"
+              },
+              {
+                "text": " { NeuroLink } ",
+                "type": "default"
+              },
+              {
+                "text": "from",
+                "type": "keyword"
+              },
+              {
+                "text": " '@juspay/neurolink'",
+                "type": "string"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " neurolink = ",
+                "type": "default"
+              },
+              {
+                "text": "new",
+                "type": "keyword"
+              },
+              {
+                "text": " NeuroLink",
+                "type": "type"
+              },
+              {
+                "text": "();",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " result = ",
+                "type": "default"
+              },
+              {
+                "text": "await",
+                "type": "keyword"
+              },
+              {
+                "text": " neurolink.",
+                "type": "default"
+              },
+              {
+                "text": "generate",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "input",
+                "type": "default"
+              },
+              {
+                "text": ": { ",
+                "type": "default"
+              },
+              {
+                "text": "text",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'Explain quantum computing'",
+                "type": "string"
+              },
+              {
+                "text": " },",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "provider",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'openai'",
+                "type": "string"
+              },
+              {
+                "text": ",",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "model",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'gpt-4o'",
+                "type": "string"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "streaming-best-practices",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "streaming-vs-buffered",
+        "title": "Streaming vs Buffered",
+        "nodes": [
+          {
+            "id": "request",
+            "label": "Request",
+            "x": 80,
+            "y": 125,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "wait",
+            "label": "Wait 3-5s",
+            "x": 300,
+            "y": 125,
+            "color": "#ef4444",
+            "appearFrame": 8
+          },
+          {
+            "id": "buffered",
+            "label": "Full Response",
+            "x": 520,
+            "y": 125,
+            "color": "#22c55e",
+            "appearFrame": 16
+          },
+          {
+            "id": "stream-req",
+            "label": "Request",
+            "x": 80,
+            "y": 325,
+            "color": "#3b82f6",
+            "appearFrame": 20
+          },
+          {
+            "id": "token1",
+            "label": "Token 1",
+            "x": 230,
+            "y": 325,
+            "color": "#22c55e",
+            "appearFrame": 24
+          },
+          {
+            "id": "token2",
+            "label": "Token 2",
+            "x": 380,
+            "y": 325,
+            "color": "#22c55e",
+            "appearFrame": 28
+          },
+          {
+            "id": "token3",
+            "label": "Token N",
+            "x": 530,
+            "y": 325,
+            "color": "#22c55e",
+            "appearFrame": 32
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 125,
+            "toX": 230,
+            "toY": 125,
+            "color": "#ef4444",
+            "appearFrame": 6,
+            "particleFrame": 10
+          },
+          {
+            "fromX": 370,
+            "fromY": 125,
+            "toX": 450,
+            "toY": 125,
+            "color": "#22c55e",
+            "appearFrame": 14,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 150,
+            "fromY": 325,
+            "toX": 160,
+            "toY": 325,
+            "color": "#22c55e",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 300,
+            "fromY": 325,
+            "toX": 310,
+            "toY": 325,
+            "color": "#22c55e",
+            "appearFrame": 26,
+            "particleFrame": 28
+          },
+          {
+            "fromX": 450,
+            "fromY": 325,
+            "toX": 460,
+            "toY": 325,
+            "color": "#22c55e",
+            "appearFrame": 30,
+            "particleFrame": 32
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "provider-failover-patterns",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "failover-flow",
+        "title": "Provider Failover Flow",
+        "nodes": [
+          {
+            "id": "client",
+            "label": "Client",
+            "x": 80,
+            "y": 225,
+            "color": "#016fb9",
+            "appearFrame": 0
+          },
+          {
+            "id": "primary",
+            "label": "OpenAI",
+            "x": 300,
+            "y": 125,
+            "color": "#ef4444",
+            "appearFrame": 8
+          },
+          {
+            "id": "fallback",
+            "label": "Anthropic",
+            "x": 300,
+            "y": 325,
+            "color": "#22c55e",
+            "appearFrame": 16
+          },
+          {
+            "id": "response",
+            "label": "Response",
+            "x": 550,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 40
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 150,
+            "color": "#ef4444",
+            "appearFrame": 20,
+            "particleFrame": 25
+          },
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 325,
+            "color": "#22c55e",
+            "appearFrame": 30,
+            "particleFrame": 35
+          },
+          {
+            "fromX": 370,
+            "fromY": 325,
+            "toX": 480,
+            "toY": 250,
+            "color": "#22c55e",
+            "appearFrame": 40,
+            "particleFrame": 45
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "failover-strategy",
+        "concept": "Failover Strategy",
+        "steps": [
+          {
+            "label": "Try Primary",
+            "icon": "1\ufe0f\u20e3",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Detect Failure",
+            "icon": "\u274c",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Try Fallback",
+            "icon": "2\ufe0f\u20e3",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Normalize",
+            "icon": "\ud83d\udd04",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Respond",
+            "icon": "\u2705",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "function-calling-patterns",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "tool-execution-loop",
+        "title": "Tool Execution Loop",
+        "nodes": [
+          {
+            "id": "user",
+            "label": "User",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "neurolink",
+            "label": "NeuroLink",
+            "x": 280,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 6
+          },
+          {
+            "id": "llm",
+            "label": "LLM",
+            "x": 480,
+            "y": 125,
+            "color": "#6366f1",
+            "appearFrame": 12
+          },
+          {
+            "id": "tools",
+            "label": "Tools",
+            "x": 480,
+            "y": 325,
+            "color": "#10b981",
+            "appearFrame": 12
+          },
+          {
+            "id": "result",
+            "label": "Result",
+            "x": 680,
+            "y": 225,
+            "color": "#22c55e",
+            "appearFrame": 40
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 8,
+            "particleFrame": 10
+          },
+          {
+            "fromX": 350,
+            "fromY": 200,
+            "toX": 410,
+            "toY": 145,
+            "color": "#6366f1",
+            "appearFrame": 14,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 480,
+            "fromY": 175,
+            "toX": 480,
+            "toY": 275,
+            "color": "#10b981",
+            "appearFrame": 22,
+            "particleFrame": 26
+          },
+          {
+            "fromX": 480,
+            "fromY": 275,
+            "toX": 480,
+            "toY": 175,
+            "color": "#6366f1",
+            "appearFrame": 30,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 550,
+            "fromY": 150,
+            "toX": 610,
+            "toY": 225,
+            "color": "#22c55e",
+            "appearFrame": 38,
+            "particleFrame": 42
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "name": "register-tool",
+        "filename": "tools.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "neurolink.",
+                "type": "default"
+              },
+              {
+                "text": "registerTool",
+                "type": "function"
+              },
+              {
+                "text": "(",
+                "type": "default"
+              },
+              {
+                "text": "'get_weather'",
+                "type": "string"
+              },
+              {
+                "text": ", {",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "description",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'Get weather for a location'",
+                "type": "string"
+              },
+              {
+                "text": ",",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "parameters",
+                "type": "default"
+              },
+              {
+                "text": ": z.",
+                "type": "default"
+              },
+              {
+                "text": "object",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "location",
+                "type": "default"
+              },
+              {
+                "text": ": z.",
+                "type": "default"
+              },
+              {
+                "text": "string",
+                "type": "function"
+              },
+              {
+                "text": "(),",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "units",
+                "type": "default"
+              },
+              {
+                "text": ": z.",
+                "type": "default"
+              },
+              {
+                "text": "enum",
+                "type": "function"
+              },
+              {
+                "text": "([",
+                "type": "default"
+              },
+              {
+                "text": "'celsius'",
+                "type": "string"
+              },
+              {
+                "text": ", ",
+                "type": "default"
+              },
+              {
+                "text": "'fahrenheit'",
+                "type": "string"
+              },
+              {
+                "text": "])",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "}),",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "execute",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "async",
+                "type": "keyword"
+              },
+              {
+                "text": " (params) ",
+                "type": "default"
+              },
+              {
+                "text": "=>",
+                "type": "keyword"
+              },
+              {
+                "text": " {",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "return",
+                "type": "keyword"
+              },
+              {
+                "text": " ",
+                "type": "default"
+              },
+              {
+                "text": "fetchWeather",
+                "type": "function"
+              },
+              {
+                "text": "(params.location);",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "}",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "mcp-tools-integration",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "mcp-integration-flow",
+        "title": "MCP Tool Integration",
+        "nodes": [
+          {
+            "id": "prompt",
+            "label": "User Prompt",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "neurolink",
+            "label": "NeuroLink",
+            "x": 280,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "mcp",
+            "label": "MCP Server",
+            "x": 500,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 16
+          },
+          {
+            "id": "db",
+            "label": "Database",
+            "x": 700,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 24
+          },
+          {
+            "id": "api",
+            "label": "REST API",
+            "x": 700,
+            "y": 225,
+            "color": "#f59e0b",
+            "appearFrame": 28
+          },
+          {
+            "id": "fs",
+            "label": "File System",
+            "x": 700,
+            "y": 350,
+            "color": "#8b5cf6",
+            "appearFrame": 32
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 350,
+            "fromY": 225,
+            "toX": 430,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 18,
+            "particleFrame": 20
+          },
+          {
+            "fromX": 570,
+            "fromY": 195,
+            "toX": 630,
+            "toY": 120,
+            "color": "#10b981",
+            "appearFrame": 34,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 570,
+            "fromY": 225,
+            "toX": 630,
+            "toY": 225,
+            "color": "#f59e0b",
+            "appearFrame": 36,
+            "particleFrame": 38
+          },
+          {
+            "fromX": 570,
+            "fromY": 255,
+            "toX": 630,
+            "toY": 340,
+            "color": "#8b5cf6",
+            "appearFrame": 38,
+            "particleFrame": 40
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "mcp-usb-c-of-ai",
+    "gifs": [
+      {
+        "type": "concept",
+        "name": "mcp-universal-standard",
+        "concept": "MCP: Universal AI Tool Protocol",
+        "steps": [
+          {
+            "label": "AI Model",
+            "icon": "\ud83e\udde0",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "MCP Protocol",
+            "icon": "\ud83d\udd0c",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Database",
+            "icon": "\ud83d\uddc4\ufe0f",
+            "x": 380,
+            "y": 120
+          },
+          {
+            "label": "File System",
+            "icon": "\ud83d\udcc1",
+            "x": 530,
+            "y": 120
+          },
+          {
+            "label": "APIs",
+            "icon": "\ud83c\udf10",
+            "x": 380,
+            "y": 300
+          },
+          {
+            "label": "Code Runner",
+            "icon": "\u2699\ufe0f",
+            "x": 530,
+            "y": 300
+          }
+        ]
+      },
+      {
+        "type": "architecture",
+        "name": "mcp-transport-protocols",
+        "title": "MCP Transport Protocols",
+        "nodes": [
+          {
+            "id": "client",
+            "label": "MCP Client",
+            "x": 80,
+            "y": 225,
+            "color": "#016fb9",
+            "appearFrame": 0
+          },
+          {
+            "id": "stdio",
+            "label": "stdio",
+            "x": 350,
+            "y": 80,
+            "color": "#10b981",
+            "appearFrame": 10
+          },
+          {
+            "id": "sse",
+            "label": "SSE",
+            "x": 350,
+            "y": 175,
+            "color": "#f59e0b",
+            "appearFrame": 14
+          },
+          {
+            "id": "ws",
+            "label": "WebSocket",
+            "x": 350,
+            "y": 270,
+            "color": "#8b5cf6",
+            "appearFrame": 18
+          },
+          {
+            "id": "http",
+            "label": "HTTP",
+            "x": 350,
+            "y": 365,
+            "color": "#3b82f6",
+            "appearFrame": 22
+          },
+          {
+            "id": "server",
+            "label": "MCP Server",
+            "x": 620,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 30
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 200,
+            "toX": 280,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 26,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 150,
+            "fromY": 215,
+            "toX": 280,
+            "toY": 185,
+            "color": "#f59e0b",
+            "appearFrame": 28,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 150,
+            "fromY": 240,
+            "toX": 280,
+            "toY": 275,
+            "color": "#8b5cf6",
+            "appearFrame": 30,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 150,
+            "fromY": 255,
+            "toX": 280,
+            "toY": 370,
+            "color": "#3b82f6",
+            "appearFrame": 32,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 420,
+            "fromY": 225,
+            "toX": 550,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 38,
+            "particleFrame": 42
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "multi-model-future",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "multi-model-routing",
+        "title": "Multi-Model Architecture",
+        "nodes": [
+          {
+            "id": "app",
+            "label": "Your App",
+            "x": 80,
+            "y": 225,
+            "color": "#016fb9",
+            "appearFrame": 0
+          },
+          {
+            "id": "router",
+            "label": "Router",
+            "x": 300,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "gpt",
+            "label": "GPT-4o",
+            "x": 550,
+            "y": 80,
+            "color": "#10b981",
+            "appearFrame": 16
+          },
+          {
+            "id": "claude",
+            "label": "Claude",
+            "x": 550,
+            "y": 195,
+            "color": "#8b5cf6",
+            "appearFrame": 20
+          },
+          {
+            "id": "gemini",
+            "label": "Gemini",
+            "x": 550,
+            "y": 310,
+            "color": "#3b82f6",
+            "appearFrame": 24
+          },
+          {
+            "id": "mistral",
+            "label": "Mistral",
+            "x": 550,
+            "y": 380,
+            "color": "#f59e0b",
+            "appearFrame": 28
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 370,
+            "fromY": 200,
+            "toX": 480,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 30,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 370,
+            "fromY": 215,
+            "toX": 480,
+            "toY": 200,
+            "color": "#8b5cf6",
+            "appearFrame": 32,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 370,
+            "fromY": 240,
+            "toX": 480,
+            "toY": 310,
+            "color": "#3b82f6",
+            "appearFrame": 34,
+            "particleFrame": 38
+          },
+          {
+            "fromX": 370,
+            "fromY": 255,
+            "toX": 480,
+            "toY": 380,
+            "color": "#f59e0b",
+            "appearFrame": 36,
+            "particleFrame": 40
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "rag-implementation",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "rag-pipeline",
+        "title": "RAG Pipeline Flow",
+        "nodes": [
+          {
+            "id": "docs",
+            "label": "Documents",
+            "x": 80,
+            "y": 125,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "chunk",
+            "label": "Chunk",
+            "x": 230,
+            "y": 125,
+            "color": "#6366f1",
+            "appearFrame": 6
+          },
+          {
+            "id": "embed",
+            "label": "Embed",
+            "x": 380,
+            "y": 125,
+            "color": "#8b5cf6",
+            "appearFrame": 12
+          },
+          {
+            "id": "vectordb",
+            "label": "Vector DB",
+            "x": 550,
+            "y": 125,
+            "color": "#10b981",
+            "appearFrame": 18
+          },
+          {
+            "id": "query",
+            "label": "Query",
+            "x": 80,
+            "y": 325,
+            "color": "#f59e0b",
+            "appearFrame": 24
+          },
+          {
+            "id": "retrieve",
+            "label": "Retrieve",
+            "x": 300,
+            "y": 325,
+            "color": "#10b981",
+            "appearFrame": 30
+          },
+          {
+            "id": "augment",
+            "label": "Augment",
+            "x": 480,
+            "y": 325,
+            "color": "#ff9505",
+            "appearFrame": 36
+          },
+          {
+            "id": "generate",
+            "label": "Generate",
+            "x": 680,
+            "y": 325,
+            "color": "#22c55e",
+            "appearFrame": 42
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 125,
+            "toX": 160,
+            "toY": 125,
+            "color": "#6366f1",
+            "appearFrame": 4,
+            "particleFrame": 6
+          },
+          {
+            "fromX": 300,
+            "fromY": 125,
+            "toX": 310,
+            "toY": 125,
+            "color": "#8b5cf6",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 450,
+            "fromY": 125,
+            "toX": 480,
+            "toY": 125,
+            "color": "#10b981",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 150,
+            "fromY": 325,
+            "toX": 230,
+            "toY": 325,
+            "color": "#10b981",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 370,
+            "fromY": 325,
+            "toX": 410,
+            "toY": 325,
+            "color": "#ff9505",
+            "appearFrame": 34,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 550,
+            "fromY": 325,
+            "toX": 610,
+            "toY": 325,
+            "color": "#22c55e",
+            "appearFrame": 40,
+            "particleFrame": 42
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "rag-concept",
+        "concept": "How RAG Works",
+        "steps": [
+          {
+            "label": "Documents",
+            "icon": "\ud83d\udcc4",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Chunk",
+            "icon": "\u2702\ufe0f",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Embed",
+            "icon": "\ud83d\udd22",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Retrieve",
+            "icon": "\ud83d\udd0d",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Generate",
+            "icon": "\u2728",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "middleware-system",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "middleware-chain",
+        "title": "Middleware Pipeline",
+        "nodes": [
+          {
+            "id": "request",
+            "label": "Request",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "analytics",
+            "label": "Analytics",
+            "x": 230,
+            "y": 225,
+            "color": "#10b981",
+            "appearFrame": 8
+          },
+          {
+            "id": "guardrails",
+            "label": "Guardrails",
+            "x": 380,
+            "y": 225,
+            "color": "#ef4444",
+            "appearFrame": 14
+          },
+          {
+            "id": "autoeval",
+            "label": "AutoEval",
+            "x": 530,
+            "y": 225,
+            "color": "#8b5cf6",
+            "appearFrame": 20
+          },
+          {
+            "id": "provider",
+            "label": "AI Provider",
+            "x": 700,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 26
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 160,
+            "toY": 225,
+            "color": "#10b981",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 300,
+            "fromY": 225,
+            "toX": 310,
+            "toY": 225,
+            "color": "#ef4444",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 450,
+            "fromY": 225,
+            "toX": 460,
+            "toY": 225,
+            "color": "#8b5cf6",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 600,
+            "fromY": 225,
+            "toX": 630,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 28,
+            "particleFrame": 30
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "name": "middleware-config",
+        "filename": "config.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " neurolink = ",
+                "type": "default"
+              },
+              {
+                "text": "new",
+                "type": "keyword"
+              },
+              {
+                "text": " NeuroLink",
+                "type": "type"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "middleware",
+                "type": "default"
+              },
+              {
+                "text": ": {",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "analytics",
+                "type": "default"
+              },
+              {
+                "text": ": { ",
+                "type": "default"
+              },
+              {
+                "text": "enabled",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "true",
+                "type": "keyword"
+              },
+              {
+                "text": " },",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "guardrails",
+                "type": "default"
+              },
+              {
+                "text": ": {",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "contentFiltering",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "true",
+                "type": "keyword"
+              },
+              {
+                "text": ",",
+                "type": "default"
+              }
+            ],
+            "indent": 3
+          },
+          {
+            "tokens": [
+              {
+                "text": "piiDetection",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "true",
+                "type": "keyword"
+              }
+            ],
+            "indent": 3
+          },
+          {
+            "tokens": [
+              {
+                "text": "}",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "}",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "provider-abstraction",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "provider-abstraction-layer",
+        "title": "Provider Abstraction Layer",
+        "nodes": [
+          {
+            "id": "generate",
+            "label": "generate()",
+            "x": 80,
+            "y": 225,
+            "color": "#016fb9",
+            "appearFrame": 0
+          },
+          {
+            "id": "base",
+            "label": "BaseProvider",
+            "x": 300,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "openai",
+            "label": "OpenAI\nProvider",
+            "x": 550,
+            "y": 80,
+            "color": "#10b981",
+            "appearFrame": 16
+          },
+          {
+            "id": "anthropic",
+            "label": "Anthropic\nProvider",
+            "x": 550,
+            "y": 195,
+            "color": "#8b5cf6",
+            "appearFrame": 20
+          },
+          {
+            "id": "vertex",
+            "label": "Vertex\nProvider",
+            "x": 550,
+            "y": 310,
+            "color": "#3b82f6",
+            "appearFrame": 24
+          },
+          {
+            "id": "factory",
+            "label": "Factory",
+            "x": 300,
+            "y": 380,
+            "color": "#f59e0b",
+            "appearFrame": 30
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 370,
+            "fromY": 200,
+            "toX": 480,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 28,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 370,
+            "fromY": 225,
+            "toX": 480,
+            "toY": 205,
+            "color": "#8b5cf6",
+            "appearFrame": 30,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 370,
+            "fromY": 250,
+            "toX": 480,
+            "toY": 315,
+            "color": "#3b82f6",
+            "appearFrame": 32,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 300,
+            "fromY": 350,
+            "toX": 300,
+            "toY": 275,
+            "color": "#f59e0b",
+            "appearFrame": 34,
+            "particleFrame": 38
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "building-ai-agents",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "agent-loop",
+        "title": "Agent Loop",
+        "nodes": [
+          {
+            "id": "goal",
+            "label": "User Goal",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "observe",
+            "label": "Observe",
+            "x": 260,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 8
+          },
+          {
+            "id": "think",
+            "label": "Think",
+            "x": 460,
+            "y": 100,
+            "color": "#6366f1",
+            "appearFrame": 14
+          },
+          {
+            "id": "act",
+            "label": "Act",
+            "x": 550,
+            "y": 260,
+            "color": "#f59e0b",
+            "appearFrame": 20
+          },
+          {
+            "id": "result",
+            "label": "Tool Result",
+            "x": 350,
+            "y": 350,
+            "color": "#8b5cf6",
+            "appearFrame": 26
+          },
+          {
+            "id": "response",
+            "label": "Response",
+            "x": 700,
+            "y": 100,
+            "color": "#22c55e",
+            "appearFrame": 40
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 200,
+            "toY": 130,
+            "color": "#10b981",
+            "appearFrame": 6,
+            "particleFrame": 8
+          },
+          {
+            "fromX": 330,
+            "fromY": 100,
+            "toX": 390,
+            "toY": 100,
+            "color": "#6366f1",
+            "appearFrame": 12,
+            "particleFrame": 14
+          },
+          {
+            "fromX": 510,
+            "fromY": 140,
+            "toX": 540,
+            "toY": 220,
+            "color": "#f59e0b",
+            "appearFrame": 18,
+            "particleFrame": 20
+          },
+          {
+            "fromX": 510,
+            "fromY": 290,
+            "toX": 420,
+            "toY": 345,
+            "color": "#8b5cf6",
+            "appearFrame": 24,
+            "particleFrame": 26
+          },
+          {
+            "fromX": 320,
+            "fromY": 320,
+            "toX": 270,
+            "toY": 150,
+            "color": "#10b981",
+            "appearFrame": 30,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 530,
+            "fromY": 100,
+            "toX": 630,
+            "toY": 100,
+            "color": "#22c55e",
+            "appearFrame": 38,
+            "particleFrame": 40
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "agent-concept",
+        "concept": "AI Agent Pattern",
+        "steps": [
+          {
+            "label": "Goal",
+            "icon": "\ud83c\udfaf",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Observe",
+            "icon": "\ud83d\udc41\ufe0f",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Think",
+            "icon": "\ud83e\udde0",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Act",
+            "icon": "\u26a1",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Result",
+            "icon": "\u2705",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "multi-provider-ai-agent-typescript",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "multi-provider-agent",
+        "title": "Multi-Provider Agent",
+        "nodes": [
+          {
+            "id": "task",
+            "label": "Task",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "classifier",
+            "label": "Classifier",
+            "x": 260,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "openai",
+            "label": "OpenAI\nAnalysis",
+            "x": 480,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 16
+          },
+          {
+            "id": "claude",
+            "label": "Claude\nWriting",
+            "x": 480,
+            "y": 225,
+            "color": "#8b5cf6",
+            "appearFrame": 20
+          },
+          {
+            "id": "gemini",
+            "label": "Gemini\nVision",
+            "x": 480,
+            "y": 350,
+            "color": "#3b82f6",
+            "appearFrame": 24
+          },
+          {
+            "id": "output",
+            "label": "Output",
+            "x": 680,
+            "y": 225,
+            "color": "#22c55e",
+            "appearFrame": 36
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 190,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 6,
+            "particleFrame": 8
+          },
+          {
+            "fromX": 330,
+            "fromY": 200,
+            "toX": 410,
+            "toY": 120,
+            "color": "#10b981",
+            "appearFrame": 26,
+            "particleFrame": 28
+          },
+          {
+            "fromX": 330,
+            "fromY": 225,
+            "toX": 410,
+            "toY": 225,
+            "color": "#8b5cf6",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 330,
+            "fromY": 250,
+            "toX": 410,
+            "toY": 350,
+            "color": "#3b82f6",
+            "appearFrame": 30,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 550,
+            "fromY": 225,
+            "toX": 610,
+            "toY": 225,
+            "color": "#22c55e",
+            "appearFrame": 34,
+            "particleFrame": 36
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "workflow-engine",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "workflow-strategies",
+        "title": "Workflow Engine",
+        "nodes": [
+          {
+            "id": "input",
+            "label": "Input",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "ensemble",
+            "label": "Ensemble",
+            "x": 280,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 8
+          },
+          {
+            "id": "chain",
+            "label": "Chain",
+            "x": 280,
+            "y": 225,
+            "color": "#f59e0b",
+            "appearFrame": 12
+          },
+          {
+            "id": "adaptive",
+            "label": "Adaptive",
+            "x": 280,
+            "y": 350,
+            "color": "#8b5cf6",
+            "appearFrame": 16
+          },
+          {
+            "id": "judge",
+            "label": "Judge Panel",
+            "x": 500,
+            "y": 225,
+            "color": "#ef4444",
+            "appearFrame": 24
+          },
+          {
+            "id": "output",
+            "label": "Best Output",
+            "x": 700,
+            "y": 225,
+            "color": "#22c55e",
+            "appearFrame": 36
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 200,
+            "toX": 210,
+            "toY": 120,
+            "color": "#10b981",
+            "appearFrame": 20,
+            "particleFrame": 22
+          },
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#f59e0b",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 150,
+            "fromY": 250,
+            "toX": 210,
+            "toY": 345,
+            "color": "#8b5cf6",
+            "appearFrame": 24,
+            "particleFrame": 26
+          },
+          {
+            "fromX": 350,
+            "fromY": 225,
+            "toX": 430,
+            "toY": 225,
+            "color": "#ef4444",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 570,
+            "fromY": 225,
+            "toX": 630,
+            "toY": 225,
+            "color": "#22c55e",
+            "appearFrame": 34,
+            "particleFrame": 36
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "judge-scoring",
+        "concept": "Judge Scoring Pipeline",
+        "steps": [
+          {
+            "label": "Models Run",
+            "icon": "\ud83c\udfc3",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Outputs",
+            "icon": "\ud83d\udcdd",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Judge Score",
+            "icon": "\u2696\ufe0f",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Consensus",
+            "icon": "\ud83e\udd1d",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Best Result",
+            "icon": "\ud83c\udfc6",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "multi-agent-networks",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "hub-spoke-topology",
+        "title": "Hub-Spoke Agent Network",
+        "nodes": [
+          {
+            "id": "router",
+            "label": "RoutingAgent",
+            "x": 400,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 0
+          },
+          {
+            "id": "researcher",
+            "label": "Researcher",
+            "x": 200,
+            "y": 80,
+            "color": "#10b981",
+            "appearFrame": 8
+          },
+          {
+            "id": "writer",
+            "label": "Writer",
+            "x": 600,
+            "y": 80,
+            "color": "#f59e0b",
+            "appearFrame": 12
+          },
+          {
+            "id": "editor",
+            "label": "Editor",
+            "x": 200,
+            "y": 370,
+            "color": "#3b82f6",
+            "appearFrame": 16
+          },
+          {
+            "id": "checker",
+            "label": "Fact-Checker",
+            "x": 600,
+            "y": 370,
+            "color": "#8b5cf6",
+            "appearFrame": 20
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 350,
+            "fromY": 195,
+            "toX": 260,
+            "toY": 120,
+            "color": "#10b981",
+            "appearFrame": 24,
+            "particleFrame": 28
+          },
+          {
+            "fromX": 450,
+            "fromY": 195,
+            "toX": 540,
+            "toY": 120,
+            "color": "#f59e0b",
+            "appearFrame": 26,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 350,
+            "fromY": 255,
+            "toX": 260,
+            "toY": 340,
+            "color": "#3b82f6",
+            "appearFrame": 28,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 450,
+            "fromY": 255,
+            "toX": 540,
+            "toY": 340,
+            "color": "#8b5cf6",
+            "appearFrame": 30,
+            "particleFrame": 34
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "advanced-rag",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "advanced-rag-pipeline",
+        "title": "Advanced RAG Pipeline",
+        "nodes": [
+          {
+            "id": "docs",
+            "label": "Documents",
+            "x": 80,
+            "y": 100,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "chunker",
+            "label": "ChunkerFactory",
+            "x": 260,
+            "y": 100,
+            "color": "#6366f1",
+            "appearFrame": 6
+          },
+          {
+            "id": "embed",
+            "label": "Embeddings",
+            "x": 440,
+            "y": 100,
+            "color": "#8b5cf6",
+            "appearFrame": 12
+          },
+          {
+            "id": "store",
+            "label": "Vector + BM25",
+            "x": 660,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 18
+          },
+          {
+            "id": "query",
+            "label": "Query",
+            "x": 80,
+            "y": 350,
+            "color": "#f59e0b",
+            "appearFrame": 24
+          },
+          {
+            "id": "hybrid",
+            "label": "Hybrid Search",
+            "x": 300,
+            "y": 350,
+            "color": "#ff9505",
+            "appearFrame": 30
+          },
+          {
+            "id": "rerank",
+            "label": "Reranker",
+            "x": 500,
+            "y": 350,
+            "color": "#ef4444",
+            "appearFrame": 36
+          },
+          {
+            "id": "gen",
+            "label": "Generate",
+            "x": 680,
+            "y": 350,
+            "color": "#22c55e",
+            "appearFrame": 42
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 100,
+            "toX": 190,
+            "toY": 100,
+            "color": "#6366f1",
+            "appearFrame": 4,
+            "particleFrame": 6
+          },
+          {
+            "fromX": 330,
+            "fromY": 100,
+            "toX": 370,
+            "toY": 100,
+            "color": "#8b5cf6",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 510,
+            "fromY": 100,
+            "toX": 590,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 150,
+            "fromY": 350,
+            "toX": 230,
+            "toY": 350,
+            "color": "#ff9505",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 370,
+            "fromY": 350,
+            "toX": 430,
+            "toY": 350,
+            "color": "#ef4444",
+            "appearFrame": 34,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 570,
+            "fromY": 350,
+            "toX": 610,
+            "toY": 350,
+            "color": "#22c55e",
+            "appearFrame": 40,
+            "particleFrame": 42
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "how-we-built-mcp-integration",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "mcp-lifecycle",
+        "title": "MCP Connection Lifecycle",
+        "nodes": [
+          {
+            "id": "connect",
+            "label": "Connect",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "handshake",
+            "label": "Handshake",
+            "x": 230,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 8
+          },
+          {
+            "id": "discover",
+            "label": "Discover\nTools",
+            "x": 380,
+            "y": 225,
+            "color": "#f59e0b",
+            "appearFrame": 16
+          },
+          {
+            "id": "register",
+            "label": "Register",
+            "x": 530,
+            "y": 225,
+            "color": "#10b981",
+            "appearFrame": 24
+          },
+          {
+            "id": "execute",
+            "label": "Execute",
+            "x": 680,
+            "y": 225,
+            "color": "#22c55e",
+            "appearFrame": 32
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 160,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 6,
+            "particleFrame": 8
+          },
+          {
+            "fromX": 300,
+            "fromY": 225,
+            "toX": 310,
+            "toY": 225,
+            "color": "#f59e0b",
+            "appearFrame": 14,
+            "particleFrame": 16
+          },
+          {
+            "fromX": 450,
+            "fromY": 225,
+            "toX": 460,
+            "toY": 225,
+            "color": "#10b981",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 600,
+            "fromY": 225,
+            "toX": 610,
+            "toY": 225,
+            "color": "#22c55e",
+            "appearFrame": 30,
+            "particleFrame": 32
+          }
+        ]
+      },
+      {
+        "type": "architecture",
+        "name": "mcp-resilience",
+        "title": "MCP Resilience Layer",
+        "nodes": [
+          {
+            "id": "toolcall",
+            "label": "Tool Call",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "breaker",
+            "label": "Circuit\nBreaker",
+            "x": 260,
+            "y": 225,
+            "color": "#ef4444",
+            "appearFrame": 8
+          },
+          {
+            "id": "ratelimit",
+            "label": "Rate\nLimiter",
+            "x": 420,
+            "y": 225,
+            "color": "#f59e0b",
+            "appearFrame": 14
+          },
+          {
+            "id": "server",
+            "label": "MCP\nServer",
+            "x": 580,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 20
+          },
+          {
+            "id": "health",
+            "label": "Health\nMonitor",
+            "x": 420,
+            "y": 380,
+            "color": "#10b981",
+            "appearFrame": 26
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 190,
+            "toY": 225,
+            "color": "#ef4444",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 330,
+            "fromY": 225,
+            "toX": 350,
+            "toY": 225,
+            "color": "#f59e0b",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 490,
+            "fromY": 225,
+            "toX": 510,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 420,
+            "fromY": 350,
+            "toX": 420,
+            "toY": 275,
+            "color": "#10b981",
+            "appearFrame": 28,
+            "particleFrame": 30
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "event-system",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "event-lifecycle",
+        "title": "Event System Lifecycle",
+        "nodes": [
+          {
+            "id": "generate",
+            "label": "generate()",
+            "x": 80,
+            "y": 120,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "genstart",
+            "label": "generation\n:start",
+            "x": 260,
+            "y": 120,
+            "color": "#10b981",
+            "appearFrame": 6
+          },
+          {
+            "id": "toolstart",
+            "label": "tool:start",
+            "x": 420,
+            "y": 120,
+            "color": "#f59e0b",
+            "appearFrame": 12
+          },
+          {
+            "id": "toolend",
+            "label": "tool:end",
+            "x": 560,
+            "y": 120,
+            "color": "#f59e0b",
+            "appearFrame": 18
+          },
+          {
+            "id": "genend",
+            "label": "generation\n:end",
+            "x": 700,
+            "y": 120,
+            "color": "#22c55e",
+            "appearFrame": 24
+          },
+          {
+            "id": "stream",
+            "label": "stream()",
+            "x": 80,
+            "y": 340,
+            "color": "#3b82f6",
+            "appearFrame": 28
+          },
+          {
+            "id": "sstart",
+            "label": "stream\n:start",
+            "x": 260,
+            "y": 340,
+            "color": "#10b981",
+            "appearFrame": 32
+          },
+          {
+            "id": "schunk",
+            "label": "stream\n:chunk",
+            "x": 420,
+            "y": 340,
+            "color": "#8b5cf6",
+            "appearFrame": 36
+          },
+          {
+            "id": "send",
+            "label": "stream\n:end",
+            "x": 580,
+            "y": 340,
+            "color": "#22c55e",
+            "appearFrame": 42
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 120,
+            "toX": 190,
+            "toY": 120,
+            "color": "#10b981",
+            "appearFrame": 4,
+            "particleFrame": 6
+          },
+          {
+            "fromX": 330,
+            "fromY": 120,
+            "toX": 350,
+            "toY": 120,
+            "color": "#f59e0b",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 480,
+            "fromY": 120,
+            "toX": 580,
+            "toY": 120,
+            "color": "#f59e0b",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 600,
+            "fromY": 120,
+            "toX": 720,
+            "toY": 120,
+            "color": "#22c55e",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 150,
+            "fromY": 340,
+            "toX": 190,
+            "toY": 340,
+            "color": "#10b981",
+            "appearFrame": 30,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 330,
+            "fromY": 340,
+            "toX": 350,
+            "toY": 340,
+            "color": "#8b5cf6",
+            "appearFrame": 34,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 490,
+            "fromY": 340,
+            "toX": 510,
+            "toY": 340,
+            "color": "#22c55e",
+            "appearFrame": 40,
+            "particleFrame": 42
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "factory-registry-pattern",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "factory-registry",
+        "title": "Factory + Registry Pattern",
+        "nodes": [
+          {
+            "id": "app",
+            "label": "Application",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "factory",
+            "label": "Provider\nFactory",
+            "x": 280,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "registry",
+            "label": "Provider\nRegistry",
+            "x": 480,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 14
+          },
+          {
+            "id": "openai",
+            "label": "OpenAI",
+            "x": 680,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 22
+          },
+          {
+            "id": "anthropic",
+            "label": "Anthropic",
+            "x": 680,
+            "y": 225,
+            "color": "#8b5cf6",
+            "appearFrame": 26
+          },
+          {
+            "id": "vertex",
+            "label": "Vertex",
+            "x": 680,
+            "y": 350,
+            "color": "#3b82f6",
+            "appearFrame": 30
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 350,
+            "fromY": 225,
+            "toX": 410,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 550,
+            "fromY": 200,
+            "toX": 610,
+            "toY": 120,
+            "color": "#10b981",
+            "appearFrame": 32,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 550,
+            "fromY": 225,
+            "toX": 610,
+            "toY": 225,
+            "color": "#8b5cf6",
+            "appearFrame": 34,
+            "particleFrame": 38
+          },
+          {
+            "fromX": 550,
+            "fromY": 250,
+            "toX": 610,
+            "toY": 345,
+            "color": "#3b82f6",
+            "appearFrame": 36,
+            "particleFrame": 40
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "server-adapters",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "server-adapter-factory",
+        "title": "Server Adapter Factory",
+        "nodes": [
+          {
+            "id": "neurolink",
+            "label": "NeuroLink",
+            "x": 80,
+            "y": 225,
+            "color": "#016fb9",
+            "appearFrame": 0
+          },
+          {
+            "id": "factory",
+            "label": "ServerAdapter\nFactory",
+            "x": 300,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "hono",
+            "label": "Hono",
+            "x": 550,
+            "y": 80,
+            "color": "#f59e0b",
+            "appearFrame": 16
+          },
+          {
+            "id": "express",
+            "label": "Express",
+            "x": 550,
+            "y": 185,
+            "color": "#10b981",
+            "appearFrame": 20
+          },
+          {
+            "id": "fastify",
+            "label": "Fastify",
+            "x": 550,
+            "y": 290,
+            "color": "#3b82f6",
+            "appearFrame": 24
+          },
+          {
+            "id": "koa",
+            "label": "Koa",
+            "x": 550,
+            "y": 380,
+            "color": "#8b5cf6",
+            "appearFrame": 28
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 370,
+            "fromY": 200,
+            "toX": 480,
+            "toY": 100,
+            "color": "#f59e0b",
+            "appearFrame": 30,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 370,
+            "fromY": 215,
+            "toX": 480,
+            "toY": 195,
+            "color": "#10b981",
+            "appearFrame": 32,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 370,
+            "fromY": 240,
+            "toX": 480,
+            "toY": 295,
+            "color": "#3b82f6",
+            "appearFrame": 34,
+            "particleFrame": 38
+          },
+          {
+            "fromX": 370,
+            "fromY": 255,
+            "toX": 480,
+            "toY": 380,
+            "color": "#8b5cf6",
+            "appearFrame": 36,
+            "particleFrame": 40
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "how-we-built-streaming-tool-calls",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "streaming-tool-calls",
+        "title": "Streaming Tool Calls",
+        "nodes": [
+          {
+            "id": "stream",
+            "label": "Stream",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "text1",
+            "label": "Text\nTokens",
+            "x": 230,
+            "y": 120,
+            "color": "#22c55e",
+            "appearFrame": 8
+          },
+          {
+            "id": "toolcall",
+            "label": "Tool Call\nDetected",
+            "x": 380,
+            "y": 225,
+            "color": "#f59e0b",
+            "appearFrame": 16
+          },
+          {
+            "id": "execute",
+            "label": "Execute\nTool",
+            "x": 530,
+            "y": 325,
+            "color": "#8b5cf6",
+            "appearFrame": 22
+          },
+          {
+            "id": "resume",
+            "label": "Resume\nStream",
+            "x": 530,
+            "y": 120,
+            "color": "#22c55e",
+            "appearFrame": 30
+          },
+          {
+            "id": "complete",
+            "label": "Complete",
+            "x": 700,
+            "y": 225,
+            "color": "#10b981",
+            "appearFrame": 38
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 200,
+            "toX": 160,
+            "toY": 145,
+            "color": "#22c55e",
+            "appearFrame": 6,
+            "particleFrame": 8
+          },
+          {
+            "fromX": 300,
+            "fromY": 160,
+            "toX": 310,
+            "toY": 210,
+            "color": "#f59e0b",
+            "appearFrame": 14,
+            "particleFrame": 16
+          },
+          {
+            "fromX": 450,
+            "fromY": 260,
+            "toX": 460,
+            "toY": 325,
+            "color": "#8b5cf6",
+            "appearFrame": 20,
+            "particleFrame": 22
+          },
+          {
+            "fromX": 530,
+            "fromY": 285,
+            "toX": 530,
+            "toY": 170,
+            "color": "#22c55e",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 600,
+            "fromY": 150,
+            "toX": 630,
+            "toY": 225,
+            "color": "#10b981",
+            "appearFrame": 36,
+            "particleFrame": 38
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "structured-output-llm-json-schema-typescript",
+    "gifs": [
+      {
+        "type": "code",
+        "name": "structured-output-zod",
+        "filename": "schema.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "import",
+                "type": "keyword"
+              },
+              {
+                "text": " { z } ",
+                "type": "default"
+              },
+              {
+                "text": "from",
+                "type": "keyword"
+              },
+              {
+                "text": " 'zod'",
+                "type": "string"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " schema = z.",
+                "type": "default"
+              },
+              {
+                "text": "object",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "sentiment",
+                "type": "default"
+              },
+              {
+                "text": ": z.",
+                "type": "default"
+              },
+              {
+                "text": "enum",
+                "type": "function"
+              },
+              {
+                "text": "([",
+                "type": "default"
+              },
+              {
+                "text": "'positive'",
+                "type": "string"
+              },
+              {
+                "text": ", ",
+                "type": "default"
+              },
+              {
+                "text": "'negative'",
+                "type": "string"
+              },
+              {
+                "text": "]),",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "confidence",
+                "type": "default"
+              },
+              {
+                "text": ": z.",
+                "type": "default"
+              },
+              {
+                "text": "number",
+                "type": "function"
+              },
+              {
+                "text": "().",
+                "type": "default"
+              },
+              {
+                "text": "min",
+                "type": "function"
+              },
+              {
+                "text": "(0).",
+                "type": "default"
+              },
+              {
+                "text": "max",
+                "type": "function"
+              },
+              {
+                "text": "(1),",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "topics",
+                "type": "default"
+              },
+              {
+                "text": ": z.",
+                "type": "default"
+              },
+              {
+                "text": "array",
+                "type": "function"
+              },
+              {
+                "text": "(z.",
+                "type": "default"
+              },
+              {
+                "text": "string",
+                "type": "function"
+              },
+              {
+                "text": "())",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " result = ",
+                "type": "default"
+              },
+              {
+                "text": "await",
+                "type": "keyword"
+              },
+              {
+                "text": " neurolink.",
+                "type": "default"
+              },
+              {
+                "text": "generate",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "output",
+                "type": "default"
+              },
+              {
+                "text": ": { ",
+                "type": "default"
+              },
+              {
+                "text": "schema",
+                "type": "default"
+              },
+              {
+                "text": " }",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "mcp-server-tutorial",
+    "gifs": [
+      {
+        "type": "code",
+        "name": "create-mcp-server",
+        "filename": "server.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "import",
+                "type": "keyword"
+              },
+              {
+                "text": " { ",
+                "type": "default"
+              },
+              {
+                "text": "createMCPServer",
+                "type": "function"
+              },
+              {
+                "text": " } ",
+                "type": "default"
+              },
+              {
+                "text": "from",
+                "type": "keyword"
+              },
+              {
+                "text": " '@juspay/neurolink'",
+                "type": "string"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " server = ",
+                "type": "default"
+              },
+              {
+                "text": "createMCPServer",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "id",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'my-tools'",
+                "type": "string"
+              },
+              {
+                "text": ",",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "title",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'Business Tools'",
+                "type": "string"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "server.",
+                "type": "default"
+              },
+              {
+                "text": "registerTool",
+                "type": "function"
+              },
+              {
+                "text": "(",
+                "type": "default"
+              },
+              {
+                "text": "'query_db'",
+                "type": "string"
+              },
+              {
+                "text": ", {",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "// tool definition...",
+                "type": "comment"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      },
+      {
+        "type": "architecture",
+        "name": "mcp-server-flow",
+        "title": "MCP Server Flow",
+        "nodes": [
+          {
+            "id": "user",
+            "label": "User",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "agent",
+            "label": "AI Agent",
+            "x": 250,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 6
+          },
+          {
+            "id": "mcp",
+            "label": "MCP Server",
+            "x": 430,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 12
+          },
+          {
+            "id": "db",
+            "label": "Database",
+            "x": 630,
+            "y": 140,
+            "color": "#10b981",
+            "appearFrame": 20
+          },
+          {
+            "id": "notify",
+            "label": "Notifier",
+            "x": 630,
+            "y": 310,
+            "color": "#f59e0b",
+            "appearFrame": 24
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 180,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 4,
+            "particleFrame": 6
+          },
+          {
+            "fromX": 320,
+            "fromY": 225,
+            "toX": 360,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 500,
+            "fromY": 200,
+            "toX": 560,
+            "toY": 160,
+            "color": "#10b981",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 500,
+            "fromY": 260,
+            "toX": 560,
+            "toY": 300,
+            "color": "#f59e0b",
+            "appearFrame": 30,
+            "particleFrame": 32
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "full-stack-ai-chatbot-nextjs-neurolink",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "nextjs-chatbot-architecture",
+        "title": "Next.js Chatbot Architecture",
+        "nodes": [
+          {
+            "id": "react",
+            "label": "React UI",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "route",
+            "label": "API Route",
+            "x": 280,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "neurolink",
+            "label": "NeuroLink",
+            "x": 480,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 14
+          },
+          {
+            "id": "llm",
+            "label": "LLM",
+            "x": 680,
+            "y": 140,
+            "color": "#10b981",
+            "appearFrame": 20
+          },
+          {
+            "id": "tools",
+            "label": "Tools",
+            "x": 680,
+            "y": 310,
+            "color": "#f59e0b",
+            "appearFrame": 24
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 6,
+            "particleFrame": 8
+          },
+          {
+            "fromX": 350,
+            "fromY": 225,
+            "toX": 410,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 12,
+            "particleFrame": 14
+          },
+          {
+            "fromX": 550,
+            "fromY": 200,
+            "toX": 610,
+            "toY": 155,
+            "color": "#10b981",
+            "appearFrame": 26,
+            "particleFrame": 28
+          },
+          {
+            "fromX": 550,
+            "fromY": 260,
+            "toX": 610,
+            "toY": 305,
+            "color": "#f59e0b",
+            "appearFrame": 28,
+            "particleFrame": 30
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "name": "nextjs-api-route",
+        "filename": "route.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "// app/api/chat/route.ts",
+                "type": "comment"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "export",
+                "type": "keyword"
+              },
+              {
+                "text": " ",
+                "type": "default"
+              },
+              {
+                "text": "async",
+                "type": "keyword"
+              },
+              {
+                "text": " ",
+                "type": "default"
+              },
+              {
+                "text": "function",
+                "type": "keyword"
+              },
+              {
+                "text": " ",
+                "type": "default"
+              },
+              {
+                "text": "POST",
+                "type": "function"
+              },
+              {
+                "text": "(req: ",
+                "type": "default"
+              },
+              {
+                "text": "Request",
+                "type": "type"
+              },
+              {
+                "text": ") {",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " { message } = ",
+                "type": "default"
+              },
+              {
+                "text": "await",
+                "type": "keyword"
+              },
+              {
+                "text": " req.",
+                "type": "default"
+              },
+              {
+                "text": "json",
+                "type": "function"
+              },
+              {
+                "text": "();",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " stream = ",
+                "type": "default"
+              },
+              {
+                "text": "await",
+                "type": "keyword"
+              },
+              {
+                "text": " neurolink.",
+                "type": "default"
+              },
+              {
+                "text": "stream",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "input",
+                "type": "default"
+              },
+              {
+                "text": ": { ",
+                "type": "default"
+              },
+              {
+                "text": "text",
+                "type": "default"
+              },
+              {
+                "text": ": message }",
+                "type": "default"
+              }
+            ],
+            "indent": 2
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "return",
+                "type": "keyword"
+              },
+              {
+                "text": " stream.",
+                "type": "default"
+              },
+              {
+                "text": "toResponse",
+                "type": "function"
+              },
+              {
+                "text": "();",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "}",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "embeddings-vector-operations",
+    "gifs": [
+      {
+        "type": "concept",
+        "name": "embedding-pipeline",
+        "concept": "Embedding Pipeline",
+        "steps": [
+          {
+            "label": "Text Input",
+            "icon": "\ud83d\udcdd",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Tokenize",
+            "icon": "\ud83d\udd24",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Embed",
+            "icon": "\ud83d\udd22",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Vector",
+            "icon": "\ud83d\udcd0",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Similarity",
+            "icon": "\ud83d\udd0d",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "type": "code",
+        "name": "embed-api",
+        "filename": "embed.ts",
+        "lines": [
+          {
+            "tokens": [
+              {
+                "text": "const",
+                "type": "keyword"
+              },
+              {
+                "text": " embedding = ",
+                "type": "default"
+              },
+              {
+                "text": "await",
+                "type": "keyword"
+              },
+              {
+                "text": " neurolink.",
+                "type": "default"
+              },
+              {
+                "text": "embed",
+                "type": "function"
+              },
+              {
+                "text": "({",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "input",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'Search query text'",
+                "type": "string"
+              },
+              {
+                "text": ",",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "provider",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'openai'",
+                "type": "string"
+              },
+              {
+                "text": ",",
+                "type": "default"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "model",
+                "type": "default"
+              },
+              {
+                "text": ": ",
+                "type": "default"
+              },
+              {
+                "text": "'text-embedding-3-small'",
+                "type": "string"
+              }
+            ],
+            "indent": 1
+          },
+          {
+            "tokens": [
+              {
+                "text": "});",
+                "type": "default"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "// embedding.vector: number[]",
+                "type": "comment"
+              }
+            ],
+            "indent": 0
+          },
+          {
+            "tokens": [
+              {
+                "text": "// embedding.dimensions: 1536",
+                "type": "comment"
+              }
+            ],
+            "indent": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "rag-application-typescript-tutorial",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "rag-app-architecture",
+        "title": "RAG Application Architecture",
+        "nodes": [
+          {
+            "id": "loader",
+            "label": "Doc Loader",
+            "x": 80,
+            "y": 100,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "splitter",
+            "label": "Splitter",
+            "x": 230,
+            "y": 100,
+            "color": "#6366f1",
+            "appearFrame": 6
+          },
+          {
+            "id": "embedder",
+            "label": "Embedder",
+            "x": 380,
+            "y": 100,
+            "color": "#8b5cf6",
+            "appearFrame": 12
+          },
+          {
+            "id": "store",
+            "label": "Vector Store",
+            "x": 550,
+            "y": 100,
+            "color": "#10b981",
+            "appearFrame": 18
+          },
+          {
+            "id": "input",
+            "label": "User Query",
+            "x": 80,
+            "y": 350,
+            "color": "#f59e0b",
+            "appearFrame": 24
+          },
+          {
+            "id": "search",
+            "label": "Search",
+            "x": 300,
+            "y": 350,
+            "color": "#10b981",
+            "appearFrame": 30
+          },
+          {
+            "id": "context",
+            "label": "Context",
+            "x": 480,
+            "y": 350,
+            "color": "#ff9505",
+            "appearFrame": 36
+          },
+          {
+            "id": "answer",
+            "label": "Answer",
+            "x": 680,
+            "y": 350,
+            "color": "#22c55e",
+            "appearFrame": 42
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 100,
+            "toX": 160,
+            "toY": 100,
+            "color": "#6366f1",
+            "appearFrame": 4,
+            "particleFrame": 6
+          },
+          {
+            "fromX": 300,
+            "fromY": 100,
+            "toX": 310,
+            "toY": 100,
+            "color": "#8b5cf6",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 450,
+            "fromY": 100,
+            "toX": 480,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 150,
+            "fromY": 350,
+            "toX": 230,
+            "toY": 350,
+            "color": "#10b981",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 370,
+            "fromY": 350,
+            "toX": 410,
+            "toY": 350,
+            "color": "#ff9505",
+            "appearFrame": 34,
+            "particleFrame": 36
+          },
+          {
+            "fromX": 550,
+            "fromY": 350,
+            "toX": 610,
+            "toY": 350,
+            "color": "#22c55e",
+            "appearFrame": 40,
+            "particleFrame": 42
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "reduce-llm-costs-smart-model-routing",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "smart-model-routing",
+        "title": "Smart Model Routing",
+        "nodes": [
+          {
+            "id": "prompt",
+            "label": "Prompt",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "classifier",
+            "label": "Complexity\nClassifier",
+            "x": 280,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "cheap",
+            "label": "Flash\n$0.30/M",
+            "x": 520,
+            "y": 100,
+            "color": "#22c55e",
+            "appearFrame": 16
+          },
+          {
+            "id": "mid",
+            "label": "Sonnet\n$3/M",
+            "x": 520,
+            "y": 225,
+            "color": "#f59e0b",
+            "appearFrame": 20
+          },
+          {
+            "id": "premium",
+            "label": "GPT-4o\n$10/M",
+            "x": 520,
+            "y": 350,
+            "color": "#ef4444",
+            "appearFrame": 24
+          },
+          {
+            "id": "output",
+            "label": "Response",
+            "x": 700,
+            "y": 225,
+            "color": "#10b981",
+            "appearFrame": 36
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 350,
+            "fromY": 200,
+            "toX": 450,
+            "toY": 120,
+            "color": "#22c55e",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 350,
+            "fromY": 225,
+            "toX": 450,
+            "toY": 225,
+            "color": "#f59e0b",
+            "appearFrame": 30,
+            "particleFrame": 32
+          },
+          {
+            "fromX": 350,
+            "fromY": 250,
+            "toX": 450,
+            "toY": 345,
+            "color": "#ef4444",
+            "appearFrame": 32,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 590,
+            "fromY": 225,
+            "toX": 630,
+            "toY": 225,
+            "color": "#10b981",
+            "appearFrame": 38,
+            "particleFrame": 40
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "cost-savings",
+        "concept": "60% Cost Reduction",
+        "steps": [
+          {
+            "label": "All GPT-4o",
+            "icon": "\ud83d\udcb0",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Classify",
+            "icon": "\ud83c\udff7\ufe0f",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Route Smart",
+            "icon": "\ud83d\udd00",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Same Quality",
+            "icon": "\u2705",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "60% Saved",
+            "icon": "\ud83d\udcc9",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "context-compaction",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "compaction-pipeline",
+        "title": "Context Compaction",
+        "nodes": [
+          {
+            "id": "msg1",
+            "label": "Msgs 1-15",
+            "x": 80,
+            "y": 120,
+            "color": "#6366f1",
+            "appearFrame": 0
+          },
+          {
+            "id": "msg2",
+            "label": "Msgs 16-20",
+            "x": 80,
+            "y": 280,
+            "color": "#3b82f6",
+            "appearFrame": 4
+          },
+          {
+            "id": "check",
+            "label": "Token\nLimit?",
+            "x": 260,
+            "y": 200,
+            "color": "#ef4444",
+            "appearFrame": 10
+          },
+          {
+            "id": "extract",
+            "label": "Extract\nKey Info",
+            "x": 420,
+            "y": 200,
+            "color": "#f59e0b",
+            "appearFrame": 18
+          },
+          {
+            "id": "summary",
+            "label": "Summary\n~200 tokens",
+            "x": 600,
+            "y": 120,
+            "color": "#22c55e",
+            "appearFrame": 26
+          },
+          {
+            "id": "recent",
+            "label": "Recent\nMessages",
+            "x": 600,
+            "y": 280,
+            "color": "#3b82f6",
+            "appearFrame": 30
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 150,
+            "toX": 190,
+            "toY": 190,
+            "color": "#ef4444",
+            "appearFrame": 8,
+            "particleFrame": 10
+          },
+          {
+            "fromX": 150,
+            "fromY": 270,
+            "toX": 190,
+            "toY": 220,
+            "color": "#ef4444",
+            "appearFrame": 8,
+            "particleFrame": 10
+          },
+          {
+            "fromX": 330,
+            "fromY": 200,
+            "toX": 350,
+            "toY": 200,
+            "color": "#f59e0b",
+            "appearFrame": 16,
+            "particleFrame": 18
+          },
+          {
+            "fromX": 490,
+            "fromY": 180,
+            "toX": 530,
+            "toY": 140,
+            "color": "#22c55e",
+            "appearFrame": 24,
+            "particleFrame": 26
+          },
+          {
+            "fromX": 490,
+            "fromY": 225,
+            "toX": 530,
+            "toY": 270,
+            "color": "#3b82f6",
+            "appearFrame": 28,
+            "particleFrame": 30
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "multi-model-consensus",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "consensus-pipeline",
+        "title": "Multi-Model Consensus",
+        "nodes": [
+          {
+            "id": "input",
+            "label": "Decision\nInput",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "claude",
+            "label": "Claude",
+            "x": 300,
+            "y": 80,
+            "color": "#8b5cf6",
+            "appearFrame": 8
+          },
+          {
+            "id": "gpt",
+            "label": "GPT-4o",
+            "x": 300,
+            "y": 225,
+            "color": "#10b981",
+            "appearFrame": 12
+          },
+          {
+            "id": "gemini",
+            "label": "Gemini",
+            "x": 300,
+            "y": 370,
+            "color": "#3b82f6",
+            "appearFrame": 16
+          },
+          {
+            "id": "agg",
+            "label": "Aggregator",
+            "x": 500,
+            "y": 225,
+            "color": "#6366f1",
+            "appearFrame": 24
+          },
+          {
+            "id": "approve",
+            "label": "Consensus",
+            "x": 700,
+            "y": 140,
+            "color": "#22c55e",
+            "appearFrame": 34
+          },
+          {
+            "id": "escalate",
+            "label": "Escalate",
+            "x": 700,
+            "y": 320,
+            "color": "#ef4444",
+            "appearFrame": 38
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 200,
+            "toX": 230,
+            "toY": 100,
+            "color": "#8b5cf6",
+            "appearFrame": 18,
+            "particleFrame": 20
+          },
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 230,
+            "toY": 225,
+            "color": "#10b981",
+            "appearFrame": 20,
+            "particleFrame": 22
+          },
+          {
+            "fromX": 150,
+            "fromY": 250,
+            "toX": 230,
+            "toY": 365,
+            "color": "#3b82f6",
+            "appearFrame": 22,
+            "particleFrame": 24
+          },
+          {
+            "fromX": 370,
+            "fromY": 225,
+            "toX": 430,
+            "toY": 225,
+            "color": "#6366f1",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 570,
+            "fromY": 200,
+            "toX": 630,
+            "toY": 155,
+            "color": "#22c55e",
+            "appearFrame": 32,
+            "particleFrame": 34
+          },
+          {
+            "fromX": 570,
+            "fromY": 250,
+            "toX": 630,
+            "toY": 315,
+            "color": "#ef4444",
+            "appearFrame": 36,
+            "particleFrame": 38
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "batch-processing",
+    "gifs": [
+      {
+        "type": "architecture",
+        "name": "batch-concurrency",
+        "title": "Batch Processing Pipeline",
+        "nodes": [
+          {
+            "id": "items",
+            "label": "1000 Items",
+            "x": 80,
+            "y": 225,
+            "color": "#3b82f6",
+            "appearFrame": 0
+          },
+          {
+            "id": "pool",
+            "label": "Concurrency\nPool (10)",
+            "x": 280,
+            "y": 225,
+            "color": "#ff9505",
+            "appearFrame": 8
+          },
+          {
+            "id": "w1",
+            "label": "Worker 1",
+            "x": 500,
+            "y": 80,
+            "color": "#10b981",
+            "appearFrame": 16
+          },
+          {
+            "id": "w2",
+            "label": "Worker 2",
+            "x": 500,
+            "y": 180,
+            "color": "#10b981",
+            "appearFrame": 18
+          },
+          {
+            "id": "w3",
+            "label": "Worker N",
+            "x": 500,
+            "y": 280,
+            "color": "#10b981",
+            "appearFrame": 20
+          },
+          {
+            "id": "results",
+            "label": "Results",
+            "x": 700,
+            "y": 225,
+            "color": "#22c55e",
+            "appearFrame": 36
+          }
+        ],
+        "connections": [
+          {
+            "fromX": 150,
+            "fromY": 225,
+            "toX": 210,
+            "toY": 225,
+            "color": "#ff9505",
+            "appearFrame": 10,
+            "particleFrame": 12
+          },
+          {
+            "fromX": 350,
+            "fromY": 200,
+            "toX": 430,
+            "toY": 100,
+            "color": "#10b981",
+            "appearFrame": 24,
+            "particleFrame": 26
+          },
+          {
+            "fromX": 350,
+            "fromY": 225,
+            "toX": 430,
+            "toY": 190,
+            "color": "#10b981",
+            "appearFrame": 26,
+            "particleFrame": 28
+          },
+          {
+            "fromX": 350,
+            "fromY": 250,
+            "toX": 430,
+            "toY": 285,
+            "color": "#10b981",
+            "appearFrame": 28,
+            "particleFrame": 30
+          },
+          {
+            "fromX": 570,
+            "fromY": 225,
+            "toX": 630,
+            "toY": 225,
+            "color": "#22c55e",
+            "appearFrame": 34,
+            "particleFrame": 36
+          }
+        ]
+      },
+      {
+        "type": "concept",
+        "name": "batch-concept",
+        "concept": "Batch Processing Strategy",
+        "steps": [
+          {
+            "label": "Input Queue",
+            "icon": "\ud83d\udce5",
+            "x": 80,
+            "y": 200
+          },
+          {
+            "label": "Rate Limit",
+            "icon": "\ud83d\udea6",
+            "x": 230,
+            "y": 200
+          },
+          {
+            "label": "Parallel",
+            "icon": "\u26a1",
+            "x": 380,
+            "y": 200
+          },
+          {
+            "label": "Retry",
+            "icon": "\ud83d\udd04",
+            "x": 530,
+            "y": 200
+          },
+          {
+            "label": "Collect",
+            "icon": "\ud83d\udcca",
+            "x": 680,
+            "y": 200
+          }
+        ]
+      }
+    ]
+  }
+]

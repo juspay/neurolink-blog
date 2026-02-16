@@ -11,5 +11,4 @@ group :jekyll_plugins do
   gem "jekyll-paginate", "~> 1.1"
 end
 
-# Performance (commented out due to Ruby 3.4 compatibility issues)
-# gem "html-proofer", "~> 5.0", group: :test
+# gem "html-proofer", "~> 5.0", group: :test  # Uncomment after running: bundle lock

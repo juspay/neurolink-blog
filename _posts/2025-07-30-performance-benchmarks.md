@@ -1,21 +1,32 @@
 ---
 layout: post
-title: "Performance Benchmarking Guide for NeuroLink"
-date: 2025-07-30 10:00:00 +0530
+title: Performance Benchmarking Guide for NeuroLink
+date: '2025-07-30 10:00:00 +0530'
 author: neurolink
-description: "A comprehensive guide to benchmarking AI SDK performance, with reproducible methodologies and best practices for measuring latency, throughput, and memory usage."
-categories: [Technical, Guide]
-tags: [benchmarks, performance, latency, throughput, testing]
+description: >-
+  A comprehensive guide to benchmarking AI SDK performance, with reproducible
+  methodologies and best practices for measuring latency, throughput, and memory
+  usage.
+categories:
+  - Technical
+  - Guide
+tags:
+  - benchmarks
+  - performance
+  - latency
+  - throughput
+  - testing
 toc: true
-mermaid: true
+mermaid: false
 pin: false
+image:
+  path: /assets/img/posts/performance-benchmarks/hero.png
+  alt: Performance Benchmarking Guide for NeuroLink
 ---
 
-# Performance Benchmarking Guide for NeuroLink
+By the end of this guide, you'll have a reproducible benchmarking setup for measuring NeuroLink's performance -- latency, throughput, memory usage, and streaming speed -- against your specific workloads.
 
-Performance matters. When your AI application serves concurrent users, every millisecond of latency compounds into user frustration. Every megabyte of memory adds to infrastructure costs. Understanding how to measure and optimize these metrics is essential for production AI systems.
-
-This guide provides methodologies for benchmarking NeuroLink and any AI SDK. Rather than presenting unverifiable numbers, we focus on **how to measure performance yourself** with reproducible techniques you can apply to your specific workloads.
+You will build benchmark scripts, measure cold-start and warm performance, compare providers, and identify bottlenecks. No unverifiable numbers here -- everything is a methodology you run yourself.
 
 ---
 
@@ -82,10 +93,11 @@ function calculatePercentile(values: number[], percentile: number): number {
   return sorted[Math.max(0, index)];
 }
 
+// Use reduce-based min/max to avoid call stack overflow with large arrays
 function calculateStats(values: number[]) {
   return {
-    min: Math.min(...values),
-    max: Math.max(...values),
+    min: values.reduce((min, v) => Math.min(min, v), Infinity),
+    max: values.reduce((max, v) => Math.max(max, v), -Infinity),
     p50: calculatePercentile(values, 50),
     p95: calculatePercentile(values, 95),
     p99: calculatePercentile(values, 99),
@@ -582,26 +594,23 @@ async function runWithVariance(
 
 ## Conclusion
 
-Performance benchmarking is essential for production AI applications, but published numbers from any vendor (including us) should be treated as starting points, not guarantees.
+By now you have a complete benchmarking methodology: harness setup, metric collection, statistical analysis, and red-flag detection. Use it to:
 
-The benchmarks that matter are the ones you run:
-- In your environment
-- With your workloads
-- Against your constraints
+1. Establish your own baseline metrics in your environment
+2. Compare providers fairly for your specific workloads
+3. Detect performance regressions over time
+4. Make data-driven optimization decisions
 
-Use the methodologies in this guide to:
-1. Establish your own baseline metrics
-2. Compare providers fairly for your use case
-3. Identify performance regressions over time
-4. Make informed decisions about optimization
-
-Remember: **Measure what matters to you. Then decide.**
-
----
+Published benchmarks from any vendor (including us) are starting points, not guarantees. The numbers that matter are the ones you measure yourself.
 
 ## Further Reading
 
 - [NeuroLink SDK Documentation](https://docs.neurolink.ink/)
-- [Streaming Best Practices](/posts/streaming-best-practices/)
-- [Cost Optimization Strategies](/posts/cost-optimization-strategies/)
-- [Error Handling Patterns](/posts/error-handling-patterns/)
+
+---
+
+**Related posts:**
+
+- [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
+- [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)
+- [Provider Comparison Matrix: Choosing the Right AI Provider](/posts/provider-comparison-matrix/)
