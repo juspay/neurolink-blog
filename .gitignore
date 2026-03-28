@@ -78,3 +78,8 @@ Gemfile.lock.bak
 docs/archive/
 docs/verification/
 tools/blog-visuals/output/
+.claude-flow/
+.claude/
+.hive-mind/
+.swarm/
+.mcp.json
