@@ -808,5 +808,131 @@
     "title": "NeuroLink + Docusaurus: How We Document an AI SDK",
     "tone": "deep-dive",
     "reason": "architecture/internals content"
+  },
+  {
+    "slug": "meet-tara-from-slack-thread-to-merged-pr",
+    "title": "Meet Tara: From Slack Thread to Merged PR",
+    "tone": "announcement",
+    "reason": "product launch story"
+  },
+  {
+    "slug": "hippocampus-persistent-memory",
+    "title": "Hippocampus: Persistent Memory That Learns Across Conversations",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "claude-proxy-multi-account-oauth",
+    "title": "Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "client-sdks-react-hooks-http",
+    "title": "NeuroLink Client SDKs: React Hooks, HTTP Client, and AI SDK Adapter",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "advanced-mcp-routing-caching-batching",
+    "title": "Advanced MCP: Tool Routing, Caching, and Batching Strategies",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "lifecycle-middleware-hooks",
+    "title": "Lifecycle Middleware: onFinish, onError, and onChunk Hooks",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "ai-nervous-system-architecture",
+    "title": "The AI Nervous System: How NeuroLink Routes Intelligence",
+    "tone": "opinion",
+    "reason": "opinion/thought-leadership content"
+  },
+  {
+    "slug": "gemini-3-native-integration",
+    "title": "Gemini 3 Native Integration: Google's Latest Models in NeuroLink",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "mcp-auto-discovery-elicitation",
+    "title": "MCP Auto-Discovery: Finding and Registering Tools at Runtime",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "yama-ai-code-review",
+    "title": "Yama: AI-Native Code Review Powered by NeuroLink",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "rag-chunking-strategies-compared",
+    "title": "10 Chunking Strategies for RAG: A Practical Comparison",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "rag-reranking-strategies",
+    "title": "5 Reranking Strategies for Production RAG Pipelines",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "mcp-circuit-breaker-pattern",
+    "title": "MCP Circuit Breaker: Preventing Cascading Failures in AI Tool Calls",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "multi-scene-video-generation-veo",
+    "title": "Multi-Scene Video Generation: Directing AI Films with Veo 3.1",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "opentelemetry-ai-observability",
+    "title": "OpenTelemetry for AI: Tracing Every Token Through Your Pipeline",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "conversation-summarization-patterns",
+    "title": "Conversation Summarization: Smart Context Management for Long Chats",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "github-actions-ai-cicd",
+    "title": "GitHub Actions for AI: Automating NeuroLink in Your CI/CD Pipeline",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "dynamic-model-selection-runtime",
+    "title": "Dynamic Model Selection: Routing AI Requests at Runtime",
+    "tone": "tutorial",
+    "reason": "practical guide/tutorial content"
+  },
+  {
+    "slug": "tool-annotations-auto-inference",
+    "title": "Tool Annotations: How NeuroLink Auto-Infers Metadata for Smart Routing",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "docusaurus-mcp-docs-server",
+    "title": "Live Documentation: Building an MCP Docs Server Inside Docusaurus",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
+  },
+  {
+    "slug": "neurolink-testing-20-test-suites",
+    "title": "How We Test NeuroLink: 20 Continuous Test Suites and Counting",
+    "tone": "deep-dive",
+    "reason": "architecture/internals content"
   }
 ]

@@ -808,5 +808,131 @@
     "title": "NeuroLink + Docusaurus: How We Document an AI SDK",
     "prompt": "Abstract digital illustration, abstract technology workspace with floating code elements and neural network patterns, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
     "tone": "deep-dive"
+  },
+  {
+    "slug": "hippocampus-persistent-memory",
+    "title": "Hippocampus: Persistent Memory That Learns Across Conversations",
+    "prompt": "Abstract digital illustration, layered memory circuits with persistent storage nodes and flowing data condensation streams, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "claude-proxy-multi-account-oauth",
+    "title": "Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale",
+    "prompt": "Abstract digital illustration, multiple authentication tokens rotating through a central proxy gateway with rate-limit shields, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "meet-tara-from-slack-thread-to-merged-pr",
+    "title": "Meet Tara: From Slack Thread to Merged PR",
+    "prompt": "Abstract digital illustration, a Slack conversation thread transforming into a merged pull request with glowing approval checkmarks, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, celebratory, vibrant, exciting aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "announcement"
+  },
+  {
+    "slug": "advanced-mcp-routing-caching-batching",
+    "title": "Advanced MCP: Tool Routing, Caching, and Batching Strategies",
+    "prompt": "Abstract digital illustration, layered routing pipelines with caching nodes and batched request queues flowing through a tool orchestration hub, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "client-sdks-react-hooks-http",
+    "title": "NeuroLink Client SDKs: React Hooks, HTTP Client, and AI SDK Adapter",
+    "prompt": "Abstract digital illustration, React component tree with streaming data hooks connecting to an HTTP transport layer and AI backend, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "mcp-auto-discovery-elicitation",
+    "title": "MCP Auto-Discovery: Finding and Registering Tools at Runtime",
+    "prompt": "Abstract digital illustration, scanning beams discovering hidden tool endpoints across a distributed network with dynamic registration nodes, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "ai-nervous-system-architecture",
+    "title": "The AI Nervous System: How NeuroLink Routes Intelligence",
+    "prompt": "Abstract digital illustration, biological neural pathways reimagined as data routing channels with neurons as LLM providers and synapses as token streams, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, bold, dynamic, forward-looking aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "opinion"
+  },
+  {
+    "slug": "tool-annotations-auto-inference",
+    "title": "Tool Annotations: How NeuroLink Auto-Infers Metadata for Smart Routing",
+    "prompt": "Abstract digital illustration, metadata tags being automatically attached to tool function signatures with inference arrows and classification labels, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "gemini-3-native-integration",
+    "title": "Gemini 3 Native Integration: Google's Latest Models in NeuroLink",
+    "prompt": "Abstract digital illustration, geometric constellation of connected AI services with a prominent native SDK bridge and multimodal input streams, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "yama-ai-code-review",
+    "title": "Yama: AI-Native Code Review Powered by NeuroLink",
+    "prompt": "Abstract digital illustration, code diff panels being analyzed by an AI review agent with structured comment annotations flowing back to a repository, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "rag-chunking-strategies-compared",
+    "title": "10 Chunking Strategies for RAG: A Practical Comparison",
+    "prompt": "Abstract digital illustration, a document being split into varied chunk patterns with semantic boundaries and overlap regions visualized as layered slices, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "lifecycle-middleware-hooks",
+    "title": "Lifecycle Middleware: onFinish, onError, and onChunk Hooks",
+    "prompt": "Abstract digital illustration, a processing pipeline with hook points at each lifecycle stage emitting events and callbacks through a middleware chain, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "rag-reranking-strategies",
+    "title": "5 Reranking Strategies for Production RAG Pipelines",
+    "prompt": "Abstract digital illustration, search results being reordered by multiple scoring algorithms with relevance arrows and quality filters, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "mcp-circuit-breaker-pattern",
+    "title": "MCP Circuit Breaker: Preventing Cascading Failures in AI Tool Calls",
+    "prompt": "Abstract digital illustration, circuit breaker states transitioning between closed open and half-open with failure isolation shields protecting downstream services, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "docusaurus-mcp-docs-server",
+    "title": "Live Documentation: Building an MCP Docs Server Inside Docusaurus",
+    "prompt": "Abstract digital illustration, a documentation site with live tool endpoints serving interactive API schemas through an embedded MCP server, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
+  },
+  {
+    "slug": "multi-scene-video-generation-veo",
+    "title": "Multi-Scene Video Generation: Directing AI Films with Veo 3.1",
+    "prompt": "Abstract digital illustration, multiple video scene panels being composed and directed by an AI orchestrator with cinematic transitions between frames, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "opentelemetry-ai-observability",
+    "title": "OpenTelemetry for AI: Tracing Every Token Through Your Pipeline",
+    "prompt": "Abstract digital illustration, distributed tracing spans flowing through an AI pipeline with token-level metrics and exporter endpoints collecting telemetry data, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "dynamic-model-selection-runtime",
+    "title": "Dynamic Model Selection: Routing AI Requests at Runtime",
+    "prompt": "Abstract digital illustration, incoming AI requests being dynamically routed to different model providers based on task complexity and cost signals, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "conversation-summarization-patterns",
+    "title": "Conversation Summarization: Smart Context Management for Long Chats",
+    "prompt": "Abstract digital illustration, long conversation threads being condensed into compact summary nodes with sliding context windows and token budgets, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "github-actions-ai-cicd",
+    "title": "GitHub Actions for AI: Automating NeuroLink in Your CI/CD Pipeline",
+    "prompt": "Abstract digital illustration, CI/CD workflow stages with AI testing and deployment steps integrated into an automated pipeline with status checks, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, clean, organized, welcoming aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "tutorial"
+  },
+  {
+    "slug": "neurolink-testing-20-test-suites",
+    "title": "How We Test NeuroLink: 20 Continuous Test Suites and Counting",
+    "prompt": "Abstract digital illustration, twenty parallel test suite runners with green passing indicators and coverage metrics flowing into a quality dashboard, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
   }
 ]

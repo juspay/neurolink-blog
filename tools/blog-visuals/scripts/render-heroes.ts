@@ -46,12 +46,6 @@ async function renderAllHeroes(): Promise<void> {
     webpackOverride: (config) => config,
   });
 
-  // Get the HeroBanner composition
-  const composition = await selectComposition({
-    serveUrl: bundleLocation,
-    id: "HeroBanner",
-  });
-
   console.log(`Rendering ${prompts.length} hero images...`);
 
   for (let i = 0; i < prompts.length; i++) {
@@ -65,19 +59,28 @@ async function renderAllHeroes(): Promise<void> {
       await generateBackground(prompt.prompt, bgPath);
     }
 
+    const inputProps = {
+      slug: prompt.slug,
+      backgroundImage: bgPath,
+      title: prompt.title,
+      category: prompt.tone,
+      date: "",
+    };
+
+    // Get the HeroBanner composition with inputProps for Zod schema validation
+    const composition = await selectComposition({
+      serveUrl: bundleLocation,
+      id: "HeroBanner",
+      inputProps,
+    });
+
     // Step 2: Render hero image with Remotion
     console.log(`  [${i + 1}/${prompts.length}] Rendering hero: ${prompt.slug}`);
     await renderStill({
       composition,
       serveUrl: bundleLocation,
       output: heroPath,
-      inputProps: {
-        slug: prompt.slug,
-        backgroundImage: bgPath,
-        title: prompt.title,
-        category: prompt.tone,
-        date: "",
-      },
+      inputProps,
     });
 
     // Step 3: Copy to blog assets
