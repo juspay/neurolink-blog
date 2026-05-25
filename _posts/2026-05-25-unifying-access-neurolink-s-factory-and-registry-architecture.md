@@ -205,99 +205,33 @@ The benefits are clear:
 
 This architecture is a key reason we can integrate new technologies and providers so quickly. It's a foundational investment in maintainability and scalability that pays dividends every day.
 
+## Adding a new component: the three-step contract
+
+The pattern's payoff is that extension follows the same shape every time.
+
+For a new AI provider:
+
+1. Create a class that extends `BaseProvider` and implements the streaming + tool surface.
+2. Register a factory function in `src/lib/factories/providerRegistry.ts` so `registerAllProviders` picks it up at startup.
+3. Add the provider name to the `AIProviderName` type union in `src/lib/types/providers.ts`.
+
+For a new file processor:
+
+1. Extend `BaseFileProcessor` and declare `canProcess(file)` + `process(file)` + `getInfo()`.
+2. Register it via `ProcessorRegistry.getInstance().register(myProcessor, priority)`.
+3. Add MIME-type mappings to `src/lib/processors/config/mimeTypes.ts` if the format is new.
+
+For a new chunker:
+
+1. Implement the chunker contract (input: document; output: array of chunks).
+2. Call `ChunkerFactory.getInstance().registerChunker(strategy, factory)` once at startup.
+3. Optionally tag it with use-case metadata so `getChunkersForUseCase` returns it for the right callers.
+
+The shape is identical because the factory + registry contract is identical. The variation is in the per-component logic, not in the wiring.
+
 ---
 
 **Related posts:**
 - [Dynamic Model Selection: Routing AI Requests at Runtime](/posts/dynamic-model-selection-runtime/)
 - [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
 - [How We Test NeuroLink: 20 Continuous Test Suites and Counting](/posts/neurolink-testing-20-test-suites/)
-
-## Takeaways
-
-A few patterns are worth naming explicitly before closing the post.
-
-**Read the named files, not the description.**
-
-The architecture this post describes lives in real files in the NeuroLink repository.
-
-If you are extending or replacing any of it, open those files first.
-
-The descriptions here are summaries; the source is the contract.
-
-A summary compresses; a contract binds.
-
-When the two disagree, the contract wins.
-
-**Boundaries change slower than implementations.**
-
-The interfaces named in this post change rarely.
-
-The classes implementing them change with every release.
-
-When something breaks, suspect the implementation first and the contract last.
-
-The boundary is the place to add invariants, not the place to add features.
-
-Features belong to implementations; invariants belong to boundaries.
-
-**Patterns repeat across subsystems for a reason.**
-
-If a pattern shows up in two places, it is probably load-bearing.
-
-Adding a third call site should use the same pattern unless there is a specific reason to diverge.
-
-When in doubt, prefer the convention you can already see.
-
-The cost of one extra divergent shape is small; the cost of N divergent shapes is quadratic.
-
-A repeated pattern is also a repeated failure mode: when it breaks, it breaks in every call site.
-
-**Testing happens at the boundary.**
-
-Each subsystem named here has a corresponding test file in `test/`.
-
-When you make a change, run the matching suite first and the full matrix second.
-
-The full matrix catches the regressions that single-suite runs hide.
-
-Tests that exercise only the happy path are tests that pass for the wrong reason.
-
-Tests that exercise the boundary catch regressions early — before they leak into call sites.
-
-**Naming carries weight.**
-
-The class names, file names, and method names you see here were chosen to communicate intent.
-
-A class named `Factory` should make instances; a class named `Registry` should look them up.
-
-When a name and a behaviour drift apart, the name is usually the bug.
-
-If you find yourself explaining "the X actually does Y," rename X to Y.
-
-## Where to read next
-
-The NeuroLink repository is the canonical reference.
-
-`src/lib/` holds the runtime; `src/lib/types/` holds the contracts; `test/` holds the validation matrix.
-
-For changes, the conventional starting point is the test that proves the new behaviour, followed by the implementation that makes it pass.
-
-The CHANGELOG records the externally-visible result of those changes; the commit history records the path that got there.
-
-Both are worth reading when ramping up on a subsystem you have not touched before.
-
-The README files inside each subsystem are usually the highest-bandwidth introduction.
-
-Skim them before reading any individual file; they describe how the parts fit, not just what each part does.
-
-## A note on this post
-
-This post was assembled from a curated architectural story and verified against the NeuroLink source code before publishing.
-
-Symbol names, file paths, and version numbers are checked deterministically against the repository at gate time; anything outside the verified set is rejected as fabrication.
-
-Specific quantitative claims — latencies, throughput, sizes — must be cited inline or appear in the evidence; bare numbers in prose are stripped at gate time as well.
-
-The verification stack is part of why the post exists at all: NeuroLink's own multi-provider tooling powers the drafter, and the codebase itself supplies the ground truth.
-
-When something here surprises you, please open the named file and read it; the source is always the more reliable narrator.
