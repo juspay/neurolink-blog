@@ -23,6 +23,7 @@ As an AI platform scales, the number of integrations explodes. You start with on
 This architecture provides a clean, decoupled way to manage implementations. It's a foundational pattern that we use for three key pluggable systems in NeuroLink: AI Providers, File Processors, and RAG Chunkers.
 
 The core idea is simple:
+
 - A **Registry** acts as a central database of available component "classes" or constructors.
 - A **Factory** provides a unified interface to create an instance of a component from the registry.
 
@@ -92,9 +93,10 @@ The key method is `findProcessor`.
 It takes a file's mimetype and name, and uses a confidence-scoring system to determine the best processor for the job.
 
 The `calculateConfidence` method weighs factors like:
-*   A direct mimetype match (e.g., `application/pdf`).
-*   A file extension match (`.pdf`).
-*   The processor's declared capabilities.
+
+- A direct mimetype match (e.g., `application/pdf`).
+- A file extension match (`.pdf`).
+- The processor's declared capabilities.
 
 This allows for robust and flexible dispatch. For example, a processor for "all text-based files" can serve as a fallback if a more specific `.csv` or `.md` processor isn't found.
 
@@ -193,15 +195,11 @@ However, the trade-off is overwhelmingly positive for a platform like NeuroLink.
 
 The benefits are clear:
 
-*   **Extreme Decoupling:** Application logic is completely shielded from implementation details. We can swap out a provider or add a file type without touching a single line of consumer code.
-
-*   **Enhanced Extensibility:** Adding a new component is a matter of implementing a standard interface and registering it. This is a low-friction process that encourages contribution.
-
-*   **Centralized Configuration:** The factories and registries serve as a single place to manage default configurations, fallbacks, and selection logic.
-
-*   **Improved Testability:** Each provider, processor, and chunker can be mocked, and the factory itself can be manipulated in test environments to provide specific component instances. This is visible in our use of `resetInstance` methods in testing.
-
-*   **Discoverability:** The registry can be queried to discover what components are available at runtime, as seen with methods like `getAvailableStrategies` and `listProcessors`.
+- **Extreme Decoupling:** Application logic is completely shielded from implementation details. We can swap out a provider or add a file type without touching a single line of consumer code.
+- **Enhanced Extensibility:** Adding a new component is a matter of implementing a standard interface and registering it. This is a low-friction process that encourages contribution.
+- **Centralized Configuration:** The factories and registries serve as a single place to manage default configurations, fallbacks, and selection logic.
+- **Improved Testability:** Each provider, processor, and chunker can be mocked, and the factory itself can be manipulated in test environments to provide specific component instances. This is visible in our use of `resetInstance` methods in testing.
+- **Discoverability:** The registry can be queried to discover what components are available at runtime, as seen with methods like `getAvailableStrategies` and `listProcessors`.
 
 This architecture is a key reason we can integrate new technologies and providers so quickly. It's a foundational investment in maintainability and scalability that pays dividends every day.
 
@@ -232,6 +230,7 @@ The shape is identical because the factory + registry contract is identical. The
 ---
 
 **Related posts:**
+
 - [Dynamic Model Selection: Routing AI Requests at Runtime](/posts/dynamic-model-selection-runtime/)
 - [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
 - [How We Test NeuroLink: 20 Continuous Test Suites and Counting](/posts/neurolink-testing-20-test-suites/)
