@@ -1,7 +1,7 @@
 ---
 layout: post
 title: 'Unifying Access: NeuroLink''s Factory and Registry Architecture'
-date: '2026-05-25 10:00:00 +0530'
+date: '2026-05-25T10:00:00+05:30'
 categories:
   - Deep Dive
   - Engineering
