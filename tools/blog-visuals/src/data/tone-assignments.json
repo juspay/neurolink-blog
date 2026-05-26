@@ -934,5 +934,11 @@
     "title": "How We Test NeuroLink: 20 Continuous Test Suites and Counting",
     "tone": "deep-dive",
     "reason": "architecture/internals content"
+  },
+  {
+    "slug": "four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one",
+    "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
