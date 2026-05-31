@@ -946,5 +946,11 @@
     "title": "Ten ESLint rules that hold NeuroLink's type system together",
     "tone": "engineering",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "what-you-actually-inherit-when-you-extend-baseprovider",
+    "title": "What You Actually Inherit When You Extend BaseProvider",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
