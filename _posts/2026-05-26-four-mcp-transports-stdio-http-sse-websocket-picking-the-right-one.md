@@ -40,11 +40,11 @@ const localScriptServer: MCPServerConfig = {
 
 The problem is that this creates a rigid parent-child relationship.
 
--   **Lifecycle Coupling:** If the NeuroLink agent restarts, the tool process is killed. If the tool process crashes, the agent might not have a clean way to restart it or understand why it failed. This is a classic cascading failure scenario we try to avoid, as discussed in our post on the [MCP Circuit Breaker pattern](/posts/mcp-circuit-breaker-pattern/). The `ExternalServerManager`, located in `src/lib/mcp/externalServerManager.ts`, has to contain complex logic just to handle unexpected process exits and prevent zombie processes, which is a significant overhead for what should be a simple transport.
+- **Lifecycle Coupling:** If the NeuroLink agent restarts, the tool process is killed. If the tool process crashes, the agent might not have a clean way to restart it or understand why it failed. This is a classic cascading failure scenario we try to avoid, as discussed in our post on the [MCP Circuit Breaker pattern](/posts/mcp-circuit-breaker-pattern/). The `ExternalServerManager`, located in `src/lib/mcp/externalServerManager.ts`, has to contain complex logic just to handle unexpected process exits and prevent zombie processes, which is a significant overhead for what should be a simple transport.
 
--   **No Network Visibility:** The tool isn't on the network. You can't hit it with `curl`, you can't put a load balancer in front of it, and you can't easily run it in a separate container managed by Kubernetes or another orchestrator. This also means you can't have multiple agents share a single instance of a resource-intensive tool.
+- **No Network Visibility:** The tool isn't on the network. You can't hit it with `curl`, you can't put a load balancer in front of it, and you can't easily run it in a separate container managed by Kubernetes or another orchestrator. This also means you can't have multiple agents share a single instance of a resource-intensive tool.
 
--   **Debugging Hell:** When something goes wrong, you're limited to parsing text from `stderr`. There's no structured error format, no HTTP status codes, and no easy way to inspect the state of the tool server. Is the tool hanging, or is it just slow? Is it consuming too much memory? With `stdio`, you're flying blind. This puts an enormous burden on developers to write tools that are perfectly behaved and produce easily parsable error messages.
+- **Debugging Hell:** When something goes wrong, you're limited to parsing text from `stderr`. There's no structured error format, no HTTP status codes, and no easy way to inspect the state of the tool server. Is the tool hanging, or is it just slow? Is it consuming too much memory? With `stdio`, you're flying blind. This puts an enormous burden on developers to write tools that are perfectly behaved and produce easily parsable error messages.
 
 ## HTTP: Stateless, Scalable, and Standard
 
@@ -70,9 +70,9 @@ const remoteHttpServer: MCPServerConfig = {
 
 This immediately solves the problems with `stdio`:
 
--   **Decoupled Lifecycle:** The tool server is a completely independent service. It can be deployed, scaled, and updated without affecting the NeuroLink agent that calls it.
--   **Network Native:** It's on the network. This means you can use standard infrastructure for load balancing, health checks, and security.
--   **Observability:** Every tool call is an HTTP request. This makes it trivial to integrate with standard monitoring and tracing tools. You can see every request, its latency, and its status code, which is critical for maintaining quality. Our entire philosophy around [OpenTelemetry for AI](/posts/opentelemetry-ai-observability/) relies on this kind of visibility.
+- **Decoupled Lifecycle:** The tool server is a completely independent service. It can be deployed, scaled, and updated without affecting the NeuroLink agent that calls it.
+- **Network Native:** It's on the network. This means you can use standard infrastructure for load balancing, health checks, and security.
+- **Observability:** Every tool call is an HTTP request. This makes it trivial to integrate with standard monitoring and tracing tools. You can see every request, its latency, and its status code, which is critical for maintaining quality. Our entire philosophy around [OpenTelemetry for AI](/posts/opentelemetry-ai-observability/) relies on this kind of visibility.
 
 The tradeoff is the stateless nature of HTTP. Every `executeTool` call is a new, independent request. For tools that require a continuous, stateful conversation, the overhead of establishing a new HTTP connection for every message can be inefficient.
 
@@ -109,9 +109,9 @@ For WebSockets, authentication is handled similarly during the initial HTTP `Upg
 
 While HTTP is the workhorse for most tool calls, some tools need a more persistent connection.
 
--   **Server-Sent Events (SSE):** For when a tool needs to stream updates *to* the agent. Think of a long-running task like code generation or a data analysis job. The tool can push progress events, logs, or partial results over a single, long-lived connection. The agent listens, but it can't easily talk back. This is a one-way firehose of data from the tool to the agent.
+- **Server-Sent Events (SSE):** For when a tool needs to stream updates *to* the agent. Think of a long-running task like code generation or a data analysis job. The tool can push progress events, logs, or partial results over a single, long-lived connection. The agent listens, but it can't easily talk back. This is a one-way firehose of data from the tool to the agent.
 
--   **WebSockets:** For when you need a true two-way conversation. The connection is persistent and full-duplex. This is ideal for highly interactive tools, like a "clarification agent" that asks follow-up questions before executing a task, or for anything requiring the `ElicitationProtocolHandler`. In this model, the `executeTool` can maintain context across multiple message exchanges, which is impossible with stateless HTTP and cumbersome with `stdio`.
+- **WebSockets:** For when you need a true two-way conversation. The connection is persistent and full-duplex. This is ideal for highly interactive tools, like a "clarification agent" that asks follow-up questions before executing a task, or for anything requiring the `ElicitationProtocolHandler`. In this model, the `executeTool` can maintain context across multiple message exchanges, which is impossible with stateless HTTP and cumbersome with `stdio`.
 
 The configuration in `MCPServerInfo` remains simple. You just declare the transport type and the endpoint.
 
@@ -168,11 +168,11 @@ The factory returns an object that conforms to a common interface, abstracting a
 
 Decoupling introduces new failure modes, most of which are network-related. The `ExternalServerManager`, by consuming clients from `MCPClientFactory.createClient`, is also responsible for handling their distinct failures.
 
--   **`stdio` Failures:** The most common issues are process-related. The command in `MCPServerConfig` might point to a non-existent binary (`ENOENT`), or the file might not have execute permissions (`EACCES`). If the process starts but then immediately exits with a non-zero status code, `ExternalServerManager` in `src/lib/mcp/externalServerManager.ts` must capture `stderr` to provide a meaningful error message.
+- **`stdio` Failures:** The most common issues are process-related. The command in `MCPServerConfig` might point to a non-existent binary (`ENOENT`), or the file might not have execute permissions (`EACCES`). If the process starts but then immediately exits with a non-zero status code, `ExternalServerManager` in `src/lib/mcp/externalServerManager.ts` must capture `stderr` to provide a meaningful error message.
 
--   **`http` Failures:** These are standard network errors. The DNS name for the endpoint might not resolve. The server might be down, refusing the connection. It could return a 503 Service Unavailable, indicating a temporary overload, which might warrant a retry. Or it could return a 401 Unauthorized, indicating a problem with the auth token. The client must interpret these HTTP status codes correctly.
+- **`http` Failures:** These are standard network errors. The DNS name for the endpoint might not resolve. The server might be down, refusing the connection. It could return a 503 Service Unavailable, indicating a temporary overload, which might warrant a retry. Or it could return a 401 Unauthorized, indicating a problem with the auth token. The client must interpret these HTTP status codes correctly.
 
--   **`sse` / `websocket` Failures:** These stateful connections can fail at any time. A network hiccup can sever the connection mid-stream. The `WebSocketClient` needs a robust reconnection strategy, likely with exponential backoff, to avoid overwhelming a recovering server. It also needs to handle the case where a message is sent while the connection is down. Does it queue the message, or does it fail the `executeTool` call immediately? The answer depends on the tool's requirements for guaranteed delivery.
+- **`sse` / `websocket` Failures:** These stateful connections can fail at any time. A network hiccup can sever the connection mid-stream. The `WebSocketClient` needs a robust reconnection strategy, likely with exponential backoff, to avoid overwhelming a recovering server. It also needs to handle the case where a message is sent while the connection is down. Does it queue the message, or does it fail the `executeTool` call immediately? The answer depends on the tool's requirements for guaranteed delivery.
 
 Here's a visual breakdown of how these transports relate the NeuroLink agent to the tool server:
 
@@ -206,20 +206,22 @@ graph TD
 
 There's no single "best" transport; the right choice depends entirely on the tool's architecture and how it needs to communicate.
 
--   **`stdio`**: Use this for simple, local scripts that are packaged directly with your agent. It's great for development or for tools you control completely in a monolithic environment. The lack of network configuration makes it the fastest way to get started. It's often sufficient for the kinds of validation scripts you might run in a CI pipeline, like those described in our post on [GitHub Actions for AI](/posts/github-actions-ai-cicd/).
+- **`stdio`**: Use this for simple, local scripts that are packaged directly with your agent. It's great for development or for tools you control completely in a monolithic environment. The lack of network configuration makes it the fastest way to get started. It's often sufficient for the kinds of validation scripts you might run in a CI pipeline, like those described in our post on [GitHub Actions for AI](/posts/github-actions-ai-cicd/).
 
--   **`http`**: This is your default for any tool that runs as a separate service. It's robust, scalable, and easy to manage with standard cloud infrastructure. If your tool can perform its function in a single, stateless call, HTTP is the right choice. Its ubiquity means you have a vast ecosystem of proxies, load balancers, and monitoring tools at your disposal.
+- **`http`**: This is your default for any tool that runs as a separate service. It's robust, scalable, and easy to manage with standard cloud infrastructure. If your tool can perform its function in a single, stateless call, HTTP is the right choice. Its ubiquity means you have a vast ecosystem of proxies, load balancers, and monitoring tools at your disposal.
 
--   **`sse`**: Choose SSE when your tool performs a long-running, read-only operation and you want to provide progress updates to the user or agent. It's a one-way street from the server to the client. This is perfect for streaming back log messages, status updates, or chunks of a large response as they become available.
+- **`sse`**: Choose SSE when your tool performs a long-running, read-only operation and you want to provide progress updates to the user or agent. It's a one-way street from the server to the client. This is perfect for streaming back log messages, status updates, or chunks of a large response as they become available.
 
--   **`websocket`**: Reserve WebSockets for tools that are truly conversational. If the tool needs to ask questions, get clarifications, or have a low-latency, back-and-forth exchange with the agent, the full-duplex nature of WebSockets is what you need. This is the most powerful but also the most complex transport to manage.
+- **`websocket`**: Reserve WebSockets for tools that are truly conversational. If the tool needs to ask questions, get clarifications, or have a low-latency, back-and-forth exchange with the agent, the full-duplex nature of WebSockets is what you need. This is the most powerful but also the most complex transport to manage.
 
 By supporting all four, NeuroLink's MCP allows you to `executeTool` against any kind of tool, from a local script to a globally distributed service, without changing your application-level code. You just point the `ExternalServerManager` at a new `MCPServerConfig`, and it handles the rest.
 
 ---
 
+---
+
 **Related posts:**
 
--   [MCP Circuit Breaker: Preventing Cascading Failures in AI Tool Calls](/posts/mcp-circuit-breaker-pattern/)
--   [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
--   [GitHub Actions for AI: Automating NeuroLink in Your CI/CD Pipeline](/posts/github-actions-ai-cicd/)
+- [MCP Circuit Breaker: Preventing Cascading Failures in AI Tool Calls](/posts/mcp-circuit-breaker-pattern/)
+- [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
+- [GitHub Actions for AI: Automating NeuroLink in Your CI/CD Pipeline](/posts/github-actions-ai-cicd/)
