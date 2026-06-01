@@ -940,5 +940,11 @@
     "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
     "tone": "tutorial",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "ten-eslint-rules-that-hold-neurolink-s-type-system-together",
+    "title": "Ten ESLint rules that hold NeuroLink's type system together",
+    "tone": "engineering",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
