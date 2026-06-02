@@ -940,5 +940,11 @@
     "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
     "tone": "tutorial",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "from-user-input-to-provider-api-the-five-stage-message-flow",
+    "title": "From User Input to Provider API — The Five-Stage Message Flow",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
