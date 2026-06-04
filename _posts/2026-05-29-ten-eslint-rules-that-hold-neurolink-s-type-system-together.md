@@ -82,11 +82,11 @@ This forces developers to be specific — names like OpenAiMessage, ClaudeMessag
 Second, we enforce clean filenames with `neurolink/no-types-suffix-filename`. A file named RequestTypes.ts inside the types directory is redundant — the directory already tells us it holds types, so the rule forces a rename. The before-and-after is simple:
 
 ```typescript
-// BAD: src/lib/types/mcp/RequestTypes.ts
-// ERROR: File "RequestTypes.ts" has redundant suffix. The folder IS the types folder — rename to drop the "Types"/"Type" suffix.
+// BAD: src/lib/types/mcpTypes.ts
+// ERROR: File "mcpTypes.ts" has redundant suffix. The folder IS the types folder — rename to drop the "Types"/"Type" suffix.
 export type McpRequest = { /* ... */ };
 
-// GOOD: src/lib/types/mcp/request.ts
+// GOOD: src/lib/types/mcp.ts
 export type McpRequest = { /* ... */ };
 ```
 
@@ -131,17 +131,17 @@ The linter will catch this:
 import { OpenAiChatCompletion } from 'src/lib/types/provider/openai/chat';
 
 // Linter messageId 'useBarrel':
-// Import internal types via the barrel (`@/lib/types`) instead of `src/lib/types/provider/openai/chat`.
+// Import internal types via the barrel (`../types/index.js`) instead of `src/lib/types/provider/openai/chat`.
 ```
 
 And demand this:
 
 ```typescript
 // GOOD: Barrel import
-import { OpenAiChatCompletion } from '@/lib/types';
+import { OpenAiChatCompletion } from '../types/index.js';
 ```
 
-This combination creates a powerful abstraction layer. The rest of the app interacts with a single, stable type interface — the @/lib/types barrel — while the `types` directory itself can be internally reorganized without breaking anything. This is a key enabler for the kind of deep system analysis we describe in [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/).
+This combination creates a powerful abstraction layer. The rest of the app interacts with a single, stable type interface — the ../types/index.js barrel — while the `types` directory itself can be internally reorganized without breaking anything. This is a key enabler for the kind of deep system analysis we describe in [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/).
 
 Here is a diagram of the intended flow:
 
@@ -160,8 +160,8 @@ graph TD
         C1["src/components/component.ts"]
     end
 
-    Barrel -->|"import from @/lib/types"| S1
-    Barrel -->|"import from @/lib/types"| C1
+    Barrel -->|"import from ../types/index.js"| S1
+    Barrel -->|"import from ../types/index.js"| C1
     C1 -.->|"forbidden: direct deep import"| F1
 
     style F1 fill:#eee,stroke:#333,stroke-width:2px
@@ -192,7 +192,7 @@ type Client = {
 };
 ```
 
-We allow `interface` *only* for declaring module augmentations to external libraries, a rare and explicit exception. For our own code, it's `type` all the way down.
+We allow `interface` *only* inside `declare global {}` blocks (for augmenting the global scope), a rare and explicit exception. For our own code, it's `type` all the way down.
 
 The second footgun was untyped errors from our provider integrations. An early version of our provider abstraction layer allowed `formatProviderError` functions to return a generic `Error`. This led to top-level handlers that were just a giant `if (e.message.includes(...))` block, which is fragile and unreliable.
 
