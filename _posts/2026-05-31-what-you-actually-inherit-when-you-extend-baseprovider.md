@@ -37,7 +37,7 @@ Here are the non-negotiables:
 A skeleton for a new provider looks like this. Note that this is the *entire* required surface area.
 
 ```typescript
-import { BaseProvider, AIProviderName, StreamOptions } from '@juspay/neurolink';
+import { BaseProvider, AIProviderName, StreamOptions, StreamResult } from '@juspay/neurolink';
 import { LanguageModel } from 'ai';
 
 export class MyNewProvider extends BaseProvider {
@@ -64,12 +64,12 @@ export class MyNewProvider extends BaseProvider {
 
   protected async executeStream(
     options: StreamOptions,
-  ): Promise<ReadableStream<Uint8Array>> {
+  ): Promise<StreamResult> {
     // 1. Get provider-specific credentials.
     // 2. Transform the generic 'options' into the provider's
     //    native request body format.
-    // 3. Make the fetch() call to the provider's API endpoint.
-    // 4. Return the response body stream directly.
+    // 3. Call the provider's streaming API.
+    // 4. Build and return a StreamResult (stream + usage + metadata).
     throw new Error('Not implemented: stream from your provider API');
   }
 }
@@ -88,25 +88,20 @@ The flow looks something like this:
 ```mermaid
 graph TD
     subgraph BaseProvider
-        A(public stream) --> B{prepareGenerationContext};
-        B --> C{wrapStreamWithLifecycleCallbacks};
-        C --> D["provider.executeStream()"];
-        D --> E{handleProviderError};
-        E --> F(return StreamResult);
+        A(public stream) --> B[assemble + filter tools];
+        B --> C["your executeStream()"];
+        C --> D[wrap result with lifecycle callbacks];
+        D --> E(return StreamResult);
     end
 
     subgraph Your Provider
-        D
+        C
     end
 
-    style D fill:#c9f,stroke:#333,stroke-width:2px
+    style C fill:#c9f,stroke:#333,stroke-width:2px
 ```
 
-Before your `executeStream()` is ever called, `BaseProvider` has already:
-
-1. Called `prepareGenerationContext` to build the message history, inject the system prompt, and format tool definitions.
-2. Initiated tracing and analytics, firing the `onStart` callback. This is fundamental to our observability strategy, which you can read about in [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/).
-3. Wrapped the entire operation in a robust error handler (`handleProviderError`) that catches failures, formats them using your `formatProviderError` implementation, and fires the `onError` lifecycle callback.
+Before your `executeStream()` is ever called, `BaseProvider` has already assembled the available tools (via `getToolsForStream`), applied any tool filtering, and started tracing. After your method returns its `StreamResult`, it wraps that result with the lifecycle callbacks and routes any failure through your `formatProviderError` — wrapped by `handleProviderError` in the error path. This observability is fundamental to our strategy, which you can read about in [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/).
 
 The public `stream()` method is the unified entry point; your `executeStream()` is the unique, provider-specific plug-in.
 
@@ -114,21 +109,20 @@ The public `stream()` method is the unified entry point; your `executeStream()` 
 
 Implementing five methods is the price of admission. The payoff is inheriting a suite of functionality that represents thousands of hours of engineering effort.
 
-- **Unified `generate()` and `stream()` APIs**: If you implement `executeStream()`, you get the non-streaming `generate()` method for free. `BaseProvider` implements `generate()` by simply calling `stream()` and consuming the entire result, giving users a consistent interface for both modes. This is handled by the `executeStandardGenerateFlow` method.
+- **Unified `generate()` and `stream()` APIs**: Implement the handful of abstract methods and `BaseProvider` gives you BOTH entry points — `generate()` for a single non-streaming result and `stream()` for token-by-token output. They build on the provider methods you implement, so callers get a consistent interface for both modes without you writing either entry point.
 
-- **Automatic Lifecycle Callbacks**: The `wrapStreamWithLifecycleCallbacks` method is the engine for our entire instrumentation and analytics pipeline. It ensures that every generation, whether streaming or not, emits consistent `onStart`, `onToken`, `onCompletion`, and `onError` events. You don't write a single line of code for this.
+- **Automatic Lifecycle Callbacks**: The `wrapStreamWithLifecycleCallbacks` method is the engine for our instrumentation and analytics. It ensures every generation emits consistent `onChunk`, `onFinish`, and `onError` events. You don't write a single line of code for this.
 
 - **Robust Error Handling**: The default `handleProviderError` logic in `BaseProvider` catches common network issues, timeouts, and other problems before they even reach your provider-specific code. When an error *does* come from the provider API, it's routed through your `formatProviderError` method to create a clean, standardized error message for the end user.
 
     ```typescript
-    // src/lib/providers/openAI.ts
+    // Illustrative shape. Real providers (e.g. OpenAIProvider) return
+    // TYPED errors — ProviderError, RateLimitError, AuthenticationError —
+    // not a bare Error, after inspecting the provider's error payload.
     public formatProviderError(error: unknown): Error {
-      if (isAPIError(error)) {
-        const message = error.message;
-        // ... specific OpenAI error parsing ...
-        return new Error(`OpenAI Error: ${message}`);
-      }
-      return new Error(String(error));
+      const message =
+        (error as { message?: string })?.message ?? String(error);
+      return new Error(`Provider error: ${message}`);
     }
     ```
 

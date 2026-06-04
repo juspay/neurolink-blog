@@ -25,16 +25,15 @@ The original MCP transport, `stdio`, treats a tool like a command-line utility. 
 This is a valid approach for simple, co-located tools. For example, a small Node.js script that lives on the same machine as the NeuroLink agent.
 
 ```typescript
-// src/lib/types/mcp.ts
+// Example: a local stdio server (type MCPServerInfo)
 
-const localScriptServer: MCPServerConfig = {
+const localScriptServer: MCPServerInfo = {
   id: 'local-script-server',
   name: 'Local Script Server',
-  transport: {
-    type: 'stdio',
-    command: ['node', './tools/my-local-script.js', '--mcp'],
-  },
-  // ... other config
+  transport: 'stdio',
+  command: 'node',
+  args: ['./tools/my-local-script.js', '--mcp'],
+  // ... status, tools, and other fields
 };
 ```
 
@@ -53,18 +52,14 @@ To solve the containerization problem we saw at Juspay, we introduced the HTTP t
 NeuroLink's `ExternalServerManager` doesn't spawn this process. It simply needs to know the URL.
 
 ```typescript
-// src/lib/types/mcp.ts
+// Example: a remote HTTP server (type MCPServerInfo)
 
-const remoteHttpServer: MCPServerConfig = {
+const remoteHttpServer: MCPServerInfo = {
   id: 'document-analyzer-prod',
   name: 'Production Document Analyzer',
-  transport: {
-    type: 'http',
-    endpoint: 'https://tools.juspay.in/document-analyzer',
-    httpOptions: {
-      // Headers, auth, etc.
-    }
-  },
+  transport: 'http',
+  url: 'https://tools.juspay.in/document-analyzer',
+  // headers / auth are top-level fields (see below)
 };
 ```
 
@@ -80,26 +75,23 @@ The tradeoff is the stateless nature of HTTP. Every `executeTool` call is a new,
 
 Moving from a trusted, local `stdio` process to a networked HTTP or WebSocket server introduces a critical new problem: security. A tool server exposed on the network is a potential vulnerability. It needs to know who is calling it and whether they are authorized.
 
-The `stdio` transport has no concept of authentication; the trust is implicit because the agent process is the parent of the tool process. For networked transports, we explicitly provide configuration for this in `MCPServerConfig`.
+The `stdio` transport has no concept of authentication; the trust is implicit because the agent process is the parent of the tool process. For networked transports, we explicitly provide configuration for this in `MCPServerInfo`.
 
-The `httpOptions` object within the transport configuration is the key. It allows you to specify headers that will be sent with every request. The most common use case is for an API key or a bearer token.
+The top-level `headers` field on the server config is the key. It lets you specify headers sent with every request — most commonly an API key or a bearer token. (A dedicated `auth` field handles the common token cases for you.)
 
 ```typescript
-// src/lib/types/mcp.ts
+// Example: an authenticated HTTP server (type MCPServerInfo)
 
-const secureHttpServer: MCPServerConfig = {
+const secureHttpServer: MCPServerInfo = {
   id: 'secure-internal-tool',
   name: 'Secure Internal Tool',
-  transport: {
-    type: 'http',
-    endpoint: 'https://tools.internal/secure-tool/execute',
-    httpOptions: {
-      headers: {
-        'Authorization': 'Bearer super-secret-token-from-env',
-        'X-Request-Source': 'neurolink-mcp'
-      }
-    }
+  transport: 'http',
+  url: 'https://tools.internal/secure-tool/execute',
+  headers: {
+    'Authorization': 'Bearer super-secret-token-from-env',
+    'X-Request-Source': 'neurolink-mcp'
   },
+  // or use the dedicated auth field: auth: { type: 'bearer', token: '...' }
 };
 ```
 
@@ -111,29 +103,25 @@ While HTTP is the workhorse for most tool calls, some tools need a more persiste
 
 - **Server-Sent Events (SSE):** For when a tool needs to stream updates *to* the agent. Think of a long-running task like code generation or a data analysis job. The tool can push progress events, logs, or partial results over a single, long-lived connection. The agent listens, but it can't easily talk back. This is a one-way firehose of data from the tool to the agent.
 
-- **WebSockets:** For when you need a true two-way conversation. The connection is persistent and full-duplex. This is ideal for highly interactive tools, like a "clarification agent" that asks follow-up questions before executing a task, or for anything requiring the `ElicitationProtocolHandler`. In this model, the `executeTool` can maintain context across multiple message exchanges, which is impossible with stateless HTTP and cumbersome with `stdio`.
+- **WebSockets:** For when you need a true two-way conversation. The connection is persistent and full-duplex. This is ideal for highly interactive tools, like a "clarification agent" that asks follow-up questions before executing a task — the kind of elicitation the `ElicitationProtocolHandler` coordinates (it works over any transport, not just WebSockets). In this model, the `executeTool` can maintain context across multiple message exchanges, which is impossible with stateless HTTP and cumbersome with `stdio`.
 
 The configuration in `MCPServerInfo` remains simple. You just declare the transport type and the endpoint.
 
 ```typescript
-// src/lib/types/mcp.ts
+// Example: SSE and WebSocket servers (type MCPServerInfo)
 
-const streamingReportServer: MCPServerConfig = {
+const streamingReportServer: MCPServerInfo = {
   id: 'streaming-reporter',
   name: 'Streaming Reporter',
-  transport: {
-    type: 'sse',
-    endpoint: 'https://tools.juspay.in/reports/stream',
-  },
+  transport: 'sse',
+  url: 'https://tools.juspay.in/reports/stream',
 };
 
-const conversationalAgentServer: MCPServerConfig = {
+const conversationalAgentServer: MCPServerInfo = {
   id: 'clarification-agent',
   name: 'Clarification Agent',
-  transport: {
-    type: 'websocket',
-    endpoint: 'wss://tools.juspay.in/clarify-agent',
-  },
+  transport: 'websocket',
+  url: 'wss://tools.juspay.in/clarify-agent',
 };
 ```
 
@@ -151,9 +139,9 @@ export class MCPClientFactory {
     config: MCPServerInfo,
     timeout = DEFAULT_CLIENT_TIMEOUT,
   ): Promise<MCPClientResult> {
-    // dispatch on config.transport.type:
+    // dispatch on config.transport (a plain string):
     //   "stdio"     → spawn a child process, wire stdin/stdout
-    //   "http"      → open an HTTP client against config.transport.endpoint
+    //   "http"      → open an HTTP client against config.url
     //   "sse"       → attach an SSE listener for server → client streaming
     //   "websocket" → open a full-duplex WebSocket
     // returns: { client, capabilities, transport } on success
@@ -168,7 +156,7 @@ The factory returns an object that conforms to a common interface, abstracting a
 
 Decoupling introduces new failure modes, most of which are network-related. The `ExternalServerManager`, by consuming clients from `MCPClientFactory.createClient`, is also responsible for handling their distinct failures.
 
-- **`stdio` Failures:** The most common issues are process-related. The command in `MCPServerConfig` might point to a non-existent binary (`ENOENT`), or the file might not have execute permissions (`EACCES`). If the process starts but then immediately exits with a non-zero status code, `ExternalServerManager` in `src/lib/mcp/externalServerManager.ts` must capture `stderr` to provide a meaningful error message.
+- **`stdio` Failures:** The most common issues are process-related. The command in `MCPServerInfo` might point to a non-existent binary (`ENOENT`), or the file might not have execute permissions (`EACCES`). If the process starts but then immediately exits with a non-zero status code, `ExternalServerManager` in `src/lib/mcp/externalServerManager.ts` must capture `stderr` to provide a meaningful error message.
 
 - **`http` Failures:** These are standard network errors. The DNS name for the endpoint might not resolve. The server might be down, refusing the connection. It could return a 503 Service Unavailable, indicating a temporary overload, which might warrant a retry. Or it could return a 401 Unauthorized, indicating a problem with the auth token. The client must interpret these HTTP status codes correctly.
 
@@ -214,7 +202,7 @@ There's no single "best" transport; the right choice depends entirely on the too
 
 - **`websocket`**: Reserve WebSockets for tools that are truly conversational. If the tool needs to ask questions, get clarifications, or have a low-latency, back-and-forth exchange with the agent, the full-duplex nature of WebSockets is what you need. This is the most powerful but also the most complex transport to manage.
 
-By supporting all four, NeuroLink's MCP allows you to `executeTool` against any kind of tool, from a local script to a globally distributed service, without changing your application-level code. You just point the `ExternalServerManager` at a new `MCPServerConfig`, and it handles the rest.
+By supporting all four, NeuroLink's MCP allows you to `executeTool` against any kind of tool, from a local script to a globally distributed service, without changing your application-level code. You just point the `ExternalServerManager` at a new `MCPServerInfo`, and it handles the rest.
 
 ---
 
