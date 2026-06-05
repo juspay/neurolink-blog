@@ -194,8 +194,8 @@ In return, `BaseProvider` runs the lifecycle. It builds the context. It fires th
 
 Here is what lands in your class the moment you extend it:
 
-- `generate()` — the non-streaming path, built on your `executeStream`.
-- `wrapStreamWithLifecycleCallbacks` — the `onStart`, `onToken`, and `onError` events.
+- `generate()` — the non-streaming path, run for you by `BaseProvider`.
+- `wrapStreamWithLifecycleCallbacks` — the `onChunk`, `onFinish`, and `onError` events.
 - `handleProviderError` — network, timeout, and rate-limit recovery.
 - `applyToolFiltering` and `getToolsForStream` — the whole tool-use pipeline.
 - `embed()` and `embedMany()` — embeddings, ready to override.
