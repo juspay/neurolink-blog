@@ -14,11 +14,11 @@
     "pipeline": "ts-node scripts/run-pipeline.ts"
   },
   "dependencies": {
-    "@remotion/bundler": "^4.0.0",
-    "@remotion/cli": "^4.0.0",
+    "@remotion/bundler": "^4.0.473",
+    "@remotion/cli": "^4.0.473",
     "@remotion/gif": "^4.0.0",
     "@remotion/layout-utils": "^4.0.0",
-    "@remotion/renderer": "^4.0.0",
+    "@remotion/renderer": "^4.0.473",
     "canvas": "^3.2.1",
     "gif-encoder-2": "^1.0.5",
     "gray-matter": "^4.0.3",
