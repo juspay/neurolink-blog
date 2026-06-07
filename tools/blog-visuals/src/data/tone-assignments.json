@@ -958,5 +958,11 @@
     "title": "From User Input to Provider API: The Five-Stage Message Flow",
     "tone": "deep-dive",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "twenty-four-providers-one-baseprovider-the-adapter-catalog",
+    "title": "Twenty-four providers, one BaseProvider: the adapter catalog",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
