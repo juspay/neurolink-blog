@@ -226,3 +226,4 @@ This five-stage flow—unify, process, assemble, budget, and adapt—turns a cha
 - [Conversation Summarization: Smart Context Management for Long Chats](/posts/conversation-summarization-patterns/)
 - [Dynamic Model Selection: Routing AI Requests at Runtime](/posts/dynamic-model-selection-runtime/)
 - [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
+- [Seventeen file processors, six categories, one priority system](/posts/seventeen-file-processors-six-categories-one-priority-system/)
