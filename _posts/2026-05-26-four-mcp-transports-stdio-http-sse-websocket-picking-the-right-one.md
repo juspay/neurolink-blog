@@ -190,6 +190,19 @@ graph TD
     A -- "Upgrade: websocket" <--> T_WS <--> S_WS
 ```
 
+## Configuration at a Glance
+
+Every server is declared the same way — an `MCPServerInfo` carrying a `transport` string plus the fields that transport needs (`command` for `stdio`, `url` for the network transports). The trade-offs each one carries are what should drive the choice:
+
+| Transport | `transport` value | Direction | Connection | Best for | Primary failure mode |
+|-----------|-------------------|-----------|------------|----------|----------------------|
+| stdio | `'stdio'` | bidirectional pipe | per-process, local | local scripts bundled with the agent | `ENOENT` / `EACCES` / non-zero exit |
+| HTTP | `'http'` | request / response | stateless | remote, single-call tools | DNS failure, 503, 401 |
+| SSE | `'sse'` | server → client | long-lived, one-way | streaming progress and partial results | mid-stream disconnect |
+| WebSocket | `'websocket'` | full-duplex | persistent | conversational, multi-turn tools | disconnect needing backoff reconnect |
+
+The `MCPClientFactory` reads that single `transport` string and hands back a ready client, so moving a tool from `http` to `websocket` is a one-line config change — the `ExternalServerManager` and your `executeTool` calls stay exactly the same.
+
 ## Picking the Right Transport
 
 There's no single "best" transport; the right choice depends entirely on the tool's architecture and how it needs to communicate.
