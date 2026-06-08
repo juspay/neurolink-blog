@@ -218,4 +218,5 @@ The win is speed. A new model lands in hours. The chassis is already built, test
 
 - [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
 - [Live Documentation: Building an MCP Docs Server Inside Docusaurus](/posts/docusaurus-mcp-docs-server/)
+- [Four MCP transports: stdio, http, sse, websocket — picking the right one](/posts/four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one/)
 - [Dynamic Model Selection: Routing AI Requests at Runtime](/posts/dynamic-model-selection-runtime/)
