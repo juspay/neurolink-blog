@@ -409,6 +409,13 @@ def check_13_placeholder(body, filename):
         "sk-placeholder", "placeholder:", "placeholder token", "placeholder tokens",
         "placeholder injection", "the placeholder", "contain the placeholder",
         "replace the placeholder values", "replace the placeholder",
+        # A post describing a code mechanism that INSERTS placeholder strings
+        # (e.g. context-compaction replacing pruned tool output with a placeholder)
+        # is real content, not draft incompleteness. Allow descriptive usage.
+        "placeholder string", "placeholder value", "placeholder text",
+        "placeholder message", "placeholder content", "with a placeholder",
+        "as a placeholder", "insert a placeholder", "inserts a placeholder",
+        "a placeholder for",
     ]
     for i, line in enumerate(stripped.split("\n"), 1):
         if "placeholder" in line.lower():
