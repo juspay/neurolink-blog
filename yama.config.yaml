@@ -1,0 +1,209 @@
+# =============================================================================
+# Yama PR Review configuration
+# =============================================================================
+# Consumed by the @juspay/yama GitHub Action (.github/workflows). Auto-discovered
+# from the repo root (search order: yama.config.yaml → config/yama.config.yaml →
+# .yama/config.yaml) and also passed explicitly via the workflow `config-path`.
+#
+# WHERE THE REVIEW RULES COME FROM
+#   Yama automatically loads, from this repo root, if present:
+#     • CLAUDE.md       — your authoritative engineering rules
+#     • CONTRIBUTING.md — contribution + commit conventions
+#   and injects them into the reviewer as <project-rules>. Keep repo-specific
+#   rules THERE; this file tunes WHAT the reviewer focuses on and WHAT blocks a
+#   merge.
+#
+# PROVIDER / MODEL ARE INTENTIONALLY NOT SET HERE
+#   They are controlled by the workflow inputs (ai-provider / ai-model), exposed
+#   as AI_PROVIDER / AI_MODEL env. Yama merges this file OVER those env values, so
+#   setting ai.provider / ai.model here would silently override the workflow.
+# =============================================================================
+
+version: 2
+configType: "yama"
+
+display:
+  showBanner: false
+  streamingMode: false
+  verboseToolCalls: false
+  showAIThinking: false
+
+ai:
+  # provider/model OMITTED on purpose — controlled by the workflow.
+  temperature: 0.2 # deterministic, review-grade output
+  timeout: "15m"
+  retryAttempts: 3
+
+  # The explore worker reads project rules (CLAUDE.md / CONTRIBUTING.md) and
+  # codebase context. Keep enabled so the reviewer sees your repo's rules.
+  explore:
+    enabled: true
+    timeout: "5m"
+    cacheResults: true
+
+# GitHub MCP only. Jira/Bitbucket off so no extra credentials are needed. Yama's
+# built-in denylist already blocks repo-mutating GitHub tools; this is a
+# read + review-comment workflow.
+mcpServers:
+  github:
+    enabled: true
+    # transport defaults to "http" (hosted GitHub MCP at api.githubcopilot.com).
+  jira:
+    enabled: false
+
+review:
+  enabled: true
+
+  workflowInstructions: |
+    You are reviewing a pull request for the NeuroLink Blog — a Jekyll (Chirpy
+    theme) content site deployed to blog.neurolink.ink via GitHub Pages. Most PRs
+    add or edit Markdown blog posts in `_posts/` and their hero images under
+    `assets/img/posts/`; some touch Jekyll config/layouts/includes, the Python/JS
+    quality-gate tools in `tools/`, or the Remotion (TypeScript) visual-generation
+    pipeline in `tools/blog-visuals/`.
+
+    Treat the <project-rules> block (this repo's CLAUDE.md) as the AUTHORITATIVE
+    ruleset — it documents the post conventions, front-matter contract, Related-
+    posts/orphan rules and quality-gate system. Cite the specific rule when you
+    flag a violation.
+
+    Do NOT re-run or duplicate checks already enforced by CI and the quality-gate
+    tooling. Specifically, assume these are already covered and do not comment on
+    them unless the PR visibly breaks them:
+      • markdownlint (`.markdownlint.json`) — Markdown style/formatting
+      • Mermaid syntax validation (`scripts/validate-mermaid.sh`,
+        `tools/verify-mermaid-all.js`)
+      • Jekyll production build (`bundle exec jekyll build`, JEKYLL_ENV=production)
+      • Python quality gates (`tools/audit_posts.py`, `tools/verify_all.py`):
+        front-matter validity, image-path existence, H1/code-fence balance,
+        body length, link format, related-posts presence, future-dated links,
+        broken slugs, mismatched titles, orphan detection.
+
+    Instead focus on what those mechanical gates cannot judge:
+      • Content & front-matter integrity that the gates miss — e.g. a `date:` that
+        contradicts the filename prefix, a category outside the allowed set, a
+        `mermaid: true`/diagram mismatch, a Related-posts link whose text or slug
+        is subtly wrong, or a new post that orphans an existing one.
+      • Broken or wrong links and cross-references: internal `/posts/<slug>/`
+        targets that don't exist, future-dated references, or external links that
+        are clearly wrong/dead in intent.
+      • Build/deploy safety: risky edits to `_config.yml`, `Gemfile`, `CNAME`,
+        `_layouts/`, `_includes/`, or the deploy workflows that could break the
+        Pages build or the live site (e.g. baseurl/url changes, removed plugins,
+        Liquid that won't render in production).
+      • Remotion / visual-pipeline correctness in `tools/blog-visuals/` and the
+        scripts in `tools/`: render logic, file-path handling, manifest/front-
+        matter mutation correctness, and regressions in the audit/verify scripts
+        themselves.
+      • Security: any committed secret/token/key, and XSS or unsafe HTML/Liquid in
+        rendered post content, custom JS (`assets/js/`), or includes.
+      • Accessibility/SEO of rendered pages where the PR changes them: missing or
+        empty `image.alt`, missing alt on inline images, weak `description`, or
+        layout changes that drop ARIA/heading structure.
+
+    Be specific and constructive: every comment references the exact file+line,
+    explains the concrete risk, and suggests a fix where useful. Only block per
+    <blocking-criteria>; otherwise leave inline comments and approve.
+
+  focusAreas:
+    - name: "Content & front-matter integrity"
+      priority: "MAJOR"
+      description: |
+        - Front matter matches the contract in CLAUDE.md: required fields present,
+          single-quoted title, allowed categories, date matching the filename
+          prefix, `mermaid:` flag consistent with diagram blocks.
+        - Related-posts section correct: 1-3 links, exact title match, valid
+          `/posts/<slug>/` slugs, no future-dated links, no new orphans.
+        - Body conventions: no H1 in body, balanced code fences, real (non-
+          placeholder/draft) content.
+    - name: "Build & deploy safety"
+      priority: "MAJOR"
+      description: |
+        - Edits to `_config.yml`, `Gemfile`, `CNAME`, `_layouts/`, `_includes/`
+          or the workflows that could break the Jekyll production build or the
+          GitHub Pages deploy (baseurl/url, plugins, theme config, Liquid).
+    - name: "Remotion & tooling correctness"
+      priority: "MAJOR"
+      description: |
+        - Render logic, path handling and manifest/front-matter mutations in
+          `tools/blog-visuals/` (Remotion/TypeScript).
+        - Regressions in the quality-gate scripts in `tools/` (audit/verify/
+          mermaid validators) that would weaken or break the gates.
+    - name: "Security"
+      priority: "CRITICAL"
+      description: |
+        - Hardcoded secrets / API keys / tokens / credentials in source.
+        - XSS / unsafe HTML or Liquid in rendered post content, custom JS
+          (`assets/js/`) or includes; unsafe path/file handling in tools.
+    - name: "Accessibility & SEO"
+      priority: "MINOR"
+      description: |
+        - Non-empty `image.alt` and alt text on inline images.
+        - Adequate `description` for SEO/social; preserved heading/ARIA
+          structure when layouts or includes change.
+
+  blockingCriteria:
+    - condition: "Any hardcoded secret, API key, token, password or credential committed in source (non-example)"
+      action: "BLOCK"
+      reason: "Security: secrets must never be committed"
+    - condition: "Any CRITICAL severity security vulnerability (e.g. XSS / unsafe HTML or Liquid in rendered content, secret or PII exposure)"
+      action: "BLOCK"
+      reason: "Critical security risk"
+    - condition: "A change that would break the Jekyll production build or the GitHub Pages deploy (e.g. broken `_config.yml`, invalid front matter, unrenderable Liquid, removed CNAME/plugin/theme dependency)"
+      action: "BLOCK"
+      reason: "Must not break the site build or deploy of blog.neurolink.ink"
+
+  # Generated / vendored / binary / media files are skipped.
+  excludePatterns:
+    - "*.lock"
+    - "Gemfile.lock"
+    - "package-lock.json"
+    - "pnpm-lock.yaml"
+    - "yarn.lock"
+    - "*.min.js"
+    - "*.map"
+    - "dist/**"
+    - "build/**"
+    - "coverage/**"
+    # Jekyll build output and caches
+    - "_site/**"
+    - ".jekyll-cache/**"
+    - "vendor/**"
+    - "assets/js/dist/**"
+    # Remotion / blog-visuals generated render output
+    - "tools/blog-visuals/output/**"
+    # Generated/binary media — hero images and GIFs are render artifacts, not code
+    - "assets/img/posts/**"
+    - "*.png"
+    - "*.jpg"
+    - "*.jpeg"
+    - "*.gif"
+    - "*.svg"
+    - "*.webp"
+
+  contextLines: 3
+  maxFilesPerReview: 100
+  fileAnalysisTimeout: "2m"
+
+# Review-only: never rewrite PR descriptions (also forced by the workflow input
+# skip-description-enhance: "true").
+descriptionEnhancement:
+  enabled: false
+
+# Stateless reviewer: no memory-bank dir, no knowledge-base file, no commits back
+# to the repo (needs no write access beyond posting the review).
+memoryBank:
+  enabled: false
+knowledgeBase:
+  enabled: false
+memory:
+  enabled: false
+  autoCommit: false
+
+# Cost / runtime guardrails.
+performance:
+  maxReviewDuration: "15m"
+  tokenBudget:
+    maxTokensPerReview: 800000
+    warningThreshold: 600000
+
