@@ -970,5 +970,11 @@
     "title": "Seventeen File Processors, Six Categories, One Priority System",
     "tone": "deep-dive",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "four-stage-context-compaction-what-runs-when-the-model-window-fills-up",
+    "title": "Four-stage context compaction: what runs when the model window fills up",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
