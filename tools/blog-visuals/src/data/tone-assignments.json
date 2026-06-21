@@ -937,7 +937,7 @@
   },
   {
     "slug": "four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one",
-    "title": "Four MCP transports: stdio, http, sse, websocket \u2014 picking the right one",
+    "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
     "tone": "tutorial",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
   },
@@ -974,6 +974,12 @@
   {
     "slug": "four-stage-context-compaction-what-runs-when-the-model-window-fills-up",
     "title": "Four-stage context compaction: what runs when the model window fills up",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "inside-conversationmemoryfactory-how-neurolink-picks-and-wires-a-memory-backend",
+    "title": "Inside ConversationMemoryFactory: how NeuroLink picks and wires a memory backend",
     "tone": "deep-dive",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
