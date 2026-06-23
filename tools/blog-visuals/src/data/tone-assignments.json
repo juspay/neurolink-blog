@@ -988,5 +988,11 @@
     "title": "Why Every Native Provider Must Wire the Same Tool-Persistence Hook",
     "tone": "engineering",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "grading-the-model-the-scorer-hierarchy-and-evaluation-pipeline",
+    "title": "Grading the model: the scorer hierarchy and evaluation pipeline",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
