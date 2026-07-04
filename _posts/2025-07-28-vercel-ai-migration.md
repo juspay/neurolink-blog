@@ -70,8 +70,8 @@ Built-in rate limiting, automatic retries, request queuing, and comprehensive ob
 **A note on Mastra:** If you are evaluating TypeScript agent frameworks more broadly,
 [Mastra](https://mastra.ai) (YC W25, v1.48.0 as of July 2026, $35M raised) is a
 production-ready open-source option with its own workflow engine (suspend/resume,
-HITL), four-layer memory system, and multi-provider model routing (3,000+ models
-across 94 providers). Its focus is agent orchestration and workflow primitives rather
+HITL), four-layer memory system, and multi-provider model routing through its
+AI Gateway. Its focus is agent orchestration and workflow primitives rather
 than the unified LLM proxy, credential cloaking, and server-framework-agnostic
 deployment that NeuroLink targets. Worth evaluating if agent workflow ergonomics
 or the Vercel AI SDK UI integration are your primary requirements.

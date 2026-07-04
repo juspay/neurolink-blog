@@ -552,7 +552,7 @@ interface ProviderConfig {
 const providers: ProviderConfig[] = [
   { provider: 'openai', model: 'gpt-4' },
   { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' },
-  { provider: 'google', model: 'gemini-2.5-flash' },
+  { provider: 'google-ai', model: 'gemini-2.5-flash' },
 ];
 
 async function generateWithFailover(prompt: string): Promise<string> {
