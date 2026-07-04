@@ -31,6 +31,9 @@ Building your own AI abstraction layer is a bet that your engineering time is be
 
 This post provides an honest decision framework. We build NeuroLink, so we have skin in the game -- but we also know exactly how much work a production-grade abstraction requires. There are scenarios where building custom makes sense. The goal is to help you make the right call for your context, not to sell you on ours.
 
+> Tested: 2026-07-04 against NeuroLink v9.79.x
+{: .prompt-tip }
+
 ## What an AI Abstraction Layer Actually Requires
 
 Most teams underestimate the hidden complexity of a multi-provider AI abstraction. Here is a breakdown of what a production-grade layer actually involves -- organized by the layers of complexity that emerge over time.
@@ -39,12 +42,12 @@ Most teams underestimate the hidden complexity of a multi-provider AI abstractio
 
 This is the layer most teams think about:
 
-- **Normalizing request/response formats** across providers -- OpenAI, Anthropic, Google, and Mistral all have different message schemas, content block formats, and metadata structures
+- **Normalizing request/response formats** across providers -- OpenAI, Anthropic, Google, Mistral, and dozens of others all have different message schemas, content block formats, and metadata structures
 - **Handling provider-specific authentication** -- API keys, OAuth tokens, IAM roles, service accounts, session tokens. Each provider's auth mechanism is different
 - **Model mapping and capability detection** -- not all models support tool calling, not all support images, not all support streaming. Your abstraction needs to know what each model can do
 - **Default model selection** -- what happens when the user does not specify a model?
 
-NeuroLink handles 13 providers, each with unique quirks. The `src/lib/providers/` directory contains 15 implementation files -- and that does not count the shared infrastructure.
+NeuroLink handles 29 exported providers (plus OpenRouter registered dynamically), each with unique quirks. The `src/lib/providers/` directory contains 35 implementation files -- and that does not count the shared infrastructure.
 
 ### Layer 2: Streaming Normalization
 
@@ -80,7 +83,7 @@ This is the layer that separates prototypes from production systems:
 
 Over time, your abstraction layer will need:
 
-- **MCP tool integration** -- multiple transport protocols (stdio, SSE, Streamable HTTP, and WebSocket (SDK-provided))
+- **MCP tool integration** -- multiple transport protocols (stdio, SSE, and WebSocket)
 - **Conversation memory** -- Redis-backed, in-memory, or external memory services
 - **Human-in-the-loop (HITL) approval workflows** -- pausing execution for human review
 - **Middleware pipelines** -- analytics, guardrails, content moderation, custom logic
@@ -107,17 +110,17 @@ Here are honest engineering cost estimates based on our experience building and 
 | Server adapters | 3 weeks | Low |
 | **Subtotal (full)** | **30+ weeks** | **~6 weeks/quarter** |
 
-The key insight: **the initial build is 20% of the cost. Maintenance is 80%.** Every time a provider changes their API, adds a model, deprecates a feature, or modifies their streaming format, your abstraction layer needs to be updated. OpenAI alone has made dozens of API changes in 2024-2025 -- each one requiring testing across your abstraction.
+The key insight: **the initial build is 20% of the cost. Maintenance is 80%.** Every time a provider changes their API, adds a model, deprecates a feature, or modifies their streaming format, your abstraction layer needs to be updated. OpenAI alone has made dozens of API changes in the past two years -- each one requiring testing across your abstraction.
 
 ### The Maintenance Multiplier
 
-Maintenance cost scales linearly with the number of providers. Each provider is an independent dependency that can change at any time. Three providers means triple the maintenance surface. Thirteen providers means your abstraction layer requires dedicated engineering attention every sprint.
+Maintenance cost scales linearly with the number of providers. Each provider is an independent dependency that can change at any time. Three providers means triple the maintenance surface. Supporting 29+ providers means your abstraction layer requires dedicated engineering attention every sprint.
 
 This is the trap: the initial build feels manageable, but the ongoing maintenance quietly consumes engineering bandwidth that should be going into your actual product.
 
 ### The Hidden Testing Cost
 
-Integration testing across providers is particularly expensive. You cannot mock provider APIs reliably because the bugs you are trying to catch are in the provider-specific behaviors. Real integration tests require real API keys, real requests, and real costs. Running these tests across 13 providers, with multiple models per provider, is a significant ongoing expense.
+Integration testing across providers is particularly expensive. You cannot mock provider APIs reliably because the bugs you are trying to catch are in the provider-specific behaviors. Real integration tests require real API keys, real requests, and real costs. Running these tests across 29 providers, with multiple models per provider, is a significant ongoing expense.
 
 ## When Building Makes Sense
 
@@ -154,6 +157,8 @@ For most teams, adopting an existing SDK provides better ROI:
 ### Multi-Provider Requirement
 
 This is the core value proposition of any AI abstraction layer. If you need to route to multiple providers -- for failover, cost optimization, or model selection -- the abstraction pays for itself immediately. Building this from scratch means building and maintaining everything listed in the "What an AI Abstraction Layer Actually Requires" section above.
+
+The TypeScript ecosystem now has several credible options. Vercel AI SDK (v7.0, released June 2026) covers many major providers and integrates closely with the Vercel platform. LangChain.js (v1.5.x, stable since October 2025) claims 1,000+ integrations and includes LangGraph for stateful workflows. Mastra (v1.48.0, $22M Series A April 2026) is a newer TypeScript-first framework that has gained traction quickly, particularly for teams that want agents, durable workflows, and memory as first-class primitives alongside multi-provider routing. Each is a legitimate alternative to building from scratch; the right choice depends on your deployment context, existing stack, and the feature surface you need today versus in six months.
 
 ### Small to Mid-Size Team
 
