@@ -2,7 +2,7 @@
 layout: post
 title: 'Migrating from LangChain to NeuroLink: A Step-by-Step Guide'
 date: '2025-07-22 10:00:00 +0530'
-last_updated: 2026-01-15T00:00:00.000Z
+last_updated: 2026-07-04T00:00:00.000Z
 categories:
   - Migration
   - Tutorial
@@ -26,7 +26,9 @@ image:
 
 By the end of this guide, you'll have migrated your LangChain application to NeuroLink with side-by-side code comparisons, pattern translations, and a step-by-step migration strategy.
 
-**Verification Details:** This guide was verified with NeuroLink v8.32.0 released January 5, 2026.
+**Verification Details:** This guide was verified with NeuroLink v9.79.2 released June 2026.
+
+> Tested: 2026-07-04 against NeuroLink v9.79.2
 
 ## Why Teams Are Migrating
 
@@ -36,11 +38,13 @@ Before diving into the technical details, let's understand why organizations are
 
 **Complex Abstractions**: LangChain's extensive abstraction layers (Chains, Runnables, OutputParsers) add cognitive overhead. NeuroLink provides a single, intuitive API that handles all use cases.
 
-**Provider Lock-in**: Switching between OpenAI, Anthropic, or other providers in LangChain requires significant code changes. NeuroLink lets you swap providers with a single parameter change.
+**Provider Lock-in**: Switching between OpenAI, Anthropic, or other providers in LangChain requires different package imports and class instantiation per provider. NeuroLink lets you swap providers with a single parameter change.
 
 **Bundle Size Concerns**: LangChain's comprehensive nature often means pulling in more than you need. NeuroLink's focused design keeps your bundle lean.
 
 **Debugging Complexity**: LangChain's abstraction layers can make it difficult to understand what's happening when things go wrong. NeuroLink's transparent execution model provides clear visibility into every request.
+
+> **Note on alternatives:** If your primary goal is TypeScript-native agent orchestration with durable workflows and multi-agent patterns (rather than provider unification), [Mastra](https://github.com/mastra-ai/mastra) (v1.48.0, Apache 2.0 core) is worth evaluating alongside NeuroLink. Mastra provides a graph-based workflow engine with suspend/resume and a 4-layer memory system, at the cost of a larger surface area. This guide focuses on the NeuroLink migration path.
 
 ## Understanding the Conceptual Mappings
 
@@ -84,6 +88,7 @@ import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
+// Model strings in this guide are illustrative. Current OpenAI flagship (mid-2026): gpt-5.4 / gpt-5.5.
 const response = await neurolink.generate({
   input: { text: "What is the capital of France?" },
   provider: 'openai',
@@ -392,14 +397,15 @@ Native JavaScript `Promise.all` handles parallel execution cleanly without speci
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
-// Note: BufferMemory and ConversationChain are deprecated in LangChain
-// LangChain now recommends using LangGraph for stateful conversations
-// See: https://js.langchain.com/docs/versions/migrating_memory/
-import { BufferMemory } from "langchain/memory";  // Deprecated
-import { ConversationChain } from "langchain/chains";  // Deprecated
+// Note: BufferMemory and ConversationChain were deprecated in LangChain 0.x
+// and moved to @langchain/classic in LangChain 1.0 (released Oct 2025).
+// LangChain 1.x recommends using createAgent() for stateful conversations.
+// See: https://www.langchain.com/blog/langchain-langgraph-1dot0
+import { BufferMemory } from "@langchain/classic/memory";  // Legacy
+import { ConversationChain } from "@langchain/classic/chains";  // Legacy
 
 const model = new ChatOpenAI({ model: "gpt-4" });
-const memory = new BufferMemory();  // Consider migrating to LangGraph
+const memory = new BufferMemory();
 
 const chain = new ConversationChain({
   llm: model,
@@ -546,7 +552,7 @@ interface ProviderConfig {
 const providers: ProviderConfig[] = [
   { provider: 'openai', model: 'gpt-4' },
   { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' },
-  { provider: 'google', model: 'gemini-2.0-flash' },
+  { provider: 'google', model: 'gemini-2.5-flash' },
 ];
 
 async function generateWithFailover(prompt: string): Promise<string> {
@@ -688,7 +694,7 @@ describe("Migration Validation", () => {
 Once all components are migrated and validated, remove LangChain dependencies:
 
 ```bash
-npm uninstall langchain @langchain/core @langchain/openai @langchain/anthropic
+npm uninstall langchain @langchain/core @langchain/openai @langchain/anthropic @langchain/classic
 
 # Verify no imports remain
 grep -r "@langchain" src/
@@ -806,11 +812,12 @@ Here's a before/after comparison of a complete chatbot:
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
-// Note: BufferMemory and ConversationChain are deprecated in LangChain
-// LangChain now recommends using LangGraph for stateful conversations
-// See: https://js.langchain.com/docs/versions/migrating_memory/
-import { BufferMemory } from "langchain/memory";  // Deprecated
-import { ConversationChain } from "langchain/chains";  // Deprecated
+// Note: BufferMemory and ConversationChain were deprecated in LangChain 0.x
+// and moved to @langchain/classic in LangChain 1.0 (Oct 2025).
+// LangChain 1.x recommends using createAgent() for stateful conversations.
+// See: https://www.langchain.com/blog/langchain-langgraph-1dot0
+import { BufferMemory } from "@langchain/classic/memory";  // Legacy
+import { ConversationChain } from "@langchain/classic/chains";  // Legacy
 import {
   SystemMessage,
   HumanMessage,
@@ -822,7 +829,7 @@ const model = new ChatOpenAI({
   streaming: true,
 });
 
-const memory = new BufferMemory();  // Consider migrating to LangGraph
+const memory = new BufferMemory();
 
 const chain = new ConversationChain({
   llm: model,
@@ -881,7 +888,7 @@ By now you have a working migration path for every major LangChain pattern: prov
 1. Install NeuroLink alongside LangChain
 2. Migrate one route or feature at a time using `generate()` and `stream()`
 3. Replace chain patterns with direct NeuroLink calls or direct API calls
-4. Swap LangChain memory for NeuroLink's built-in session memory
+4. Manage conversation history as plain JavaScript arrays passed via `conversationHistory`
 5. Remove LangChain once all routes are validated
 
 The result is a simpler codebase with fewer abstractions, standard JavaScript patterns, and the ability to switch providers with a single parameter change.

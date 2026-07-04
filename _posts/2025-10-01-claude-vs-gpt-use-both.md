@@ -29,9 +29,11 @@ image:
 
 The "Claude vs GPT" debate is a false dichotomy, and the industry needs to stop pretending otherwise.
 
-Every week, another benchmark post declares a winner. Every week, the conclusion is the same: "it depends." Claude handles long-context analysis and nuanced instruction following better. GPT's o-series models dominate deep reasoning. GPT-4o produces more consistently structured output. Claude Haiku delivers cost-efficient responses for simple queries. The data is clear -- each model family has genuine, measurable strengths that the other lacks.
+Every week, another benchmark post declares a winner. Every week, the conclusion is the same: "it depends." Claude handles long-context analysis and nuanced instruction following better. GPT-5.x models expose reasoning as a tunable parameter and dominate deep reasoning at scale. GPT-5.4 produces more consistently structured output. Claude Haiku delivers cost-efficient responses for simple queries. The data is clear — each model family has genuine, measurable strengths that the other lacks.
 
-The trend is equally clear: production applications that lock into a single provider are leaving performance and resilience on the table. The real question is not which model to choose, but how to compose both into a system that leverages each model's strengths. NeuroLink's unified provider interface makes this practical: one API, any model, same response format. This post covers an honest model comparison followed by the patterns that matter -- task-based routing, automatic failover, multi-model consensus, and cost optimization.
+The trend is equally clear: production applications that lock into a single provider are leaving performance and resilience on the table. The real question is not which model to choose, but how to compose both into a system that leverages each model's strengths. NeuroLink's unified provider interface makes this practical: one API, any model, same response format. This post covers an honest model comparison followed by the patterns that matter — task-based routing, automatic failover, multi-model consensus, and cost optimization.
+
+> Tested: 2026-07-04 against NeuroLink v9.81
 
 ## Honest model comparison
 
@@ -42,17 +44,17 @@ Before jumping into multi-model patterns, let us acknowledge what each model fam
 | **Coding** | Strong at understanding context | Strong at code generation |
 | **Creative writing** | More natural, nuanced tone | More structured, formatted output |
 | **Instruction following** | Excellent at complex instructions | Excellent at structured output |
-| **Reasoning** | Strong chain-of-thought | o-series models for deep reasoning |
-| **Long context** | 200K tokens standard | 128K tokens standard |
-| **Multimodal** | Vision, PDF processing | Vision, DALL-E, audio |
-| **Tool calling** | Reliable tool use | Parallel tool calling |
-| **Cost** | Competitive (Haiku for low cost) | Tiered (nano/mini/full) |
+| **Reasoning** | Adaptive thinking (effort parameter) on flagship tiers | Reasoning levels (none→xhigh) on GPT-5.x series |
+| **Long context** | 1M tokens (flagships); 200K (Haiku 4.5) | 1M tokens (GPT-5.5/5.4); 400K (GPT-5.4 mini) |
+| **Multimodal** | Vision, PDF processing | Vision, image generation, realtime voice |
+| **Tool calling** | Reliable tool use | Parallel tool calling, computer use built-in |
+| **Cost** | Competitive (Haiku 4.5 for low cost) | Tiered (nano/mini/full) |
 
-NeuroLink supports the complete Claude lineup: Claude 4.5 Opus, Claude 4.5 Sonnet, Claude 4.5 Haiku, Claude 4, Claude 3.7, and Claude 3.5 variants. These are defined in the `AnthropicModels` enum in the SDK constants.
+NeuroLink supports Claude Opus 4.6, Claude Sonnet 4.6, Claude Haiku 4.5, and legacy 4.5/4.1/4.0 variants. These are defined in the `AnthropicModels` enum in the SDK constants. (Claude Fable 5, Opus 4.8, and Sonnet 5 are current Anthropic API models; NeuroLink enum support for those tiers is in progress.)
 
-NeuroLink also supports the complete GPT lineup: GPT-5.2, GPT-5, GPT-4.1, GPT-4o, and the full o-series (o3, o3-mini, o4-mini). These are defined in the `OpenAIModels` enum.
+NeuroLink also supports the current GPT lineup: GPT-5.4, GPT-5.4 mini, GPT-5.4 nano, GPT-5.2, and earlier series (GPT-4.1, GPT-4o). These are defined in the `OpenAIModels` enum.
 
-> **Warning:** Model capabilities evolve rapidly. This comparison reflects the state as of publication. Both Anthropic and OpenAI release updates frequently. The multi-model approach protects you from being locked to any single model's capabilities at any point in time.
+> **Warning:** Model capabilities evolve rapidly. This comparison reflects the state as of the "Tested" date above. Both Anthropic and OpenAI release updates frequently. The multi-model approach protects you from being locked to any single model's capabilities at any point in time.
 {: .prompt-warning }
 
 ## Using both: The Unified Interface
@@ -68,13 +70,13 @@ const neurolink = new NeuroLink();
 const claudeResult = await neurolink.generate({
   input: { text: 'Analyze this code for security issues' },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-4-6',
 });
 
 const gptResult = await neurolink.generate({
   input: { text: 'Analyze this code for security issues' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 ```
 
@@ -89,9 +91,9 @@ The most common multi-model pattern is routing different tasks to the model that
 ```typescript
 async function smartGenerate(task: string, input: string) {
   const routingConfig = {
-    'code-review': { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-    'creative':    { provider: 'openai', model: 'gpt-4o' },
-    'reasoning':   { provider: 'openai', model: 'o3-mini' },
+    'code-review': { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+    'creative':    { provider: 'openai', model: 'gpt-5.4' },
+    'reasoning':   { provider: 'openai', model: 'gpt-5.4-mini' },
     'quick':       { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
   };
 
@@ -107,11 +109,13 @@ This manual routing works well when your task categories are known ahead of time
 
 A practical routing strategy for a production application might look like:
 
-- **Code review and analysis:** Claude Sonnet -- strong at understanding code context and providing nuanced feedback
-- **Creative content generation:** GPT-4o -- well-structured output with consistent formatting
-- **Deep mathematical or logical reasoning:** o3-mini -- purpose-built for multi-step reasoning
-- **Quick factual responses:** Claude Haiku -- fast and inexpensive for simple queries
-- **Structured data extraction:** GPT-4o -- reliable at producing well-formed JSON
+- **Code review and analysis:** Claude Sonnet — strong at understanding code context and providing nuanced feedback
+- **Creative content generation:** GPT-5.4 — well-structured output with consistent formatting
+- **Deep mathematical or logical reasoning:** GPT-5.4 with `reasoning_level: 'high'` — purpose-built for multi-step reasoning
+- **Quick factual responses:** Claude Haiku 4.5 — fast and inexpensive for simple queries
+- **Structured data extraction:** GPT-5.4 — reliable at producing well-formed JSON
+
+If you are evaluating SDK alternatives, [Mastra](https://mastra.ai) is a TypeScript agent framework that also supports multi-provider routing across Anthropic and OpenAI. The key difference is scope: Mastra is agent-orchestration-first, while NeuroLink bundles provider routing, RAG, voice, MCP server management, and workflow primitives in a single package. For teams that need the full stack in one SDK, NeuroLink avoids the integration overhead of wiring multiple libraries together.
 
 ## Pattern 2: Automatic Failover
 
@@ -152,7 +156,7 @@ console.log('Selected model:', result.workflow?.selectedModel);
 console.log('Consensus score:', result.workflow?.metrics?.totalTime);
 ```
 
-The `CONSENSUS_3_WORKFLOW` runs the prompt against three models in parallel. A judge model scores each response on quality criteria, and the best answer is returned. This is expensive -- you are paying for three generations plus the judge evaluation -- but for decisions where accuracy matters more than cost, it provides a level of confidence that no single model can match.
+The `CONSENSUS_3_WORKFLOW` runs the prompt against three models in parallel. A judge model scores each response on quality criteria, and the best answer is returned. This is expensive — you are paying for three generations plus the judge evaluation — but for decisions where accuracy matters more than cost, it provides a level of confidence that no single model can match.
 
 Pre-built workflow options include:
 
@@ -162,13 +166,13 @@ Pre-built workflow options include:
 
 ## Pattern 4: Cost Optimization
 
-Using both models is not just about quality -- it is also about cost. Different models have dramatically different price points, and routing intelligently can cut your AI costs by 80% or more without sacrificing quality where it matters.
+Using both models is not just about quality — it is also about cost. Different models have dramatically different price points, and routing intelligently can significantly reduce your AI costs without sacrificing quality where it matters.
 
 The strategy is straightforward:
 
-- Use Claude Haiku or GPT-4o-mini for simple queries (classification, extraction, simple Q&A). These cost fractions of a cent per call.
-- Route complex tasks to Claude Sonnet or GPT-4o. These cost more but deliver higher quality for tasks that need it.
-- Reserve o-series models (o3, o3-mini) exclusively for deep reasoning tasks. These models are the most expensive but provide capabilities that other models cannot match.
+- Use Claude Haiku 4.5 ($1/$5 per MTok) or GPT-5.4 mini ($0.75/$4.50 per MTok) for simple queries (classification, extraction, simple Q&A). These cost fractions of a cent per call.
+- Route complex tasks to Claude Sonnet 4.6 or GPT-5.4 ($2.50/$15 per MTok). These cost more but deliver higher quality for tasks that need it. (Anthropic's newer Claude Sonnet 5 at $3/$15, intro $2/$10 through August 2026, is available via direct API key once NeuroLink adds the enum constant.)
+- Reserve the highest tiers (Claude Opus 4.6 or GPT-5.4 Pro at the upper end of the NeuroLink enum) for the highest-stakes tasks. The wider Anthropic lineup now includes Claude Fable 5 ($10/$50 per MTok, fact-checked against Anthropic's models page) and OpenAI offers GPT-5.5 ($5/$30 per MTok) — these are available via direct API keys even where NeuroLink's enum has not yet added a named constant.
 
 NeuroLink's `createBestAIProvider()` auto-selects the best available provider based on your configured API keys, falling back through the provider chain based on availability.
 
@@ -185,7 +189,7 @@ NeuroLink provides multiple access paths to both Claude and GPT models, includin
 | **OpenRouter** | `provider: 'openrouter'` | `provider: 'openrouter'` |
 | **LiteLLM** | `provider: 'litellm'` | `provider: 'litellm'` |
 
-This matters for enterprise deployments. If your company has an AWS agreement, you can access Claude through Bedrock with your existing billing. If you are on Azure, access GPT through your Azure subscription. OpenRouter and LiteLLM provide unified access to both through a single API key if you prefer that approach.
+This matters for enterprise deployments. If your company has an AWS agreement, you can access Claude through Bedrock with your existing billing. If you are on Azure, access GPT through your Azure subscription. OpenRouter and LiteLLM provide unified access to both through a single API key if you prefer that approach. Claude Fable 5 is also available through Microsoft Foundry for enterprise Azure customers.
 
 The provider-specific model enums in NeuroLink's constants ensure type-safe access to every model variant available through each channel.
 
@@ -220,7 +224,7 @@ const simple = await neurolink.generate({
 
 ## The bottom line
 
-The single-provider era is over. The data shows that multi-model applications outperform single-model applications on every metric that matters: quality, resilience, and cost efficiency. Locking into one provider is not a safe choice -- it is a fragile one.
+The single-provider era is over. The data shows that multi-model applications outperform single-model applications on every metric that matters: quality, resilience, and cost efficiency. Locking into one provider is not a safe choice — it is a fragile one.
 
 Start with one provider, add the other when you need failover, consensus, or task routing. The unified interface means the cost of adding a second provider is minimal. The benefit is substantial.
 

@@ -32,6 +32,8 @@ We build NeuroLink, so we have a bias. But we also genuinely believe in choosing
 
 This comparison covers architecture philosophy, provider support, side-by-side code, a feature matrix, and concrete recommendations for when each tool shines.
 
+> **Tested: 2026-07-04 against NeuroLink v9.81 and LangChain.js v1.5.2**
+
 ## Architecture Philosophy
 
 The architectural differences between NeuroLink and LangChain reflect their different design priorities. Understanding these differences is key to choosing the right tool.
@@ -40,21 +42,21 @@ The architectural differences between NeuroLink and LangChain reflect their diff
 
 LangChain abstracts the **pipeline**. Its core primitive is the chain -- a composable sequence of operations (LLM calls, retrievals, transformations) that can be wired together declaratively.
 
-- **Chain-based composition:** `LLMChain` -> `SequentialChain` -> `RouterChain`
-- **LCEL (LangChain Expression Language):** Declarative pipeline syntax for building complex workflows
-- **350+ integrations:** Vector stores, document loaders, retrievers, tools, and more
-- **Python-first:** The Python SDK is the primary implementation, with LangChain.js as a TypeScript port
+- **Chain-based composition:** LCEL (LangChain Expression Language) remains the recommended approach for custom chains and RAG pipelines, providing `.invoke()`, `.stream()`, and `.batch()` across all Runnable components
+- **New agent API (v1.x):** `createAgent({ model, tools, middleware })` replaces the older `AgentExecutor` pattern. Legacy classes (`LLMChain`, `ConversationChain`, `AgentExecutor`) are preserved in the separate `@langchain/classic` package for backward compatibility
+- **1000+ integrations:** Vector stores, document loaders, retrievers, tools, and more -- claimed on the official product page, with provider packages now split into standalone `@langchain/<provider>` scoped packages
+- **Python-first:** The Python SDK is the primary implementation, with LangChain.js as a TypeScript port; the JS and Python repos now track the same major version (v1.x)
 
 LangChain's mental model is: define your pipeline as a graph of operations, then run data through it.
 
 ### NeuroLink's Approach: Provider Abstraction
 
-NeuroLink abstracts the **provider**. Its core primitive is the unified interface -- a single `generate()` and `stream()` API that works identically across 13 AI providers.
+NeuroLink abstracts the **provider**. Its core primitive is the unified interface -- a single `generate()` and `stream()` API that works identically across 30 named AI providers.
 
-- **Provider-first:** Unified interface across 13 providers (defined in the `AIProviderName` enum)
+- **Provider-first:** Unified interface across 30 named providers (defined in the `AIProviderName` enum, with OpenRouter registered dynamically)
 - **Lightweight wrapper:** Built on Vercel AI SDK primitives (`streamText`, `generateText`)
 - **TypeScript-native:** Built at Juspay for production TypeScript backends from day one
-- **MCP-native:** Tool integration through the Model Context Protocol standard, not custom abstractions
+- **MCP-native:** Tool integration through the Model Context Protocol standard, with stdio, SSE, WebSocket, and HTTP transports supported
 
 NeuroLink's mental model is: write your AI logic once, run it on any provider.
 
@@ -76,19 +78,23 @@ const result = await neurolink.generate({
 });
 ```
 
+### A Note on Mastra
+
+Mastra is a TypeScript-native framework (v1.48.0, Apache 2.0 core) that occupies similar territory to NeuroLink on the language dimension -- it is also TypeScript-first, integrates with Vercel AI SDK, and supports MCP as a first-class primitive. Where Mastra competes directly is in its graph-based workflow engine and its four-layer memory system (including Observational Memory). Teams evaluating TypeScript AI frameworks should also review Mastra alongside NeuroLink and LangChain.js. Mastra's positioning is closer to LangGraph (agent orchestration graphs) than to NeuroLink's provider-abstraction model.
+
 ## Provider Support Comparison
 
 Both frameworks support multiple AI providers, but the approach differs significantly:
 
 | Capability | NeuroLink | LangChain |
 |---|---|---|
-| **Native providers** | 13 (OpenAI, Anthropic, Vertex, Bedrock, Azure, Google AI, Mistral, Ollama, LiteLLM, HuggingFace, SageMaker, OpenRouter, OpenAI-Compatible) | 70+ (but many community-maintained) |
-| **Provider switching** | One config change, same interface | Requires class changes |
+| **Named providers** | 30 (AIProviderName enum + OpenRouter dynamically registered) | 1000+ claimed (many in standalone @langchain/<provider> packages) |
+| **Provider switching** | One config change, same interface | Requires import change to different scoped package |
 | **Auto-detection** | `createBestAIProvider()` scans env vars | Manual configuration |
-| **Fallback** | Built-in `createAIProviderWithFallback()` | Via fallback chain (manual setup) |
-| **Streaming** | Unified streaming across all providers | Provider-specific streaming behavior |
+| **Fallback** | Built-in `createAIProviderWithFallback()` | Via middleware or custom chain setup |
+| **Streaming** | Unified streaming across all providers | Provider-specific streaming behavior; LCEL unifies via .stream() |
 
-NeuroLink has fewer providers than LangChain, but every provider is maintained by the core team and implements the full `BaseProvider` interface. LangChain has more integrations, but quality varies -- some are community-maintained and may lag behind provider API changes.
+NeuroLink has fewer named providers than LangChain, but every provider is maintained by the core team and implements the full `BaseProvider` interface. LangChain's `@langchain/community` package has been deprecated and is being sunset; integrations are migrating to standalone scoped packages, though quality still varies.
 
 NeuroLink's auto-detection (`createBestAIProvider()`) and automatic fallback (`createAIProviderWithFallback()`) are particularly useful for production deployments where resilience matters more than raw integration count.
 
@@ -112,7 +118,7 @@ console.log(result.content);
 ```
 
 ```typescript
-// LangChain.js
+// LangChain.js v1.x
 import { ChatOpenAI } from '@langchain/openai';
 
 const model = new ChatOpenAI({ modelName: 'gpt-4o' });
@@ -165,7 +171,7 @@ await pipeline.ingest(['./docs/*.md']);
 const response = await pipeline.query('What are the key features?');
 ```
 
-NeuroLink's RAG pipeline includes 10 chunking strategies and hybrid search out of the box. LangChain's RAG support is more flexible (with dozens of retriever options) but requires more assembly.
+NeuroLink's RAG pipeline includes 9 chunking strategies (Character, HTML, JSON, LaTeX, Markdown, Recursive, SemanticMarkdown, Sentence, Token), hybrid vector+BM25 search, reranking, and GraphRAG out of the box. LangChain's RAG support is more flexible (with many retriever options) but requires more assembly.
 
 ## When LangChain is the Better Choice
 
@@ -173,15 +179,15 @@ Let us be honest about where LangChain excels:
 
 ### Python-First Teams
 
-If your stack is Python, LangChain is the natural choice. It was built for Python from day one, and the Python SDK is always the most up-to-date. The TypeScript port (LangChain.js) is good but typically lags behind the Python version in features.
+If your stack is Python, LangChain is the natural choice. It was built for Python from day one, and the Python SDK is always the most up-to-date. The TypeScript port (LangChain.js) tracks the same major version (v1.x) and covers the core API surface, but the Python ecosystem's data science tooling integrates more naturally.
 
-### Complex Agent Chains
+### Complex Agent Orchestration
 
-LCEL (LangChain Expression Language) provides sophisticated multi-step chain composition that goes beyond what NeuroLink's workflow engine offers. If you are building complex agent loops with branching logic, conditional routing, and multi-agent collaboration, LangChain's pipeline model is more expressive.
+LangChain's v1.x `createAgent()` API -- running on LangGraph's durable runtime -- provides sophisticated multi-step agent execution with persistence, rewind, and checkpointing. If you are building complex agent loops with branching logic, conditional routing, and human-in-the-loop interrupts via LangGraph, this model is more expressive than NeuroLink's workflow engine.
 
 ### Massive Integration Ecosystem
 
-With 350+ integrations covering vector stores, document loaders, retrievers, and tools, LangChain has the widest integration catalog in the AI framework space. If you need a specific integration (like a niche vector database or document parser), chances are LangChain has it.
+With 1000+ integrations (LangChain's own marketing figure) covering vector stores, document loaders, retrievers, and tools, LangChain has the widest integration catalog in the AI framework space. If you need a specific integration (like a niche vector database or document parser), chances are LangChain has a package for it.
 
 ### Research and Prototyping
 
@@ -189,11 +195,11 @@ LangChain excels in Jupyter notebook-based exploration. The Python ecosystem's d
 
 ### LangSmith Ecosystem
 
-LangSmith provides end-to-end observability, a prompt hub, dataset management, and evaluation tooling. It is a polished, proprietary platform that works seamlessly with LangChain.
+LangSmith provides end-to-end observability, evaluation, and one-click agent deployment. It is now framework-agnostic (Python, TypeScript, Go, Java SDKs) but integrates most naturally with LangChain. Activating tracing requires a single environment variable (`LANGCHAIN_TRACING_V2=true`).
 
 ### Community Size
 
-LangChain has a larger community, more tutorials, more Stack Overflow answers, and more third-party learning resources. For teams that value community-driven support, this matters.
+LangChain has a larger community, more tutorials, more Stack Overflow answers, and more third-party learning resources. The langchainjs repo has ~17,900 GitHub stars and is used by 51,400 repositories.
 
 ## When NeuroLink is the Better Choice
 
@@ -205,11 +211,11 @@ NeuroLink is TypeScript-native from the ground up. Types are not generated or po
 
 ### Production Multi-Provider Deployments
 
-One interface, 13 providers, automatic fallback, circuit breakers, health checking -- NeuroLink was built at Juspay for production fintech systems where downtime is not an option. The `createAIProviderWithFallback()` and `ProviderHealthChecker` utilities handle provider resilience at the SDK level.
+One interface, 30 providers, automatic fallback, circuit breakers, health checking -- NeuroLink was built at Juspay for production fintech systems where downtime is not an option. The `createAIProviderWithFallback()` and `ProviderHealthChecker` utilities handle provider resilience at the SDK level.
 
 ### MCP Tool Integration
 
-NeuroLink supports 58+ MCP servers through 4 transport protocols. MCP is an open standard, meaning tools built for NeuroLink work with any MCP-compatible client. This is a more portable approach than LangChain's custom tool abstraction.
+NeuroLink supports stdio, SSE, WebSocket, and HTTP (Streamable HTTP) MCP transports via `mcpClientFactory.ts`. MCP is an open standard, meaning tools built for NeuroLink work with any MCP-compatible client. This is a more portable approach than LangChain's custom tool abstraction (LangChain does offer `@langchain/mcp-adapters`, but this is an adapter layer, not a native integration).
 
 ### Enterprise Patterns from Juspay
 
@@ -233,19 +239,20 @@ Here is a detailed comparison across all major features:
 
 | Feature | NeuroLink | LangChain |
 |---|---|---|
-| **Language** | TypeScript (native) | Python (primary), TypeScript (port) |
-| **AI Providers** | 13 unified | 70+ (varying quality) |
-| **Streaming** | Unified across providers | Provider-specific |
-| **Tool/Function Calling** | Vercel AI SDK + MCP | Custom tool abstraction |
-| **MCP Support** | Native (4 transport protocols) | Via langchain-mcp adapter |
-| **RAG** | Built-in (10 chunkers, hybrid search, Graph RAG) | Via LangChain retrievers |
-| **Workflow Engine** | Built-in (ensemble, chain, adaptive, judge scoring) | Via LangGraph |
+| **Language** | TypeScript (native) | Python (primary), TypeScript (LangChain.js, same v1.x major version; core API surface covered) |
+| **AI Providers** | 30 unified (AIProviderName enum + OpenRouter) | 1000+ claimed integrations (standalone @langchain/<provider> packages; @langchain/community deprecated) |
+| **Streaming** | Unified across providers | Via LCEL .stream() (Runnable interface) |
+| **Tool/Function Calling** | Vercel AI SDK + MCP | Custom tool abstraction; @langchain/mcp-adapters for MCP |
+| **MCP Support** | Native (stdio, SSE, WebSocket, HTTP transports) | Via @langchain/mcp-adapters (stateless per invocation by default) |
+| **RAG** | Built-in (9 chunkers, hybrid vector+BM25, reranking, GraphRAG) | Via LangChain retrievers (more options, more assembly) |
+| **Workflow Engine** | Built-in (ensemble, chain, adaptive, judge scoring) | Via LangGraph (graph-based, durable runtime, suspend/resume) |
 | **Server Adapters** | 4 frameworks (Hono, Express, Fastify, Koa) | LangServe (FastAPI only) |
-| **Middleware** | Factory pattern (analytics, guardrails, custom) | Callbacks system |
-| **HITL** | Built-in with approval workflows | Via LangGraph interrupt |
-| **Memory** | Redis + Mem0 integration | Multiple memory types |
-| **Observability** | OpenTelemetry + Langfuse | LangSmith (proprietary) |
-| **Image/Video Generation** | Built-in (Imagen, Veo 3.1) | Third-party integrations |
+| **Middleware** | Factory pattern (analytics, guardrails, custom) | Built-in middleware (HITL, summarization, PII redaction) in v1.x |
+| **HITL** | Built-in with approval workflows | Via `createAgent()` middleware (v1.x) |
+| **Memory** | Redis conversation history + @juspay/hippocampus semantic memory | Multiple memory types |
+| **Observability** | OpenTelemetry + Langfuse | LangSmith (framework-agnostic; env-var activation) |
+| **Task Scheduling** | Built-in (cron/interval/once; node-timeout + BullMQ backends) | Not built-in |
+| **Voice Pipeline** | Built-in (5 TTS + 5 STT providers, LiveKit WebRTC, WebSocket server) | Not built-in |
 
 The patterns are clear: NeuroLink favors depth over breadth (fewer integrations, but first-party quality), open standards (MCP, OpenTelemetry), and production patterns (circuit breakers, health checks, HITL). LangChain favors breadth, flexibility, and ecosystem size.
 
@@ -255,7 +262,7 @@ Yes -- and many teams do. Here are some common patterns:
 
 - **LangChain for Python microservices, NeuroLink for TypeScript APIs:** If you have a polyglot architecture, use each framework where its language shines
 - **Shared vector stores:** Pinecone, Qdrant, and other vector databases work with both frameworks. Ingest with LangChain, query with NeuroLink, or vice versa
-- **MCP as the bridge:** MCP servers are framework-agnostic. Build a tool once as an MCP server and consume it from both LangChain (via langchain-mcp) and NeuroLink (natively)
+- **MCP as the bridge:** MCP servers are framework-agnostic. Build a tool once as an MCP server and consume it from both LangChain (via `@langchain/mcp-adapters`) and NeuroLink (natively)
 - **LiteLLM as a shared proxy:** NeuroLink's LiteLLM provider can route through the same proxy infrastructure used by LangChain-based services
 
 The key insight is that these frameworks are complementary, not mutually exclusive. The best choice depends on the specific service you are building, not a blanket organizational mandate.
@@ -268,22 +275,22 @@ If you are considering moving from LangChain.js to NeuroLink, here is the genera
 |---|---|
 | `ChatOpenAI`, `ChatAnthropic`, etc. | `neurolink.generate({ provider: "openai" })` |
 | Custom tools with `DynamicTool` | `tool()` from Vercel AI SDK + MCP servers |
-| `ConversationBufferMemory` | `conversationMemory` constructor option (Redis) |
-| `LLMChain` | `neurolink.generate()` or `neurolink.stream()` |
-| `SequentialChain` | NeuroLink workflow engine (chain strategy) |
+| `ConversationBufferMemory` (now in @langchain/classic) | `conversationMemory` constructor option (Redis) |
+| `LLMChain` (now in @langchain/classic) | `neurolink.generate()` or `neurolink.stream()` |
+| `createAgent({ model, tools, middleware })` | NeuroLink workflow engine + HITL module |
 | LCEL pipelines | Workflow configs with ensemble/adaptive strategies |
 | LangServe deployment | Server adapters (Hono, Express, Fastify, Koa) |
 | LangSmith observability | OpenTelemetry + Langfuse integration |
 
-The `openai-compatible` provider is particularly useful during migration, as it can connect to any endpoint that LangChain was previously talking to directly.
+Note: legacy LangChain classes (`LLMChain`, `ConversationChain`, `AgentExecutor`) were moved to `@langchain/classic` in the v1.0 reset -- they are preserved but no longer the recommended API. The `openai-compatible` provider in NeuroLink is particularly useful during migration, as it can connect to any endpoint that LangChain was previously talking to directly.
 
 ## Conclusion
 
 These are different tools for different contexts. Here is an honest summary:
 
-**Choose LangChain when** your team is Python-first, you need 350+ integrations, you are building complex multi-agent chains with LCEL, or you want the LangSmith observability platform.
+**Choose LangChain when** your team is Python-first, you need a vast integration ecosystem, you are building complex multi-agent systems with LangGraph's durable runtime, or you want the LangSmith observability platform.
 
-**Choose NeuroLink when** your team is TypeScript-first, you need production-grade multi-provider resilience, you want MCP-native tool integration, or you need enterprise patterns like HITL, guardrails, and circuit breakers.
+**Choose NeuroLink when** your team is TypeScript-first, you need production-grade multi-provider resilience across 30 providers, you want native MCP tool integration, or you need enterprise patterns like HITL, guardrails, task scheduling, and circuit breakers.
 
 **Choose both when** you have a polyglot architecture with Python and TypeScript services, or you want to standardize on MCP tools that work across frameworks.
 

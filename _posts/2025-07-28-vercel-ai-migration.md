@@ -2,7 +2,7 @@
 layout: post
 title: Migrating from Vercel AI SDK to NeuroLink
 date: '2025-07-28 10:00:00 +0530'
-last_updated: 2026-01-15T00:00:00.000Z
+last_updated: 2026-07-04T00:00:00.000Z
 categories:
   - Migration
   - Tutorial
@@ -25,7 +25,9 @@ image:
 
 By the end of this guide, you'll have migrated your Vercel AI SDK application to NeuroLink with side-by-side code comparisons, pattern translations, and a step-by-step migration path.
 
-**Verification Details:** This migration guide was verified with NeuroLink v8.32.0 and Vercel AI SDK v5.x.
+**Verification Details:** This migration guide was verified with NeuroLink v9.81 and Vercel AI SDK v7.x.
+
+> Tested: 2026-07-04 against NeuroLink v9.81
 
 ## Why Migrate from Vercel AI SDK?
 
@@ -33,7 +35,7 @@ Before diving into the migration process, let's understand why teams choose to m
 
 ### Provider Flexibility
 
-While Vercel AI SDK supports multiple providers, NeuroLink offers unified access to 13 providers through a single API. Switch between OpenAI, Anthropic, Google, Mistral, and other providers without changing your application code.
+While Vercel AI SDK supports multiple providers, NeuroLink offers unified access to 30 providers through a single API. Switch between OpenAI, Anthropic, Google, Mistral, and other providers without changing your application code.
 
 ### Cost Optimization
 
@@ -54,14 +56,25 @@ NeuroLink provides consistent streaming behavior across all providers, including
 
 Built-in rate limiting, automatic retries, request queuing, and comprehensive observability come standard with NeuroLink, features that often require additional infrastructure with Vercel AI SDK.
 
-> **Note on AI SDK 6:** Vercel released AI SDK 6 in December 2025 with significant
-> new capabilities including full MCP (Model Context Protocol) support, an Agent
-> abstraction for building reusable agents, and DevTools integration. With over
-> 20 million monthly downloads, the AI SDK continues to evolve. Evaluate your
-> specific requirements - if MCP support or the new agent patterns are critical
-> to your use case, compare both SDKs' implementations before deciding on your
-> migration path.
+> **Note on AI SDK 7:** Vercel released AI SDK 7 in June 2026 with significant
+> new capabilities including WorkflowAgent for durable and resumable agent execution,
+> HarnessAgent for wrapping external runtimes (Claude Code, Codex, etc.), MCP Apps
+> (server-rendered UIs inside sandboxed iframes), granular timeout controls, and
+> a dedicated `@ai-sdk/otel` observability package. With over 16 million weekly
+> downloads, the AI SDK continues to evolve rapidly. Evaluate your specific
+> requirements — if durable agent workflows, the new WorkflowAgent pattern, or
+> Node.js 22-only ESM are constraints for your project, compare both SDKs'
+> implementations before deciding on your migration path.
 {: .prompt-info }
+
+> **A note on Mastra:** If you are evaluating TypeScript agent frameworks more broadly,
+> [Mastra](https://mastra.ai) (YC W25, v1.48.0 as of July 2026, $35M raised) is a
+> production-ready open-source option with its own workflow engine (suspend/resume,
+> HITL), four-layer memory system, and multi-provider model routing (3,000+ models
+> across 94 providers). Its focus is agent orchestration and workflow primitives rather
+> than the unified LLM proxy, credential cloaking, and server-framework-agnostic
+> deployment that NeuroLink targets. Worth evaluating if agent workflow ergonomics
+> or the Vercel AI SDK UI integration are your primary requirements.
 
 ## Understanding the Architecture Differences
 
@@ -392,7 +405,7 @@ export async function generateContentCheap(prompt: string) {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'anthropic',
-    model: 'claude-3-haiku-20240307', // Cheaper model
+    model: 'claude-3-5-haiku-20241022', // Cost-optimized model
   });
 
   return result.content;

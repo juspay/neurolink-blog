@@ -15,7 +15,7 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  SDK or gateway? We evaluated both architectures for unifying 13 AI providers.
+  SDK or gateway? We evaluated both architectures for unifying 29+ AI providers.
   Here is why NeuroLink chose SDK-first and what we gained.
 toc: true
 mermaid: true
@@ -27,9 +27,11 @@ image:
 
 When you need to unify multiple AI providers behind a single interface, you face a fundamental architectural choice: put the abstraction in a **library** (SDK) or in a **service** (gateway). Both solve the same problem, but they make radically different trade-offs.
 
-LangChain is an SDK. LiteLLM Proxy is a gateway. Portkey is a gateway. NeuroLink is an SDK with optional gateway capabilities. Each approach has genuine strengths that matter in different contexts.
+LangChain is an SDK. LiteLLM Proxy is a gateway. Portkey is a gateway (now part of Palo Alto Networks' Prisma AIRS platform since May 2026). NeuroLink is an SDK with optional gateway capabilities. Each approach has genuine strengths that matter in different contexts.
 
 This comparison examines both approaches with evidence from real projects: what each gives you, what each costs you, and a decision framework for choosing. We also cover the hybrid pattern -- SDK for latency-sensitive paths, gateway for shared services -- which avoids the forced either/or choice.
+
+> **Tested: 2026-07-04 against NeuroLink v9.81.** Provider count has grown from 13 at the original writing to 29+ named providers. Competitor status has changed materially: Portkey was acquired by Palo Alto Networks (closed May 29, 2026) and Helicone entered maintenance mode (acquired by Mintlify, March 2026). All claims below reflect the current state.
 
 ## Defining the Two Approaches
 
@@ -127,7 +129,7 @@ await server.initialize();
 await server.start();
 ```
 
-The `ServerAdapterFactory` supports four frameworks: Hono (with multi-runtime support for Node.js, Bun, Deno, and Cloudflare Workers), Express, Fastify, and Koa. Each adapter provides the same route surface and middleware capabilities.
+The `ServerAdapterFactory` supports four frameworks: Hono (with multi-runtime support for Node.js, Bun, and Deno), Express, Fastify, and Koa. Each adapter provides the same route surface and middleware capabilities.
 
 Built-in server middleware includes:
 
@@ -225,7 +227,11 @@ export abstract class BaseServerAdapter extends EventEmitter {
 }
 ```
 
-The `BaseServerAdapter` tracks active connections, supports graceful shutdown with connection draining, and manages the server lifecycle through well-defined states: uninitialized, initialized, running, draining, stopping, stopped. This is production-grade lifecycle management that handles rolling deployments and zero-downtime restarts.
+The `BaseServerAdapter` tracks active connections, supports graceful shutdown with connection draining, and manages the server lifecycle through well-defined states: uninitialized, initializing, initialized, starting, running, draining, stopping, stopped, error. This is production-grade lifecycle management that handles rolling deployments and zero-downtime restarts.
+
+### The SDK-First Landscape in 2026
+
+It is worth noting that the SDK-first approach has gained significant traction. Mastra -- a TypeScript AI agent framework ($35M total funding, 25,800+ GitHub stars as of July 2026) -- also embraced the SDK pattern. Mastra's v1.47.0 introduced a `GatewayManager` primitive that centralizes model discovery and authentication across providers, closely mirroring the hybrid pattern NeuroLink has offered since launch: a library-first core with optional centralized routing. The parallel architectures suggest the ecosystem is converging on SDK-with-optional-gateway as the dominant pattern for TypeScript shops.
 
 ## Decision framework
 
