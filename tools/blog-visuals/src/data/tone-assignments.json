@@ -937,7 +937,7 @@
   },
   {
     "slug": "four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one",
-    "title": "Four MCP transports: stdio, http, sse, websocket \u2014 picking the right one",
+    "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
     "tone": "tutorial",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
   },
@@ -994,5 +994,29 @@
     "title": "Grading the model: the scorer hierarchy and evaluation pipeline",
     "tone": "deep-dive",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "inside-neurolink-s-rag-the-generate-integration-bridge",
+    "title": "Inside NeuroLink's RAG: The generate() Integration Bridge",
+    "tone": "deep-dive",
+    "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "voice-as-three-stream-topologies-tts-stt-and-full-duplex-realtime",
+    "title": "Voice as Three Stream Topologies: TTS, STT, and Full-Duplex Realtime",
+    "tone": "deep-dive",
+    "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "dropping-neurolink-into-an-existing-express-or-fastify-app-and-the-embed-route",
+    "title": "NeuroLink Brownfield Integration: Express & Fastify Adapters",
+    "tone": "deep-dive",
+    "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "two-backends-two-stores-one-taskmanager-how-neurolink-schedules-ai-work",
+    "title": "Two backends, two stores, one TaskManager: how NeuroLink schedules AI work",
+    "tone": "deep-dive",
+    "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
   }
 ]
