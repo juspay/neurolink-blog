@@ -83,7 +83,7 @@ This is the layer that separates prototypes from production systems:
 
 Over time, your abstraction layer will need:
 
-- **MCP tool integration** -- multiple transport protocols (stdio, SSE, and WebSocket)
+- **MCP tool integration** -- multiple transport protocols (stdio and Streamable HTTP per the MCP spec, plus legacy SSE and WebSocket variants found in real-world servers)
 - **Conversation memory** -- Redis-backed, in-memory, or external memory services
 - **Human-in-the-loop (HITL) approval workflows** -- pausing execution for human review
 - **Middleware pipelines** -- analytics, guardrails, content moderation, custom logic

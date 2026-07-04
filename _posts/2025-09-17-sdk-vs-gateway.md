@@ -231,7 +231,7 @@ The `BaseServerAdapter` tracks active connections, supports graceful shutdown wi
 
 ### The SDK-First Landscape in 2026
 
-It is worth noting that the SDK-first approach has gained significant traction. Mastra -- a TypeScript AI agent framework ($35M total funding, 25,800+ GitHub stars as of July 2026) -- also embraced the SDK pattern. Mastra's v1.47.0 introduced a `GatewayManager` primitive that centralizes model discovery and authentication across providers, closely mirroring the hybrid pattern NeuroLink has offered since launch: a library-first core with optional centralized routing. The parallel architectures suggest the ecosystem is converging on SDK-with-optional-gateway as the dominant pattern for TypeScript shops.
+It is worth noting that the SDK-first approach has gained significant traction. Mastra -- a TypeScript AI agent framework ($35M total funding, ~25K GitHub stars as of July 2026) -- also embraced the SDK pattern. Mastra's v1.47.0 introduced a `GatewayManager` primitive that centralizes model discovery and authentication across providers, closely mirroring the hybrid pattern NeuroLink has offered since launch: a library-first core with optional centralized routing. The parallel architectures suggest the ecosystem is converging on SDK-with-optional-gateway as the dominant pattern for TypeScript shops.
 
 ## Decision framework
 
