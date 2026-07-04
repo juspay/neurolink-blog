@@ -33,8 +33,6 @@ This comparison examines all three platforms with evidence-based analysis. To be
 >
 > This comparison reflects our understanding of each platform as of the publication date. Features, pricing, and capabilities change frequently—always consult official documentation for the most current information.
 
-> Tested: 2026-07-04 against NeuroLink v9.79.2
-
 ## Understanding LLM Gateways: The Foundation
 
 Before diving into platform specifics, let us establish what an LLM gateway provides and why it has become essential infrastructure for production AI applications.
