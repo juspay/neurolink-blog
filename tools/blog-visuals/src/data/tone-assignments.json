@@ -1018,5 +1018,17 @@
     "title": "Two backends, two stores, one TaskManager: how NeuroLink schedules AI work",
     "tone": "deep-dive",
     "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "workflowrunner-internals-how-our-six-phase-pipeline-tames-ensemble-ai",
+    "title": "WorkflowRunner Internals: How Our Six-Phase Pipeline Tames Ensemble AI",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "workflowrunner-internals-how-ensembleexecutor-judgescorer-and-responseconditione",
+    "title": "WorkflowRunner internals: how ensembleExecutor, judgeScorer, and responseConditioner compose a six-phase pipeline",
+    "tone": "deep-dive",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
