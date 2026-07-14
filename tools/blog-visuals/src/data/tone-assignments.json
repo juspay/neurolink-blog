@@ -1018,5 +1018,17 @@
     "title": "Two backends, two stores, one TaskManager: how NeuroLink schedules AI work",
     "tone": "deep-dive",
     "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "test-matrix-how-neurolink-sweeps-17-providers-in-ci-without-exploding-the-bill",
+    "title": "test:matrix: how NeuroLink sweeps 17 providers in CI without exploding the bill",
+    "tone": "engineering",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "test-matrix-how-neurolink-sweeps-30-providers-in-ci-without-exploding-the-bill",
+    "title": "test:matrix: How NeuroLink Sweeps 30 Providers in CI Without Exploding the Bill",
+    "tone": "engineering",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
