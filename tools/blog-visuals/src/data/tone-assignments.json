@@ -1018,5 +1018,11 @@
     "title": "Two backends, two stores, one TaskManager: how NeuroLink schedules AI work",
     "tone": "deep-dive",
     "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "provider-switching-at-runtime-providerfallback-callbacks-and-modelchain-arrays",
+    "title": "Provider switching at runtime: providerFallback callbacks and modelChain arrays",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
