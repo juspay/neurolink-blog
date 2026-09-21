@@ -934,5 +934,11 @@
     "title": "How We Test NeuroLink: 20 Continuous Test Suites and Counting",
     "prompt": "Abstract digital illustration, twenty parallel test suite runners with green passing indicators and coverage metrics flowing into a quality dashboard, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
     "tone": "deep-dive"
+  },
+  {
+    "slug": "generate-stream-decide-a-third-inference-type-for-neurolink",
+    "title": "generate, stream, decide: a third inference type for NeuroLink",
+    "prompt": "Abstract digital illustration, three parallel inference paths branching from a single provider core with one path carrying typed decision signals instead of text tokens, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
+    "tone": "deep-dive"
   }
 ]
