@@ -1018,5 +1018,11 @@
     "title": "Two backends, two stores, one TaskManager: how NeuroLink schedules AI work",
     "tone": "deep-dive",
     "reason": "backfill: published 2026-06-24..29 via PRs #32-#35 outside the factory pipeline (fixes gate-1 tone-map check)"
+  },
+  {
+    "slug": "generate-stream-decide-a-third-inference-type-for-neurolink",
+    "title": "generate, stream, decide: a third inference type for NeuroLink",
+    "tone": "deep-dive",
+    "reason": "architecture/internals post on the decide inference type"
   }
 ]
