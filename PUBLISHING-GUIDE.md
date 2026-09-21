@@ -62,7 +62,9 @@ After pushing:
    - Go to: `https://github.com/[org]/neurolink-blog/actions`
    - Wait for the "pages build and deployment" workflow to complete
 
-2. Verify the post is live at: `https://blog.neurolink.ink/[year]/[month]/[day]/[post-slug]/`
+2. Verify the post is live at: `https://blog.neurolink.ink/posts/[post-slug]/`
+   (this is the `permalink: /posts/:title/` set in `_config.yml` — a dated
+   `/[year]/[month]/[day]/[slug]/` URL returns 404)
 
 ---
 
