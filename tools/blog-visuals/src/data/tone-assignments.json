@@ -1024,5 +1024,11 @@
     "title": "generate, stream, decide: a third inference type for NeuroLink",
     "tone": "deep-dive",
     "reason": "architecture/internals post on the decide inference type"
+  },
+  {
+    "slug": "two-decision-providers-one-decide-what-laya-forced-on-neurolink",
+    "title": "Two decision providers, one decide(): what Laya forced on NeuroLink",
+    "tone": "deep-dive",
+    "reason": "architecture/internals post on generalizing the shared decision-provider base for a second provider"
   }
 ]
