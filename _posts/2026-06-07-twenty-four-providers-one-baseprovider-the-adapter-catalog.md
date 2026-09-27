@@ -230,5 +230,5 @@ These functions are a perfect example of the adapter pattern at a finer granular
 **Related posts:**
 
 - [What You Actually Inherit When You Extend BaseProvider](/posts/what-you-actually-inherit-when-you-extend-baseprovider/)
-- [Dynamic Model Selection: Routing AI Requests at Runtime](/posts/dynamic-model-selection-runtime/)
 - [From User Input to Provider API: The Five-Stage Message Flow](/posts/from-user-input-to-provider-api-the-five-stage-message-flow/)
+- [NeuroLink can now generate music: how it works](/posts/neurolink-can-now-generate-music-how-it-works/)

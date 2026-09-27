@@ -1036,5 +1036,65 @@
     "title": "Provider switching at runtime: providerFallback callbacks and modelChain arrays",
     "tone": "tutorial",
     "reason": "hands-on configuration walkthrough with code"
+  },
+  {
+    "slug": "command-injection-in-the-ollama-integration",
+    "title": "Command injection in the ollama integration",
+    "tone": "deep-dive",
+    "reason": "security post-mortem on a real shipped fix, systems/implementation language"
+  },
+  {
+    "slug": "the-silent-vertex-default-in-your-rag-pipeline",
+    "title": "The silent Vertex default in your RAG pipeline",
+    "tone": "deep-dive",
+    "reason": "internals investigation of an undocumented default in the RAG pipeline"
+  },
+  {
+    "slug": "generating-talking-avatars-with-neurolink",
+    "title": "Generating talking avatars with NeuroLink",
+    "tone": "tutorial",
+    "reason": "hands-on walkthrough of the avatar generation API"
+  },
+  {
+    "slug": "neurolink-can-now-generate-music-how-it-works",
+    "title": "NeuroLink can now generate music: how it works",
+    "tone": "deep-dive",
+    "reason": "architecture post on the new music modality and its provider registry"
+  },
+  {
+    "slug": "symbol-grounding-catching-hallucinated-apis-before-publish",
+    "title": "Symbol-grounding: catching hallucinated APIs before publish",
+    "tone": "deep-dive",
+    "reason": "engineering-story post on the content factory's own gate system"
+  },
+  {
+    "slug": "fixing-ssrf-and-toctou-in-fetch-pinning",
+    "title": "Fixing SSRF and TOCTOU in fetch pinning",
+    "tone": "deep-dive",
+    "reason": "security post-mortem on a TOCTOU/SSRF fix, systems language"
+  },
+  {
+    "slug": "defending-against-decompression-bombs",
+    "title": "Defending against decompression bombs",
+    "tone": "deep-dive",
+    "reason": "security post-mortem on a decompression-bomb fix, implementation detail"
+  },
+  {
+    "slug": "when-max-tokens-truncates-structured-output-neurolink-still-said-stop",
+    "title": "When max_tokens truncates structured output, NeuroLink still said \"stop\"",
+    "tone": "deep-dive",
+    "reason": "bug post-mortem on the native Anthropic implementation's finishReason handling"
+  },
+  {
+    "slug": "migrating-a-generate-based-judgment-call-to-decide",
+    "title": "Migrating a generate()-based judgment call to decide()",
+    "tone": "tutorial",
+    "reason": "hands-on before/after migration walkthrough with code"
+  },
+  {
+    "slug": "how-we-built-a-14-gate-ai-content-pipeline",
+    "title": "How we built a 14-gate AI content pipeline",
+    "tone": "deep-dive",
+    "reason": "engineering-story post on the content factory pipeline architecture"
   }
 ]

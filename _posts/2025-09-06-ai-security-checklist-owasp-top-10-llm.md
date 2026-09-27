@@ -526,5 +526,5 @@ For deeper coverage of specific areas:
 **Related posts:**
 
 - [Security Best Practices for AI Applications](/posts/enterprise-security-guide/)
-- [The Middleware System: Analytics, Guardrails, and Custom Pipelines](/posts/middleware-system/)
 - [AI Ethics: Building Responsible AI Applications](/posts/ai-ethics-responsible-use/)
+- [Command injection in the ollama integration](/posts/command-injection-in-the-ollama-integration/)

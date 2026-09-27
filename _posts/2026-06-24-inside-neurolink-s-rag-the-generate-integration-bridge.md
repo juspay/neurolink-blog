@@ -256,4 +256,4 @@ When you configure `embeddingProvider` on the `RAGConfig`, the `createVectorQuer
 
 - [Grading the model: the scorer hierarchy and evaluation pipeline](/posts/grading-the-model-the-scorer-hierarchy-and-evaluation-pipeline/)
 - [Seventeen file processors, six categories, one priority system](/posts/seventeen-file-processors-six-categories-one-priority-system/)
-- [From User Input to Provider API: The Five-Stage Message Flow](/posts/from-user-input-to-provider-api-the-five-stage-message-flow/)
+- [The silent Vertex default in your RAG pipeline](/posts/the-silent-vertex-default-in-your-rag-pipeline/)
