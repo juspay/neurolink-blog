@@ -582,7 +582,7 @@ async function main() {
         text: "Please delete the file at /tmp/test-data.csv",
       },
       provider: "anthropic",
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-sonnet-5",
       tools,
     });
 
@@ -622,19 +622,83 @@ interface HITLAuditLog {
 }
 ```
 
-### Listening to audit events
+### Building an audit trail from the confirmation events
+
+There is no separate `hitl:audit` event on the public event emitter -- only
+`hitl:confirmation-request`, `hitl:timeout`, and `hitl:confirmation-response` are
+forwarded to `neurolink.getEventEmitter()`. In practice that is all you need: the
+request event already carries the tool, arguments, and metadata, and your own
+response-handling code knows the decision, so you can assemble each
+`HITLAuditLog` entry from those two places instead:
 
 ```typescript
-// Subscribe to audit events for external logging
-neurolink.getEventEmitter().on("hitl:audit", (auditEntry) => {
-  // Send to your logging system
+// Cache in-flight requests so the timeout handler (which only gets
+// confirmationId/toolName/timeout) can still log the original arguments
+const pendingRequests = new Map<string, { toolName: string; arguments: unknown }>();
+
+neurolink.getEventEmitter().on("hitl:confirmation-request", async (event) => {
+  const { confirmationId, toolName, arguments: args, metadata } = event.payload;
+  pendingRequests.set(confirmationId, { toolName, arguments: args });
+
+  // Log the "confirmation-requested" entry when the event arrives
+  const requestedEntry: HITLAuditLog = {
+    timestamp: metadata.timestamp,
+    eventType: "confirmation-requested",
+    toolName,
+    userId: metadata.userId,
+    sessionId: metadata.sessionId,
+    arguments: args,
+  };
+  console.log("[HITL Audit]", JSON.stringify(requestedEntry));
+  // await database.hitlAuditLogs.insert(requestedEntry);
+
+  // Show your application's confirmation UI (same pattern as above)
+  const userDecision = await showConfirmationDialog({
+    action: toolName,
+    details: args,
+    message: `AI wants to ${toolName}. Allow this action?`,
+  });
+  const respondedAt = Date.now();
+  pendingRequests.delete(confirmationId);
+
+  // Log the matching "confirmation-approved"/"confirmation-rejected" entry
+  // right where you already know the outcome:
+  const decisionEntry: HITLAuditLog = {
+    timestamp: new Date(respondedAt).toISOString(),
+    eventType: userDecision.approved ? "confirmation-approved" : "confirmation-rejected",
+    toolName,
+    userId: metadata.userId,
+    sessionId: metadata.sessionId,
+    arguments: args,
+    reason: userDecision.approved ? undefined : userDecision.reason,
+    responseTime: respondedAt - Date.parse(metadata.timestamp),
+  };
+  console.log("[HITL Audit]", JSON.stringify(decisionEntry));
+  // await database.hitlAuditLogs.insert(decisionEntry);
+
+  neurolink.getEventEmitter().emit("hitl:confirmation-response", {
+    type: "hitl:confirmation-response",
+    payload: {
+      confirmationId,
+      approved: userDecision.approved,
+      reason: userDecision.approved ? undefined : userDecision.reason,
+    },
+  });
+});
+
+// Log "confirmation-timeout" entries the same way, from the timeout event
+// (its payload only carries confirmationId/toolName/timeout, so pull the
+// original arguments from the cache populated above)
+neurolink.getEventEmitter().on("hitl:timeout", (event) => {
+  const cached = pendingRequests.get(event.payload.confirmationId);
+  const auditEntry: HITLAuditLog = {
+    timestamp: new Date().toISOString(),
+    eventType: "confirmation-timeout",
+    toolName: event.payload.toolName,
+    arguments: cached?.arguments,
+  };
   console.log("[HITL Audit]", JSON.stringify(auditEntry));
-
-  // Example: Send to external logging service
-  // await loggingService.log(auditEntry);
-
-  // Example: Store in database for compliance
-  // await database.hitlAuditLogs.insert(auditEntry);
+  pendingRequests.delete(event.payload.confirmationId);
 });
 ```
 

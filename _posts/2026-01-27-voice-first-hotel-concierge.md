@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Voice-First Hotel Concierge with Multi-Provider Routing
+title: 'Voice-First Hotel Concierge with Multi-Provider Routing'
 date: '2026-01-27 10:00:00 +0530'
 categories:
   - Use Case
@@ -44,7 +44,7 @@ flowchart TB
     STT --> Classifier[Task Classifier<br/>Fast/Complex]
 
     Classifier -->|Simple Query| Fast[Fast Agent<br/>Gemini Flash<br/>WiFi, hours, directions]
-    Classifier -->|Complex Query| Quality[Quality Agent<br/>GPT-4o<br/>Recommendations, complaints]
+    Classifier -->|Complex Query| Quality[Quality Agent<br/>GPT-5.4<br/>Recommendations, complaints]
     Classifier -->|Booking| Booking[Booking Agent<br/>Claude Sonnet<br/>+ Hotel Tools]
 
     Fast --> Memory[Conversation Memory]
@@ -71,38 +71,38 @@ The three-agent architecture breaks down as follows:
 > **Note:** LLM API calls typically take 800ms--4000ms for full responses, even for simple queries. The "under 100ms" latency sometimes cited refers only to local processing and routing decisions, not the full LLM round-trip. Use streaming to achieve sub-2-second time-to-first-token, and consider caching frequent factual queries (WiFi passwords, checkout times) for true sub-100ms responses.
 {: .prompt-info }
 
-- **Quality Agent** (GPT-4o): Handles queries that require nuance -- restaurant recommendations based on dietary restrictions, resolving complaints, planning itineraries. Response time target: under 2 seconds.
+- **Quality Agent** (GPT-5.4): Handles queries that require nuance -- restaurant recommendations based on dietary restrictions, resolving complaints, planning itineraries. Response time target: under 2 seconds.
 - **Booking Agent** (Claude Sonnet + Tools): Handles transactional requests that interact with hotel systems -- making reservations, ordering room service, scheduling housekeeping, checking billing.
 
 ## Multi-Provider Setup with Task-Based Routing
 
-The routing system uses NeuroLink's task classification patterns to determine which agent handles each query:
+The routing system uses application-specific task patterns to determine which agent handles each query:
 
 ```typescript
-import { AIProviderFactory, ModelConfigurationManager } from '@juspay/neurolink';
-import { FAST_PATTERNS, REASONING_PATTERNS } from '@juspay/neurolink';
-
-const modelConfig = ModelConfigurationManager.getInstance();
+import { AIProviderFactory } from '@juspay/neurolink';
 
 // Fast agent for simple queries (< 2s first-token via streaming)
 const fastAgent = await AIProviderFactory.createProvider(
   "google-ai",
-  modelConfig.getModelForTier("google-ai", "fast") // gemini-2.5-flash
+  "gemini-2.5-flash"
 );
 
 // Quality agent for complex requests
 const qualityAgent = await AIProviderFactory.createProvider(
   "openai",
-  modelConfig.getModelForTier("openai", "quality") // gpt-4o
+  "gpt-5.4"
 );
 
 // Booking agent with tool support
 const bookingAgent = await AIProviderFactory.createProvider(
   "bedrock",
-  modelConfig.getModelForTier("bedrock", "balanced") // claude-3-sonnet
+  "anthropic.claude-sonnet-4-6"
 );
 
-// Route based on query classification
+// Application-specific routing patterns
+const FAST_PATTERNS = [/wifi|password|hours|directions|shuttle|schedule/i];
+const REASONING_PATTERNS = [/recommend|complaint|problem|itinerary|allerg/i];
+
 function classifyQuery(text: string): "fast" | "quality" | "booking" {
   const bookingKeywords = /\b(book|reserve|order|schedule|cancel)\b/i;
   if (bookingKeywords.test(text)) return "booking";
@@ -119,9 +119,9 @@ function classifyQuery(text: string): "fast" | "quality" | "booking" {
 }
 ```
 
-The `FAST_PATTERNS` from NeuroLink's task classification config match simple queries like "What is the WiFi password?" or "Show me the pool hours." The `REASONING_PATTERNS` match queries requiring analysis, such as "Can you recommend a restaurant for someone with gluten allergies?" or "I have a problem with my room."
+These application-specific `FAST_PATTERNS` match simple queries like "What is the WiFi password?" or "Show me the pool hours." The `REASONING_PATTERNS` match queries requiring analysis, such as "Can you recommend a restaurant for someone with gluten allergies?" or "I have a problem with my room."
 
-The cost impact is substantial. Simple queries processed by Gemini Flash cost approximately $0.000075 per 1K tokens, while complex queries on GPT-4o cost $0.0006 per 1K tokens -- an 8x difference. Since 60-70% of hotel queries are simple factual lookups, task-based routing can cut AI costs by 40-50%.
+The cost impact can be substantial because simple factual lookups do not always need the same model as nuanced recommendations or complaints. Measure your own query mix and current provider pricing before assigning production traffic, then route only the requests that benefit from the higher-capability model.
 
 > **Note:** The classification defaults to "quality" when uncertain. For a guest-facing service, it is always better to over-deliver on response quality than to give a shallow answer to a complex question.
 {: .prompt-info }
@@ -131,39 +131,40 @@ The cost impact is substantial. Simple queries processed by Gemini Flash cost ap
 The booking agent needs access to hotel backend systems. NeuroLink's MCP (Model Context Protocol) registry provides a clean abstraction for connecting to Property Management Systems, Point-of-Sale systems, and event calendars:
 
 ```typescript
-import { MCPRegistry } from '@juspay/neurolink';
-import { tool } from "ai";
-import { z } from "zod";
+import { NeuroLink } from '@juspay/neurolink';
 
-const hotelRegistry = new MCPRegistry();
+const neurolink = new NeuroLink();
 
-// Register hotel PMS tools
-await hotelRegistry.registerServer("hotel-pms", {
+// Connect external MCP servers that expose hotel-system tools
+await neurolink.addExternalMCPServer("hotel-pms", {
+  id: "hotel-pms",
+  name: "Hotel PMS",
   description: "Hotel Property Management System",
-  tools: {
-    getRoomStatus: {},
-    requestRoomService: {},
-    checkGuestBilling: {},
-    requestHousekeeping: {},
-    reportMaintenance: {},
-  },
+  transport: "stdio",
+  status: "disconnected",
+  tools: [],
+  command: "node",
+  args: ["./hotel-pms-server.js"],
 });
 
-// Register restaurant tools
-await hotelRegistry.registerServer("restaurant-pos", {
+await neurolink.addExternalMCPServer("restaurant-pos", {
+  id: "restaurant-pos",
+  name: "Restaurant POS",
   description: "Restaurant reservation and ordering",
-  tools: {
-    checkAvailability: {},
-    makeReservation: {},
-    getMenu: {},
-    placeOrder: {},
-  },
+  transport: "stdio",
+  status: "disconnected",
+  tools: [],
+  command: "node",
+  args: ["./restaurant-pos-server.js"],
 });
 ```
 
 For the booking agent, direct tool definitions provide type-safe parameter schemas with Zod validation:
 
 ```typescript
+import { tool } from "ai";
+import { z } from "zod";
+
 // Direct tool definitions for booking agent
 const makeReservation = tool({
   description: "Make a restaurant reservation at the hotel",
@@ -189,7 +190,7 @@ const makeReservation = tool({
 });
 ```
 
-The MCP registry allows you to discover available services with `listServers()` and enumerate their tools with `listTools()`. This is particularly useful in hotel chains where different properties may have different PMS vendors -- the concierge code stays the same, only the tool implementations change.
+After registration, `listExternalMCPServers()` reports server health and discovered tool counts, while `listMCPServers()` returns the connected server definitions. This is particularly useful in hotel chains where different properties may have different PMS vendors -- the concierge code stays the same, only the server configurations and tool implementations change.
 
 ## Conversation Memory for Guest Context
 
@@ -247,21 +248,20 @@ NeuroLink's TTS processor handles the conversion from text to speech audio, with
 For a guest-facing service, downtime is not an option. A guest standing at the front desk at 2 AM expecting an AI concierge response cannot wait for a provider to recover. NeuroLink's circuit breaker system ensures continuous availability:
 
 ```typescript
-import { CircuitBreakerManager } from '@juspay/neurolink';
-import { withRetry, GracefulShutdown } from '@juspay/neurolink';
+import { CircuitBreakerManager, withRetry } from '@juspay/neurolink';
 
 const cbManager = new CircuitBreakerManager();
 
-const vertexBreaker = cbManager.getBreaker("vertex-concierge", {
+const googleAiBreaker = cbManager.getBreaker("google-ai-concierge", {
   failureThreshold: 3,
   resetTimeout: 15000, // Fast reset for guest-facing service
   operationTimeout: 10000, // 10s max for voice response
 });
 
-// Fallback chain: Vertex -> OpenAI -> Bedrock -> static responses
+// Fallback chain: Google AI -> OpenAI -> Bedrock -> static responses
 async function getConciergeResponse(query: string) {
   const providers = [
-    { agent: fastAgent, breaker: vertexBreaker },
+    { agent: fastAgent, breaker: googleAiBreaker },
     { agent: qualityAgent, breaker: cbManager.getBreaker("openai-concierge") },
     { agent: bookingAgent, breaker: cbManager.getBreaker("bedrock-concierge") },
   ];
@@ -270,8 +270,8 @@ async function getConciergeResponse(query: string) {
     try {
       return await breaker.execute(() =>
         withRetry(() => agent.generate({ input: { text: query } }), {
-          maxAttempts: 2,
-          initialDelay: 500,
+          maxRetries: 1,
+          baseDelayMs: 500,
         })
       );
     } catch { continue; }
@@ -295,17 +295,23 @@ Operational visibility is critical for a 24/7 service. The circuit breaker manag
 const health = cbManager.getHealthSummary();
 // Track: openBreakers, closedBreakers, halfOpenBreakers, unhealthyBreakers
 
-// Evaluation for guest satisfaction scoring
-const satisfaction = await generateEvaluation({
-  userQuery: guestRequest,
-  aiResponse: conciergeResponse,
-  primaryDomain: "hospitality",
+// Generate a response with hospitality-specific quality evaluation
+const satisfaction = await neurolink.generate({
+  input: { text: guestRequest },
+  provider: "openai",
+  model: "gpt-5.4",
+  enableEvaluation: true,
+  evaluationDomain: "hospitality",
 });
+
+if (satisfaction.evaluation) {
+  console.log("Quality score:", satisfaction.evaluation.overall);
+}
 ```
 
 The health summary tracks which circuit breakers are open (failing), closed (healthy), half-open (testing recovery), and unhealthy (degraded performance). This data feeds into hotel operations dashboards, alerting duty managers when the AI concierge needs attention.
 
-Guest satisfaction evaluation uses NeuroLink's evaluation framework with a hospitality-specific domain. This scores each interaction on accuracy, helpfulness, and tone -- the same dimensions hotel chains use for human concierge performance reviews.
+Guest interaction quality evaluation uses NeuroLink's evaluation framework with a hospitality-specific domain. The returned evaluation reports relevance, accuracy, completeness, an overall score, and written reasoning that you can use in operational review workflows.
 
 ## Deployment Considerations
 

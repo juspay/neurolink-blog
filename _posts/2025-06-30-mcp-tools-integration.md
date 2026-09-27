@@ -192,7 +192,7 @@ neurolink.registerTool('database_query', {
 const response = await neurolink.generate({
   input: { text: 'Find all users who signed up last week and export to CSV' },
   provider: 'anthropic',
-  tools: ['database_query'] // Specify tools to use
+  toolFilter: ['database_query'] // Specify tools to use
 });
 
 console.log(response.content);
@@ -230,8 +230,9 @@ MCP supports multiple transport mechanisms:
 | **stdio** | Local processes | Command + args to spawn |
 | **SSE** | Remote servers | HTTP endpoint URL |
 | **WebSocket** | Bidirectional streaming | WebSocket URL |
+| **http** | Remote servers (recommended) | Streamable HTTP endpoint URL |
 
-> **Note:** stdio and Streamable HTTP are the standard MCP transports defined in the specification. WebSocket support is provided via the official SDK's transport module but is not yet part of the MCP specification.
+> **Note:** stdio and Streamable HTTP (`http`) are the standard MCP transports defined in the specification. WebSocket support is provided via the official SDK's transport module but is not yet part of the MCP specification.
 {: .prompt-info }
 
 Choose stdio for local tool servers like database connectors. Use SSE or WebSocket for remote services and shared infrastructure.
@@ -242,7 +243,7 @@ NeuroLink automatically discovers tools from registered MCP servers. Tools are a
 
 > **Understanding MCP Auto-Discovery:** NeuroLink automatically discovers tool capabilities from MCP servers once connected. However, your application is responsible for tracking which servers are registered and managing server lifecycle. The server registry pattern shown above is recommended for production.
 
-**Current Approach (v8.32.0):**
+**Recommended Pattern:**
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -340,7 +341,7 @@ neurolink.registerTool('calculate', {
 const response = await neurolink.generate({
   input: { text: 'What is the temperature in Tokyo in Fahrenheit, and what is 32F in Celsius?' },
   provider: 'anthropic',
-  tools: ['get_weather', 'calculate']
+  toolFilter: ['get_weather', 'calculate']
 });
 
 console.log(response.content);
@@ -524,7 +525,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: 'Check if order #12345 has shipped and create a ticket if it is delayed' },
   provider: 'anthropic',
-  tools: ['get_order_status', 'create_support_ticket']
+  toolFilter: ['get_order_status', 'create_support_ticket']
 });
 
 // NeuroLink automatically:
@@ -632,7 +633,7 @@ neurolink.getEventEmitter().on('hitl:confirmation-request', async (payload) => {
 const response = await neurolink.generate({
   input: { text: 'Refund order #12345' },
   provider: 'anthropic',
-  tools: ['process_refund', 'send_email']
+  toolFilter: ['process_refund', 'send_email']
 });
 ```
 
@@ -661,7 +662,7 @@ const response = await neurolink.generate({
     `
   },
   provider: 'anthropic',
-  tools: [
+  toolFilter: [
     'get_order',
     'lookup_customer',
     'get_purchase_history',
@@ -693,7 +694,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: 'Get the weather in Tokyo, London, and New York' },
   provider: 'anthropic',
-  tools: ['get_weather']
+  toolFilter: ['get_weather']
 });
 
 // The model requests three get_weather calls
@@ -757,7 +758,7 @@ neurolink.registerTool('fetch_crm_data', crmTool);
 const response = await neurolink.generate({
   input: { text: 'Sync customer data from the CRM' },
   provider: 'anthropic',
-  tools: ['fetch_crm_data', 'update_database']
+  toolFilter: ['fetch_crm_data', 'update_database']
 });
 
 console.log('Response:', response.content);
@@ -834,7 +835,7 @@ async function handleCustomerMessage(customerId: string, message: string) {
                    check order status, and create support tickets.
                    Always verify the customer's identity before sharing sensitive info.
                    Be empathetic and solution-focused.`,
-    tools: ['lookup_customer', 'get_order_status', 'create_ticket']
+    toolFilter: ['lookup_customer', 'get_order_status', 'create_ticket']
   });
 
   return response.content;
@@ -925,7 +926,7 @@ async function analyzeData(question: string) {
                    - customers (id, name, email, signup_date, tier)
 
                    Always explain your analysis in plain language.`,
-    tools: ['query_database', 'create_chart']
+    toolFilter: ['query_database', 'create_chart']
   });
 
   return response;
@@ -995,7 +996,7 @@ async function handleDevOpsRequest(request: string) {
                    Always explain what actions you're taking and their impact.
                    For destructive operations, confirm the action before proceeding.
                    Follow the principle of least privilege.`,
-    tools: ['get_pods', 'describe_pod', 'delete_pod', 'scale_deployment', 'get_pull_requests']
+    toolFilter: ['get_pods', 'describe_pod', 'delete_pod', 'scale_deployment', 'get_pull_requests']
   });
 
   return response;
@@ -1337,7 +1338,7 @@ const neurolink = new NeuroLink();
 const streamResult = await neurolink.stream({
   input: { text: 'Analyze the sales data and provide recommendations' },
   provider: 'anthropic',
-  tools: ['query_database', 'create_chart']
+  toolFilter: ['query_database', 'create_chart']
 });
 
 // Process streaming chunks from the async iterable
@@ -1450,7 +1451,7 @@ describe('Customer support integration', () => {
     const response = await neurolink.generate({
       input: { text: `Customer ${testCustomerId} asks: Where is my order?` },
       provider: 'anthropic',
-      tools: ['lookup_customer', 'get_order_status']
+      toolFilter: ['lookup_customer', 'get_order_status']
     });
 
     expect(response.content).toContain('order');
@@ -1523,7 +1524,7 @@ Start with simple inline tools to learn the patterns. As your needs grow, build 
 - [NeuroLink MCP Integration Guide](https://docs.neurolink.ink/docs/mcp-integration)
 - [Pre-built MCP Servers](https://github.com/modelcontextprotocol/servers)
 - [Building MCP Servers](https://modelcontextprotocol.io/docs/concepts)
-- Enterprise Security Guide
+- [Enterprise Security Guide](/posts/enterprise-security-guide/)
 
 ---
 
@@ -1543,5 +1544,5 @@ Explore more NeuroLink capabilities:
 **Related posts:**
 
 - [Function Calling: AI Tool Use Patterns with NeuroLink](/posts/function-calling-patterns/)
-- [OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink](/posts/openai-integration-guide/)
+- [OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink](/posts/openai-integration-guide/)
 - [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)

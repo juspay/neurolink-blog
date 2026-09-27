@@ -15,8 +15,9 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Compare all 12+ AI providers supported by NeuroLink: OpenAI, Google AI,
-  Anthropic, Mistral, Bedrock, SageMaker, and more.
+  Compare NeuroLink's AI providers -- OpenAI, Google AI, Anthropic, Mistral,
+  Bedrock, SageMaker, and more -- across capabilities, pricing, and model
+  quality.
 toc: true
 mermaid: true
 pin: false
@@ -25,33 +26,36 @@ image:
   alt: 'Provider Comparison Matrix: Choosing the Right AI Provider'
 ---
 
-OpenAI, Anthropic, Google, Mistral, and 9 other providers all solve different problems. Here's an honest look at where each one excels, where it falls short, and which to pick for your use case.
+OpenAI, Anthropic, Google, Mistral, and dozens of other providers all solve different problems. Here's an honest look at where each one excels, where it falls short, and which to pick for your use case.
 
-NeuroLink supports 13 providers through a unified interface. This comparison covers capabilities, pricing, model quality, and concrete recommendations. No provider is best at everything -- the goal is to help you make an informed choice based on your specific requirements.
+NeuroLink supports a unified interface across 33 named LLM providers (14 with dedicated implementations, plus 19 more through a shared JSON-catalog adapter). This comparison focuses on the providers with dedicated implementations. This comparison covers capabilities, pricing, model quality, and concrete recommendations. No provider is best at everything -- the goal is to help you make an informed choice based on your specific requirements.
 
 ## Complete Provider Registry
 
-NeuroLink ships with 13 provider implementations, each wrapping a different AI service through a consistent abstraction layer:
+NeuroLink ships with dedicated implementations for its native providers, each wrapping a different AI service through a consistent abstraction layer (additional providers such as Mistral and Hugging Face are handled through a shared JSON-catalog adapter rather than a dedicated class -- see the note below):
 
 | Provider | Class | Enum Value | SDK Used |
 |---|---|---|---|
-| **OpenAI** | `OpenAIProvider` | `openai` | `@ai-sdk/openai` |
-| **Google AI Studio** | `GoogleAIStudioProvider` | `google-ai` | `@ai-sdk/google` + `@google/genai` |
-| **Anthropic** | `AnthropicProvider` | `anthropic` | `@ai-sdk/anthropic` |
-| **Mistral** | `MistralProvider` | `mistral` | `@ai-sdk/mistral` |
-| **AWS Bedrock** | `AmazonBedrockProvider` | `bedrock` | `@ai-sdk/amazon-bedrock` |
-| **AWS SageMaker** | `AmazonSageMakerProvider` | `sagemaker` | Custom `LanguageModelV1` |
-| **Google Vertex** | `GoogleVertexProvider` | `vertex` | `@ai-sdk/google-vertex` |
-| **Azure OpenAI** | `AzureOpenAIProvider` | `azure` | `@ai-sdk/azure` |
-| **Hugging Face** | `HuggingFaceProvider` | `huggingface` | `@ai-sdk/openai` (custom baseURL) |
-| **Ollama** | `OllamaProvider` | `ollama` | `@ai-sdk/openai` (local) |
-| **LiteLLM** | `LiteLLMProvider` | `litellm` | `@ai-sdk/openai` (proxy) |
-| **OpenAI-Compatible** | `OpenAICompatibleProvider` | `openai-compatible` | `@ai-sdk/openai` (custom baseURL) |
-| **OpenRouter** | `OpenRouterProvider` | `openrouter` | `@ai-sdk/openai` (OpenRouter API) |
+| **OpenAI** | `OpenAIProvider` | `openai` | Direct HTTP (`OpenAIChatCompletionsProvider`) |
+| **Google AI Studio** | `GoogleAIStudioProvider` | `google-ai` | `@google/genai` (native SDK) |
+| **Anthropic** | `AnthropicProvider` | `anthropic` | Native Anthropic SDK (direct, no longer `@ai-sdk/anthropic`) |
+| **Mistral** | `ConfiguredOpenAICompatProvider` (JSON-catalog) | `mistral` | Direct HTTP (OpenAI-compatible) |
+| **AWS Bedrock** | `AmazonBedrockProvider` | `bedrock` | AWS SDK (direct, no Vercel AI SDK) |
+| **AWS SageMaker** | `AmazonSageMakerProvider` | `sagemaker` | Custom `LanguageModel` interface (native, no AI SDK) |
+| **Google Vertex** | `GoogleVertexProvider` | `vertex` | `@google/genai` (Gemini) + `@anthropic-ai/vertex-sdk` (Claude) |
+| **Azure OpenAI** | `AzureOpenAIProvider` | `azure` | Direct HTTP (`OpenAIChatCompletionsProvider`) |
+| **Hugging Face** | `ConfiguredOpenAICompatProvider` (JSON-catalog) | `huggingface` | Direct HTTP (OpenAI-compatible) |
+| **Ollama** | `OllamaProvider` | `ollama` | Direct HTTP (`OpenAIChatCompletionsProvider`, local) |
+| **LiteLLM** | `LiteLLMProvider` | `litellm` | Direct HTTP (`OpenAIChatCompletionsProvider`, proxy) |
+| **OpenAI-Compatible** | `OpenAICompatibleProvider` | `openai-compatible` | Direct HTTP (`OpenAIChatCompletionsProvider`, custom baseURL) |
+| **OpenRouter** | `OpenRouterProvider` | `openrouter` | Direct HTTP (`OpenAIChatCompletionsProvider`) |
+| **NVIDIA NIM** | `NvidiaNimProvider` | `nvidia-nim` | Direct HTTP (`OpenAIChatCompletionsProvider`) |
+| **LM Studio** | `LMStudioProvider` | `lm-studio` | Direct HTTP (`OpenAIChatCompletionsProvider`, local) |
+| **llama.cpp** | `LlamaCppProvider` | `llamacpp` | Direct HTTP (`OpenAIChatCompletionsProvider`, local) |
 
 Every provider extends `BaseProvider` and implements the same abstract methods: `executeStream()`, `getAISDKModel()`, `getDefaultModel()`, `getProviderName()`, and `handleProviderError()`. This means adding a new provider requires zero changes to existing code.
 
-> **Note:** Several providers (Hugging Face, Ollama, LiteLLM, OpenAI-Compatible, OpenRouter) use `@ai-sdk/openai` under the hood with custom base URLs. This is because the OpenAI API format has become the de facto standard for LLM endpoints.
+> **Note:** Several providers (Hugging Face, Mistral, Ollama, LiteLLM, OpenAI-Compatible, OpenRouter) share a direct-HTTP base class (`OpenAIChatCompletionsProvider`) with custom base URLs, rather than each shipping its own SDK integration. This is because the OpenAI API format has become the de facto standard for LLM endpoints. Hugging Face and Mistral additionally route through a shared JSON-catalog adapter rather than a dedicated provider class.
 {: .prompt-info }
 
 ## Capability Comparison Matrix
@@ -78,24 +82,24 @@ Key observations:
 - **Hugging Face** offers free-tier access to open-source models but tool calling depends on the specific model
 - **AWS Bedrock** and **Google Vertex** offer enterprise features like IAM-based auth and regional deployment
 
-## Model Quality Rankings
+## Current Model Recommendations
 
-NeuroLink defines a set of `DEFAULT_MODEL_ALIASES` that map quality categories to specific models based on extensive benchmarking:
+The following editorial recommendations reflect current models available through NeuroLink. They are not the literal values of NeuroLink's legacy `DEFAULT_MODEL_ALIASES` constant:
 
 | Category | Recommended Model | Provider |
 |---|---|---|
-| **Best Coding** | Claude 3.5 Sonnet | Anthropic |
+| **Best Coding** | Claude Sonnet 5 | Anthropic |
 | **Best Analysis** | Gemini 2.5 Pro | Google AI |
-| **Best Creative** | Claude 3.5 Sonnet | Anthropic |
+| **Best Creative** | Claude Sonnet 5 | Anthropic |
 | **Best Value** | Gemini 2.5 Flash | Google AI |
-| **Latest OpenAI** | GPT-4o | OpenAI |
-| **Fastest OpenAI** | GPT-4o Mini | OpenAI |
-| **Latest Anthropic** | Claude 3.5 Sonnet | Anthropic |
-| **Fastest Anthropic** | Claude 3.5 Haiku | Anthropic |
+| **Latest OpenAI** | GPT-5.4 | OpenAI |
+| **Fastest OpenAI** | GPT-5.4 Mini | OpenAI |
+| **Latest Anthropic** | Claude Opus 5 | Anthropic |
+| **Fastest Anthropic** | Claude Haiku 4.5 | Anthropic |
 | **Latest Google** | Gemini 2.5 Pro | Google AI |
 | **Fastest Google** | Gemini 2.5 Flash | Google AI |
 
-These aliases are defined in `src/lib/types/providers.ts` and can be used programmatically to select the right model for each task without hardcoding model identifiers.
+Use these as a starting point for evaluation rather than as SDK aliases. In application code, pass the provider and model explicitly so model selection remains visible and easy to update.
 
 > **Tip:** Model rankings shift frequently. These recommendations reflect the state of the art at the time of writing. Always benchmark against your specific use cases before committing to a provider.
 {: .prompt-tip }
@@ -112,10 +116,10 @@ flowchart TB
     A -->|Self-hosted| E{Infrastructure?}
 
     B -->|Free| F["Google AI Studio<br/>gemini-2.5-flash"]
-    B -->|Low cost| G["Mistral Small<br/>or GPT-4o-mini"]
+    B -->|Low cost| G["Mistral Small<br/>or GPT-5.4 Mini"]
     B -->|Enterprise budget| H["OpenAI GPT-5<br/>or Anthropic Claude"]
 
-    C -->|Coding| I["Anthropic Claude 3.5<br/>Sonnet"]
+    C -->|Coding| I["Anthropic Claude<br/>Sonnet 5"]
     C -->|Analysis| J["Google Gemini<br/>2.5 Pro"]
     C -->|Multimodal| K["Google AI Studio<br/>Gemini 3"]
     C -->|Reasoning| L["OpenAI o3<br/>or Magistral"]
@@ -139,8 +143,8 @@ Here is a concrete recommendation for each common use case:
 | Use Case | Recommended Provider | Model | Why |
 |---|---|---|---|
 | **Prototype / Free** | Google AI Studio | `gemini-2.5-flash` | Generous free tier, fast response times |
-| **Production SaaS** | OpenAI | `gpt-4o` | Reliable, well-documented, broad adoption |
-| **Code Generation** | Anthropic or Mistral | Claude 3.5 Sonnet or Codestral | Best-in-class code quality |
+| **Production SaaS** | OpenAI | `gpt-5.4` | Reliable, well-documented, broad adoption |
+| **Code Generation** | Anthropic or Mistral | Claude Sonnet 5 or Codestral | Best-in-class code quality |
 | **Data Analysis** | Google AI Studio | `gemini-2.5-pro` | Best analytical reasoning |
 | **EU Compliance** | Mistral | `mistral-large-latest` | EU-hosted infrastructure |
 | **Enterprise AWS** | AWS Bedrock | Claude on Bedrock | No API key management, IAM auth |
@@ -166,10 +170,10 @@ flowchart LR
     C -->|"openai"| D[OpenAIProvider]
     C -->|"google-ai"| E[GoogleAIStudioProvider]
     C -->|"anthropic"| F[AnthropicProvider]
-    C -->|"mistral"| G[MistralProvider]
+    C -->|"mistral"| G[ConfiguredOpenAICompatProvider]
     C -->|"bedrock"| H[AmazonBedrockProvider]
     C -->|"sagemaker"| I[AmazonSageMakerProvider]
-    C -->|"huggingface"| J[HuggingFaceProvider]
+    C -->|"huggingface"| J[ConfiguredOpenAICompatProvider]
     C -->|"litellm"| K[LiteLLMProvider]
     C -->|"openai-compatible"| L[OpenAICompatibleProvider]
     C -->|"ollama"| M[OllamaProvider]
@@ -178,7 +182,7 @@ flowchart LR
     C -->|"openrouter"| P[OpenRouterProvider]
 ```
 
-All 13 providers extend `BaseProvider` and implement the same `stream()` and `generate()` interface. The `AIProviderFactory` instantiates the correct provider based on the `provider` parameter. Your application code stays the same regardless of which provider runs under the hood.
+Every named provider extends `BaseProvider` (directly, or via the shared `OpenAIChatCompletionsProvider`/JSON-catalog base classes) and implements the same `stream()` and `generate()` interface. The `AIProviderFactory` instantiates the correct provider based on the `provider` parameter. Your application code stays the same regardless of which provider runs under the hood.
 
 ### Live Example: Same Code, Three Providers
 
@@ -228,9 +232,9 @@ Here is a general pricing overview:
 | Tier | Providers / Models | Approximate Cost |
 |---|---|---|
 | **Free** | Google AI Studio (generous free tier), Hugging Face (rate limited) | $0 |
-| **Low Cost** | Gemini Flash, GPT-4o-mini, Mistral Small, Ollama (self-hosted) | $0.01 - $0.50 per 1M tokens |
-| **Mid Range** | GPT-4o, Mistral Large, Claude 3.5 Sonnet | $2 - $15 per 1M tokens |
-| **Premium** | GPT-5, Claude Opus, Gemini Pro | $15 - $75 per 1M tokens |
+| **Low Cost** | Gemini Flash, GPT-5.4 Mini, Mistral Small, Ollama (self-hosted) | $0.01 - $0.50 per 1M tokens |
+| **Mid Range** | GPT-5.4, Mistral Large, Claude Sonnet 5 | $2 - $15 per 1M tokens |
+| **Premium** | GPT-5.4, Claude Opus, Gemini Pro | $15 - $75 per 1M tokens |
 | **Enterprise** | Bedrock, SageMaker, Vertex AI | Pay-per-use + infrastructure costs |
 
 > **Warning:** AI pricing changes frequently. Always check the provider's official pricing page before committing to a model for production use. The costs above are approximate guidelines, not guarantees.
@@ -255,14 +259,14 @@ const neurolink = new NeuroLink();
 const resultBefore = await neurolink.generate({
   input: { text: "Analyze this contract" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 
 // After: switched to Anthropic -- same code structure
 const resultAfter = await neurolink.generate({
   input: { text: "Analyze this contract" },
   provider: "anthropic",
-  model: "claude-3-5-sonnet-20241022",
+  model: "claude-sonnet-5",
 });
 
 // Both return the same EnhancedGenerateResult type

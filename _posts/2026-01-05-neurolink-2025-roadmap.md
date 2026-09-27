@@ -103,8 +103,9 @@ if (result.imageOutput?.base64) {
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    store: 'redis',
-    ttl: 86400 // 24-hour expiration
+    redisConfig: {
+      ttl: 86400 // 24-hour expiration
+    }
   }
 });
 ```
@@ -202,6 +203,10 @@ Here are the major features that actually shipped this year:
 
 We want to be transparent about features that were previously discussed but do not exist in the SDK:
 
+### Corrections Since Publishing
+
+**Multi-Agent Orchestration**: This post originally listed multi-agent orchestration under "Features That Don't Exist." That is no longer accurate -- multi-agent orchestration is now a first-class SDK feature. `Agent` and `AgentNetwork` ship as public exports, with `AgentCoordinator`, `TaskDistributor`, `MessageBus`, and `NetworkOrchestrator` available for coordination and topology.
+
 ### Providers Not Directly Supported
 
 - **Cohere** - Not a direct integration (may be accessible via LiteLLM)
@@ -211,8 +216,6 @@ We want to be transparent about features that were previously discussed but do n
 If you need these providers, consider using LiteLLM which can route to them.
 
 ### Features That Don't Exist
-
-**Multi-Agent Orchestration**: Multi-agent orchestration is not built-in as a first-class SDK feature, but can be composed using NeuroLink's provider abstraction and tool calling primitives. See our upcoming guide on multi-agent networks for implementation patterns.
 
 **Memory Management**: Memory management via `sessionId`-based conversation tracking is built-in. Advanced semantic memory (Mem0 integration) exists internally and is planned for public API exposure in a future release.
 
@@ -238,8 +241,6 @@ The following are areas we're exploring. These are not commitments - they repres
 
 ### Areas of Long-term Interest
 
-**Agent Patterns**: While we don't plan a full multi-agent framework, we're interested in common agent patterns that could be documented or provided as utilities.
-
 **Cost Optimization Tools**: Better visibility into token usage and cost across providers.
 
 **Observability Improvements**: Enhanced integration with monitoring and logging systems.
@@ -260,14 +261,14 @@ When requesting features, it helps to describe:
 
 ## Honest Assessment
 
-NeuroLink is a solid SDK for unified AI provider access with good streaming, tool support, embeddings, RAG pipelines, and enterprise features like HITL and Redis persistence. It does not include a built-in multi-agent orchestration framework.
+NeuroLink is a solid SDK for unified AI provider access with good streaming, tool support, embeddings, RAG pipelines, and enterprise features like HITL and Redis persistence, plus built-in multi-agent orchestration via `Agent`/`AgentNetwork`.
 
 If you need:
 
 - **Unified multi-provider access**: NeuroLink is a good fit
 - **Streaming with tool calling**: NeuroLink handles this well
 - **Enterprise HITL workflows**: NeuroLink has this built in
-- **Multi-agent orchestration**: Look at LangGraph, AutoGen, or similar
+- **Multi-agent orchestration**: NeuroLink has this built in via `Agent`/`AgentNetwork`
 - **RAG pipelines**: NeuroLink includes a built-in `RAGPipeline` -- see the [RAG Implementation guide](/posts/rag-implementation/)
 - **Fine-tuning**: Use provider-specific tools
 

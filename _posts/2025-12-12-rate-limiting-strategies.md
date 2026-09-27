@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Rate Limiting and Quota Management for AI Applications
+title: 'Rate Limiting and Quota Management for AI Applications'
 date: '2025-12-12 10:00:00 +0530'
 categories:
   - Architecture
@@ -53,7 +53,7 @@ Before implementing solutions, you need to understand the various types of rate 
 ### Types of Rate Limits
 
 **Requests Per Minute (RPM)**
-The most common limit restricts how many API calls you can make within a time window. For example, OpenAI's GPT-4 might limit you to 500 requests per minute on certain tiers.
+The most common limit restricts how many API calls you can make within a time window. OpenAI's RPM limits vary by account, project, and usage tier; obtain the current value from your provider dashboard or response headers rather than tying a fixed number to a model.
 
 **Tokens Per Minute (TPM)**
 Beyond request counts, providers limit total token throughput. You might have 90,000 TPM, meaning both your inputs and outputs count against this budget.
@@ -66,16 +66,16 @@ Limits on simultaneous in-flight requests prevent any single customer from monop
 
 ## Error Handling for Rate Limiting
 
-When implementing retry strategies, you need to handle different error types that may occur during AI generation. NeuroLink throws standard JavaScript Error objects with descriptive messages that you can inspect to determine the error type.
+When implementing retry strategies, you need to handle different error types that may occur during AI generation. NeuroLink exports a typed error hierarchy from the main SDK -- `RateLimitError`, `NetworkError`, `AuthenticationError`, `AuthorizationError`, `ProviderError`, and `InvalidModelError` -- so `instanceof` checks against `@juspay/neurolink` are a supported pattern.
 
-> **Note:** NeuroLink error classes are defined internally but not exported from the main SDK. Use error message inspection to classify errors reliably.
+> **Note:** Not every provider is guaranteed to normalize its failures into one of these typed classes, so treat message inspection as a defensive fallback rather than the primary check.
 
 Common error scenarios you may encounter:
 
-- **Rate limit errors**: Check if `error.message` includes `'rate limit'` or `'429'` - implement backoff
-- **Network errors**: Check if `error.message` includes `'network'` or `'ECONNREFUSED'` - retry with backoff
-- **Authentication errors**: Check if `error.message` includes `'authentication'` or `'401'` - check configuration
-- **Provider errors**: Upstream provider issues - consider failover
+- **Rate limit errors**: Check `error instanceof RateLimitError`, or fall back to `error.message` including `'rate limit'` or `'429'` - implement backoff
+- **Network errors**: Check `error instanceof NetworkError`, or fall back to `error.message` including `'network'` or `'ECONNREFUSED'` - retry with backoff
+- **Authentication errors**: Check `error instanceof AuthenticationError`, or fall back to `error.message` including `'authentication'` or `'401'` - check configuration
+- **Provider errors**: Check `error instanceof ProviderError` - upstream provider issues, consider failover
 
 ## Implementing Exponential Backoff
 
@@ -87,11 +87,14 @@ When rate limits are hit, the most fundamental technique is exponential backoff.
 ### Basic Exponential Backoff with NeuroLink
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import { NeuroLink, RateLimitError } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
 function isRateLimitError(error: unknown): boolean {
+  if (error instanceof RateLimitError) {
+    return true;
+  }
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     return message.includes('rate limit') || message.includes('429');
@@ -111,7 +114,7 @@ async function generateWithBackoff(
       const result = await neurolink.generate({
         input: { text: prompt },
         provider: 'openai',
-        model: 'gpt-4-turbo',
+        model: 'gpt-5.4',
       });
       return result.content;
 
@@ -182,11 +185,15 @@ function calculateBackoffWithJitter(
 A production-ready retry wrapper that handles all NeuroLink error types:
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import { NeuroLink, RateLimitError, NetworkError, AuthenticationError } from '@juspay/neurolink';
 import type { GenerateOptions, GenerateResult } from '@juspay/neurolink';
 
-// Helper functions to identify error types by inspecting error messages
+// Prefer the typed error classes NeuroLink exports; fall back to message
+// inspection for providers that haven't normalized into them yet.
 function isRateLimitError(error: unknown): boolean {
+  if (error instanceof RateLimitError) {
+    return true;
+  }
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     return message.includes('rate limit') || message.includes('429');
@@ -195,6 +202,9 @@ function isRateLimitError(error: unknown): boolean {
 }
 
 function isNetworkError(error: unknown): boolean {
+  if (error instanceof NetworkError) {
+    return true;
+  }
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     return message.includes('network') || message.includes('econnrefused') ||
@@ -204,6 +214,9 @@ function isNetworkError(error: unknown): boolean {
 }
 
 function isAuthError(error: unknown): boolean {
+  if (error instanceof AuthenticationError) {
+    return true;
+  }
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     return message.includes('authentication') || message.includes('401') ||
@@ -394,7 +407,7 @@ const rateLimitedClient = new RateLimitedNeuroLink(100, 50000);
 const result = await rateLimitedClient.generate({
   input: { text: 'What is the meaning of life?' },
   provider: 'openai',
-  model: 'gpt-4-turbo',
+  model: 'gpt-5.4',
 });
 ```
 
@@ -693,7 +706,7 @@ async function processChatbotRequest(prompt: string): Promise<GenerateResult> {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4-turbo',
+    model: 'gpt-5.4',
   });
 
   allocator.recordUsage('chatbot', result.usage?.total ?? estimatedTokens);
@@ -861,7 +874,7 @@ async function handleTenantRequest(
     const result = await multiTenantLimiter.generate(tenantId, tier, {
       input: { text: prompt },
       provider: 'openai',
-      model: 'gpt-4-turbo',
+      model: 'gpt-5.4',
     });
     return result.content;
   } catch (error) {
@@ -882,10 +895,13 @@ async function handleTenantRequest(
 You will now add automatic failover so that when one provider is rate limited, your system switches to another provider with a cooldown period:
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import { NeuroLink, RateLimitError } from '@juspay/neurolink';
 import type { GenerateOptions, GenerateResult } from '@juspay/neurolink';
 
 function isRateLimitError(error: unknown): boolean {
+  if (error instanceof RateLimitError) {
+    return true;
+  }
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     return message.includes('rate limit') || message.includes('429');
@@ -918,7 +934,7 @@ class MultiProviderFailover {
       try {
         const result = await this.neurolink.generate({
           ...options,
-          provider: provider.name as any,
+          provider: provider.name,
           model: provider.model
         });
 
@@ -932,16 +948,19 @@ class MultiProviderFailover {
         const err = error as Error;
         errors.push({ provider: provider.name, error: err });
 
-        // Set cooldown for rate limited providers
-        if (isRateLimitError(error)) {
-          this.setCooldown(provider.name, provider.cooldownMs);
-          console.log(
-            `Provider ${provider.name} rate limited. ` +
-            `Cooling down for ${provider.cooldownMs / 1000}s`
-          );
+        // Only fail over for a confirmed rate-limit error. Authentication,
+        // invalid-request, and configuration failures should surface immediately.
+        if (!isRateLimitError(error)) {
+          throw error;
         }
 
-        // Track failover
+        this.setCooldown(provider.name, provider.cooldownMs);
+        console.log(
+          `Provider ${provider.name} rate limited. ` +
+          `Cooling down for ${provider.cooldownMs / 1000}s`
+        );
+
+        // Track rate-limit failover
         const count = this.failoverCount.get(provider.name) ?? 0;
         this.failoverCount.set(provider.name, count + 1);
       }
@@ -986,9 +1005,9 @@ class MultiProviderFailover {
 
 // Usage
 const failoverClient = new MultiProviderFailover([
-  { name: 'openai', priority: 1, model: 'gpt-4-turbo', cooldownMs: 60000 },
+  { name: 'openai', priority: 1, model: 'gpt-5.4', cooldownMs: 60000 },
   { name: 'anthropic', priority: 2, model: 'claude-sonnet-4-5-20250929', cooldownMs: 60000 },
-  { name: 'vertex', priority: 3, model: 'gemini-3-flash', cooldownMs: 30000 }
+  { name: 'vertex', priority: 3, model: 'gemini-2.5-flash', cooldownMs: 30000 }
 ]);
 
 const result = await failoverClient.generate({
@@ -1193,7 +1212,7 @@ if (alerts.length > 0) {
 ### Implementation Checklist
 
 - [ ] Implement exponential backoff with jitter
-- [ ] Handle errors using error message inspection to classify rate limit, network, and authentication errors
+- [ ] Classify errors with `RateLimitError`, `NetworkError`, and `AuthenticationError` using `instanceof` first; inspect messages only as a defensive fallback for unnormalized provider failures
 - [ ] Track both RPM and TPM limits proactively
 - [ ] Implement proactive rate limiting before hitting limits
 - [ ] Set up quota tracking and projection
@@ -1209,7 +1228,7 @@ if (alerts.length > 0) {
 3. **Ignoring Token Limits**: RPM compliance does not guarantee TPM compliance
 4. **No Monitoring**: Cannot optimize what you cannot measure
 5. **Hardcoded Limits**: Provider limits change; make them configurable
-6. **Poor Error Detection**: Implement robust error message inspection for reliable error identification
+6. **Poor Error Detection**: Prefer `instanceof` checks against `RateLimitError`, `NetworkError`, and `AuthenticationError`; reserve message inspection for unnormalized provider failures
 
 ## What's Next
 
@@ -1226,7 +1245,7 @@ NeuroLink's multi-provider support makes it straightforward to implement all of 
 
 ---
 
-*Need help implementing rate limiting for your AI application? Our solutions team has helped dozens of enterprises handle millions of requests while staying within provider limits. Reach out for a consultation.*
+*Need help implementing rate limiting for your AI application? Reach out to our team for a consultation.*
 
 ---
 

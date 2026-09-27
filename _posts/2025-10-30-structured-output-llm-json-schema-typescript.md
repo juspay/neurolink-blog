@@ -37,7 +37,11 @@ Without structured output, getting data from an LLM into your application requir
 
 ```typescript
 // The fragile way - DO NOT do this
-const response = await llm.generate("Extract the product name and price from: ...");
+const response = await neurolink.generate({
+  input: { text: "Extract the product name and price from: ..." },
+  provider: "openai",
+  model: "gpt-5.4",
+});
 // response.content = "The product is Sony WH-1000XM5 and it costs $349.99"
 const name = response.content.match(/product is (.+) and/)?.[1]; // brittle!
 const price = parseFloat(response.content.match(/\$(\d+\.\d+)/)?.[1] || "0"); // fragile!
@@ -57,7 +61,7 @@ flowchart LR
     E -->|Invalid| G[Retry/Error]
 ```
 
-The schema tells the LLM exactly what fields to return, what types they should be, and what values are acceptable. The SDK validates the response against the schema, and you get a TypeScript object with full type inference. If the LLM returns invalid data, the validation catches it immediately.
+The schema tells the LLM exactly what fields to return, what types they should be, and what values are acceptable. NeuroLink requests schema-shaped JSON and returns the parsed object; validating it with the same Zod schema gives you a TypeScript object with full type inference. If the LLM returns invalid data, that validation step catches it before your application uses it.
 
 ![structured-output-zod](/assets/img/posts/structured-output-llm-json-schema-typescript/structured-output-zod.gif)
 
@@ -122,71 +126,71 @@ const result = await neurolink.generate({
     Currently in stock. Rated 4.7 stars."`,
   },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   schema: ProductSchema,
   output: { format: "structured" },
 });
 
-// result.content is now a typed Product object
-const product: Product = JSON.parse(result.content);
-console.log(product.name);     // "Sony WH-1000XM5"
-console.log(product.price);    // 349.99
-console.log(product.category); // "electronics"
-console.log(product.features); // ["30-hour battery life", "adaptive sound control", ...]
+// result.content is the JSON text; result.structuredData is the parsed object
+// (typed as unknown), so validate it before treating it as a Product
+const parsed = ProductSchema.safeParse(result.structuredData);
+if (!parsed.success) {
+  throw new Error("Model output did not match ProductSchema");
+}
+
+const product: Product = parsed.data;
+console.log(product.name);     // e.g. "Sony WH-1000XM5"
+console.log(product.price);    // e.g. 349.99
+console.log(product.category); // e.g. "electronics"
+console.log(product.features); // e.g. ["30-hour battery life", "adaptive sound control", ...]
 ```
 
-Under the hood, NeuroLink converts the Zod schema into a format that the LLM provider understands. For OpenAI, it uses JSON mode with the schema embedded in the system prompt. For Anthropic, it uses tool-based extraction where the schema becomes the tool parameters. The details are handled automatically -- you just pass the schema and get structured output back.
+`result.content` is still a string: with a schema and `"structured"` or `"json"` output, it holds the JSON text. The parsed object is exposed as `result.structuredData`, which NeuroLink populates from the provider's structured-output path or from text-mode JSON recovery. Prefer it over `JSON.parse(result.content)`, and run your own `safeParse` so your application code gets a checked type rather than `unknown`. If recovery could not produce an object, `structuredData` can be absent, which the `safeParse` above turns into an explicit error.
 
-The `output: { format: "structured" }` option tells NeuroLink to enforce JSON output mode on the provider. This ensures the model returns raw JSON rather than wrapping it in markdown code blocks or conversational text.
+Under the hood, NeuroLink converts the Zod schema into the form each provider path accepts. The mechanism differs by provider (covered in the next step), but the call shape and the result fields stay the same.
+
+The `output: { format: "structured" }` option asks for JSON output rather than prose or Markdown-fenced code. Passing a `schema` is what tells NeuroLink which shape to request and parse.
 
 ## Step 3 -- Provider-Specific Behavior
 
-Different LLM providers handle structured output differently. Most work seamlessly, but Google AI and Vertex have one important caveat.
+The call shape is identical across providers. What differs is how each provider path enforces the schema, and what happens when the same request also carries tools.
 
 ```typescript
-// OpenAI: Works without restrictions
-const openaiResult = await neurolink.generate({
-  input: { text: description },
-  provider: "openai",
-  model: "gpt-4o",
-  schema: ProductSchema,
-});
+const providers = [
+  { provider: "openai", model: "gpt-5.4" },
+  { provider: "anthropic", model: "claude-sonnet-5" },
+  { provider: "google-ai", model: "gemini-2.5-flash" },
+] as const;
 
-// Google AI / Vertex: MUST disable tools
-const googleResult = await neurolink.generate({
-  input: { text: description },
-  provider: "google-ai",
-  model: "gemini-2.5-flash",
-  schema: ProductSchema,
-  disableTools: true, // Required for Google providers
-});
+for (const target of providers) {
+  const result = await neurolink.generate({
+    input: { text: description },
+    ...target,
+    schema: ProductSchema,
+    output: { format: "structured" },
+  });
 
-// Anthropic: Works with tools enabled
-const anthropicResult = await neurolink.generate({
-  input: { text: description },
-  provider: "anthropic",
-  model: "claude-sonnet-4-20250514",
-  schema: ProductSchema,
-});
+  const parsed = ProductSchema.safeParse(result.structuredData);
+  console.log(target.provider, parsed.success);
+}
 ```
 
-Here is the full compatibility matrix:
+Without tools, every path above requests schema-shaped JSON. Built-in tools are attached by default, though, so the with-tools column below is the normal case unless you pass `disableTools: true` on the structured call. With tools on the same request, the provider paths behave differently:
 
-| Provider | Structured Output | Needs disableTools? |
-|---|---|---|
-| OpenAI | Full support | No |
-| Anthropic | Full support | No |
-| Google AI / Vertex | Supported | Yes (required) |
-| Bedrock | Supported | No |
+| Provider path | Schema with tools in the same request |
+|---|---|
+| OpenAI, Azure OpenAI | The response format is sent together with the tools. |
+| Other OpenAI-compatible providers | The response format is withheld while tools are attached; NeuroLink then makes one tool-free re-ask to obtain the structured answer. |
+| Anthropic (native) | An internal `final_result` tool carries the schema, so your tools stay callable. |
+| Google AI Studio (Gemini) | Tools are suppressed for the structured turn because the Gemini API does not combine them with schema-enforced output. |
+| Vertex Gemini | Uses a `final_result` tool pattern when schema and tools coexist. |
+| Vertex Claude | Uses its own Anthropic transport and is not subject to the Gemini restriction. |
+| Amazon Bedrock | Can fall back to text-mode JSON coercion rather than a native schema mode. |
 
-> **Note:** When using Google AI or Vertex providers with structured output, you **must** set `disableTools: true`. Google's Gemini models cannot use tool calling and structured output simultaneously. If you omit this flag, the request will fail with a provider error. This is a known limitation of the Google AI API, not a NeuroLink restriction.
+> **Note:** A tool-free re-ask is a second billed model call. For streaming, its usage is reported separately in `result.metadata.structuredDataUsage`. If no object can be recovered, the call does not throw: `result.structuredData` is undefined and `result.content` holds the model's raw text. Check `structuredData` for undefined before using it. Errors thrown by `generate()` are provider, network, authentication, or rate-limit failures, not missing objects, so catch those around the call separately. `disableTools: true` is available when you want a structured turn that never attaches tools.
 {: .prompt-info }
 
-The reason for this difference lies in how each provider implements structured output internally:
-
-- **OpenAI** uses a dedicated JSON mode that coexists with tool calling.
-- **Anthropic** implements structured output through tool-based extraction, which works alongside other tools.
-- **Google AI** uses response MIME type configuration for structured output, which conflicts with their tool calling implementation.
+These behaviors come from NeuroLink's current provider implementations and can change between releases, so pin your SDK version and keep a small structured-output regression test for each provider you depend on.
 
 ## Step 4 -- Complex Nested Schemas
 
@@ -220,7 +224,7 @@ const result = await neurolink.generate({
     images: [invoiceImageBuffer],
   },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   schema: InvoiceSchema,
   output: { format: "structured" },
 });
@@ -234,7 +238,7 @@ This example demonstrates several advanced patterns:
 
 **Default values** (`currency: z.string().default("USD")`) provide fallbacks when the source text does not specify a value. If the invoice does not mention currency, the schema defaults to USD.
 
-**Multimodal input** (`images: [invoiceImageBuffer]`) lets you pass scanned invoice images alongside text. With vision-capable models like GPT-4o, the LLM can extract structured data directly from images.
+**Multimodal input** (`images: [invoiceImageBuffer]`) lets you pass scanned invoice images alongside text. With vision-capable models like GPT-5.4, the LLM can extract structured data directly from images.
 
 ## Step 5 -- Structured Output with Streaming
 
@@ -244,7 +248,7 @@ You can stream structured output for progressive UI updates. This is useful when
 const result = await neurolink.stream({
   input: { text: "Analyze these 5 support tickets..." },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   schema: z.object({
     tickets: z.array(z.object({
       id: z.string(),
@@ -257,26 +261,26 @@ const result = await neurolink.stream({
   output: { format: "structured" },
 });
 
-let jsonBuffer = "";
+let streamedText = "";
 for await (const chunk of result.stream) {
-  if ("content" in chunk) {
-    jsonBuffer += chunk.content;
-    // Optionally parse partial JSON for progressive display
+  if ("content" in chunk && typeof chunk.content === "string") {
+    streamedText += chunk.content;
+    // Optionally feed streamedText to a partial-JSON parser for progressive display
   }
 }
 
-// Parse the complete JSON
-const analysis = JSON.parse(jsonBuffer);
+// Read the parsed object only after the stream has been fully drained
+const analysis = result.metadata?.structuredData;
 ```
 
-Streaming structured output works by accumulating JSON chunks until the full object is complete. You can optionally attempt to parse partial JSON for progressive display -- showing each ticket as it appears in the stream -- but the safest approach is to buffer the complete response and parse once at the end.
+While the stream runs, content chunks carry partial text that is usually not parseable JSON. On the OpenAI-compatible provider paths (OpenAI, Azure OpenAI, and the other OpenAI-compatible providers), NeuroLink fills `result.metadata.structuredData` with the parsed object once the loop finishes. Read it only after draining the stream; before that it is still unset, and it stays absent if no object was produced. The Anthropic, Google AI Studio, Vertex, and Bedrock stream paths do not set this field, so for those providers parse the accumulated `streamedText` with your schema after the stream ends.
 
-> **Note:** When streaming structured output, the `result.stream` async generator yields chunks of raw JSON text. The JSON is only complete and parseable when the stream ends. If you need progressive display, use a streaming JSON parser library that can handle partial objects.
+> **Note:** If you need progressive display, run the accumulated chunk text through a streaming JSON parser that tolerates partial objects, and treat those partial values as provisional. Use `metadata.structuredData` (on the OpenAI-compatible paths) or the fully accumulated text, validated with your schema, as the final result. When the streamed turn also carried tools on a provider that withholds the response format, the chunks you see are the model's prose answer and the structured object comes from the separate tool-free re-ask described above.
 {: .prompt-info }
 
 ## Step 6 -- Error Handling and Retry
 
-LLMs are probabilistic. Even with a schema, the model occasionally produces invalid JSON -- a missing required field, a number outside the expected range, or a string where an enum value was expected. A robust implementation includes retry logic with validation feedback.
+LLMs are probabilistic. Even with a schema, the model can return output that does not satisfy it -- a missing required field, a number outside the expected range, or a string where an enum value was expected. Provider schema modes also do not enforce every Zod refinement, so constraints such as `.positive()` or `.max(5)` still need a local check. A robust implementation validates the result itself and retries with feedback.
 
 ```typescript
 import { z } from "zod";
@@ -284,32 +288,34 @@ import { z } from "zod";
 async function generateStructured<T extends z.ZodType>(
   prompt: string,
   schema: T,
-  maxRetries = 3
+  maxAttempts = 3
 ): Promise<z.infer<T>> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const result = await neurolink.generate({
-        input: { text: prompt },
-        provider: "openai",
-        model: "gpt-4o",
-        schema,
-        output: { format: "structured" },
-      });
+  let currentPrompt = prompt;
 
-      // Validate with Zod
-      const parsed = schema.parse(JSON.parse(result.content));
-      return parsed;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        console.warn(`Attempt ${attempt + 1}: Validation failed`, error.errors);
-        // Retry with more explicit prompt
-        prompt += "\n\nIMPORTANT: Return valid JSON matching the exact schema.";
-      } else {
-        throw error; // Non-validation errors should propagate
-      }
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Provider, network, and authentication errors throw here and propagate
+    const result = await neurolink.generate({
+      input: { text: currentPrompt },
+      provider: "openai",
+      model: "gpt-5.4",
+      schema,
+      output: { format: "structured" },
+    });
+
+    const parsed = schema.safeParse(result.structuredData);
+    if (parsed.success) {
+      return parsed.data;
     }
+
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("; ");
+    console.warn(`Attempt ${attempt}: validation failed -- ${issues}`);
+
+    currentPrompt = `${prompt}\n\nYour previous answer did not match the schema (${issues}). Return JSON that satisfies every field constraint.`;
   }
-  throw new Error("Failed to generate valid structured output after retries");
+
+  throw new Error(`No schema-valid output after ${maxAttempts} attempts`);
 }
 
 // Usage
@@ -321,11 +327,11 @@ const product = await generateStructured(
 
 This pattern has several important characteristics:
 
-**Separate validation errors from provider errors.** A `ZodError` means the model returned JSON but it did not match the schema -- this is retryable. A network error or authentication error should propagate immediately.
+**Validate the result, not the exception type.** The retry decision comes from your own `safeParse` of `result.structuredData`. A missing `structuredData` fails that check too, so it is retried in the same way. Do not assume SDK-level schema failures arrive as a `ZodError`; errors thrown by `generate()` (provider, network, authentication, or rate-limit failures) propagate from the call, while a turn that produced no object returns normally with `structuredData` undefined. You can wrap the call with your own error classification if some of those should be retried.
 
-**Augment the prompt on retry.** Adding an explicit instruction to follow the schema increases the success rate on subsequent attempts. You can also include the specific validation errors to help the model correct its output.
+**Feed the validation issues back.** Rebuilding the prompt from the original text plus the specific issues keeps it from growing on every attempt and tells the model exactly what to fix.
 
-**Limit retries.** Three attempts is usually sufficient. If the model cannot produce valid output after three tries, the prompt or schema may need revision rather than more attempts.
+**Limit retries.** Keep the attempt count small and measure how often retries succeed for your schema. Repeated failures usually mean the prompt or schema needs revision rather than more attempts.
 
 ## Real-World Use Cases
 
@@ -369,7 +375,7 @@ Generate structured API responses from natural language inputs. The schema acts 
 const ActionSchema = z.object({
   action: z.enum(["create", "update", "delete", "query"]),
   resource: z.string(),
-  parameters: z.record(z.unknown()),
+  parameters: z.record(z.string(), z.unknown()),
   confirmationRequired: z.boolean(),
 });
 ```
@@ -385,23 +391,29 @@ Different providers implement structured output differently, but NeuroLink abstr
 ```mermaid
 flowchart TD
     A[Define Zod Schema] --> B[Pass to generate/stream]
-    B --> C{Provider}
-    C -->|OpenAI| D["JSON mode
-    schema in system prompt"]
-    C -->|Google AI| E["Response MIME type
-    disableTools required"]
-    C -->|Anthropic| F["Tool-based extraction
-    schema as tool params"]
-    D --> G[Raw JSON Response]
+    B --> C{Provider path}
+    C -->|OpenAI / Azure| D["Response format
+    sent with or without tools"]
+    C -->|Other OpenAI-compatible| E["Response format
+    tool-free re-ask when tools present"]
+    C -->|Anthropic / Vertex Gemini| F["Internal final_result tool
+    when tools present"]
+    C -->|Google AI Studio| K["Schema output
+    tools suppressed"]
+    C -->|Bedrock| L["Text-mode JSON coercion
+    fallback"]
+    D --> G[content JSON text + structuredData]
     E --> G
     F --> G
-    G --> H[Zod Validation]
+    K --> G
+    L --> G
+    G --> H[Your Zod safeParse]
     H -->|Pass| I[Type-Safe Output]
     H -->|Fail| J[Retry with Feedback]
     J --> B
 ```
 
-The key insight is that NeuroLink translates your Zod schema into the provider-native format automatically. For OpenAI, the schema becomes part of the system prompt with JSON mode enabled. For Anthropic, it becomes a tool definition that the model "calls" to produce structured output. For Google AI, it configures the response MIME type. You write one schema, and it works across all providers.
+NeuroLink translates your Zod schema into whatever the selected provider path accepts: a response-format field, an internal `final_result` tool, a Gemini schema configuration, or text-mode JSON recovery. For `generate()`, whichever path runs, the result has the same shape -- JSON text in `content` and the parsed object in `structuredData`, or `structuredData` undefined when no object could be recovered. For `stream()`, only the OpenAI-compatible paths fill `metadata.structuredData` after the stream drains; on other providers, parse the accumulated text yourself. You write one schema and one validation step, and keep a per-provider regression test for the paths you rely on.
 
 ## Best Practices for Structured Output
 
@@ -417,7 +429,7 @@ The key insight is that NeuroLink translates your Zod schema into the provider-n
 
 ## What You Built
 
-You built structured JSON extraction with Zod schemas, provider-aware generation that handles OpenAI, Anthropic, and Google AI differences automatically, retry logic for validation failures, and real-world extraction patterns for documents, classification, and API response generation.
+You built structured JSON extraction with Zod schemas, provider-aware generation with one call shape across OpenAI, Anthropic, and Google AI, retry logic for validation failures, and real-world extraction patterns for documents, classification, and API response generation.
 
 Continue with these related tutorials:
 

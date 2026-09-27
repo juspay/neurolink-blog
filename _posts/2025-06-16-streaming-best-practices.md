@@ -171,18 +171,20 @@ neurolink stream "Explain microservices architecture" -p openai
 Each streaming chunk is a simple object with the text content:
 
 ```typescript
-// StreamChunk is a discriminated union for text and audio chunks
+import type { TTSAudioFormat } from '@juspay/neurolink';
+
+// StreamChunk is a discriminated union for text and TTS audio chunks
 type StreamChunk =
   | { type: "text"; content: string }
-  | { type: "audio"; audioChunk: TTSChunk };
+  | { type: "tts_audio"; audio: TTSChunk };
 
-// AudioChunk structure for audio data (from TTS processor)
-type AudioChunk = {
+// Abbreviated TTSChunk structure for synthesized audio data
+type TTSChunk = {
   data: Buffer;
-  sampleRateHz: number;
-  channels: number;
-  encoding: "PCM16LE";
-  isFinal?: boolean;
+  format: TTSAudioFormat;
+  index: number;
+  isFinal: boolean;
+  sampleRate?: number;
 };
 
 // StreamResult contains metadata after streaming completes

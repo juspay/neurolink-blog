@@ -27,7 +27,7 @@ image:
 
 In this guide, you will explore real-world projects built by the NeuroLink community. Each showcase includes the technical architecture, implementation patterns, and lessons learned -- giving you practical inspiration and proven patterns for your own NeuroLink applications.
 
-NeuroLink started as an internal tool at Juspay for unifying AI provider access across their payment platform. Today, it powers AI applications across industries -- e-commerce, healthcare, agriculture, education, and more. What follows is a curated look at what the community has shipped.
+NeuroLink was built at Juspay to unify AI provider access across their payments infrastructure, and it continues to power internal AI applications there, including Tara, Yama, and Clairvoyance. Beyond Juspay, developers have picked it up for their own projects. What follows is a curated look at patterns the community has explored.
 
 ## Community Ecosystem
 
@@ -58,34 +58,23 @@ These projects demonstrate NeuroLink running in production environments, serving
 
 ### Fintech AI Assistant
 
-A payment orchestration company built a customer-facing AI chat assistant using NeuroLink's multi-provider failover to ensure 99.99% uptime. The assistant handles account inquiries, transaction disputes, and payment guidance across multiple channels.
+A common pattern for payments and fintech teams is a customer-facing AI chat assistant that leans on NeuroLink's multi-provider failover to stay resilient to a single provider's outages. Such an assistant might handle account inquiries, transaction disputes, and payment guidance across multiple channels.
 
-The key architectural decision was using `createAIProviderWithFallback` with Bedrock as the primary provider and Vertex as the fallback. When Bedrock experiences latency spikes or outages, the system automatically fails over to Vertex with zero user-visible disruption. Circuit breakers prevent cascade failures, and the failover logic is transparent to the application layer.
-
-**Key metrics reported by the team:**
-
-| Metric | Value |
-|---|---|
-| Monthly active conversations | 500K+ |
-| Provider failover events | ~12/month |
-| Average response time | 1.8 seconds |
-| Uptime (12-month rolling) | 99.99% |
-
-The team reported that NeuroLink's provider abstraction saved them approximately 3 months of engineering effort compared to building direct provider integrations with custom failover logic.
+The key architectural decision is using `createAIProviderWithFallback` with Bedrock as the primary provider and Vertex as the fallback. When Bedrock experiences latency spikes or outages, the system automatically fails over to Vertex with minimal user-visible disruption. Circuit breakers prevent cascade failures, and the failover logic stays transparent to the application layer.
 
 ### E-Commerce Product Search
 
-A large e-commerce platform built a semantic product search system using NeuroLink's RAG pipeline. Instead of traditional keyword matching, customers can search for products using natural language -- "comfortable running shoes for flat feet under $100" returns relevant results ranked by semantic similarity.
+Semantic product search is another pattern well suited to NeuroLink's RAG pipeline. Instead of traditional keyword matching, customers can search for products using natural language -- "comfortable running shoes for flat feet under $100" -- and get results ranked by semantic similarity rather than exact keyword overlap.
 
-The pipeline processes 500K+ product descriptions using NeuroLink's `MarkdownChunker` and `SemanticMarkdownChunker`. Product data is chunked, embedded, and stored in a vector database. At query time, the RAG pipeline retrieves relevant products, reranks them, and generates a natural language summary of the top results.
+The pipeline chunks product descriptions with NeuroLink's `MarkdownChunker` or `SemanticMarkdownChunker`, embeds them, and stores them in a vector database. At query time, the RAG pipeline retrieves relevant products, reranks them, and generates a natural language summary of the top results.
 
-The semantic search approach improved click-through rates by an estimated 23% compared to the previous keyword-based system, according to the team's A/B testing data.
+Search like this generally handles long-tail, conversational queries better than pure keyword matching, since it captures intent rather than exact term overlap.
 
 ### Healthcare Documentation
 
-A healthcare technology company integrated NeuroLink's MCP system to power tool-augmented clinical note generation. Clinicians dictate notes during patient visits, and the AI assistant structures them into standardized clinical documentation -- pulling relevant patient history, lab results, and medication lists through MCP tool calls.
+Tool-augmented clinical note generation is a pattern some teams have explored with NeuroLink's MCP system: clinicians dictate notes during a visit, and an AI assistant structures them into documentation -- pulling relevant patient history, lab results, and medication lists through MCP tool calls.
 
-The system uses the stdio transport for HIPAA-compliant local tool execution. All patient data stays on-premise; only de-identified queries are sent to the AI provider. The MCP tool architecture ensures clear boundaries between the AI model and sensitive health data.
+Using the stdio transport keeps tool execution local rather than routed through a remote server, so only de-identified queries need to reach the AI provider. This kind of MCP tool architecture creates a clear boundary between the AI model and sensitive data, though teams handling regulated health data are responsible for their own compliance review -- NeuroLink itself does not carry a HIPAA certification.
 
 ## Open-Source Integrations
 
@@ -100,11 +89,11 @@ A full-stack AI application template that demonstrates NeuroLink's streaming API
 - Provider selection UI for comparing responses across models
 - Session management with conversation memory
 
-The template has been forked over 200 times on GitHub and serves as the starting point for many community projects.
+The template serves as a starting point for community projects that want NeuroLink's streaming API wired into a Next.js app with React Server Components out of the box.
 
 ### NeuroLink + LangChain Bridge
 
-An adapter that lets LangChain users swap in NeuroLink providers without rewriting their chains. The bridge maps LangChain's `BaseLLM` interface to NeuroLink's `BaseProvider` contract, giving LangChain users access to NeuroLink's 13 providers, failover logic, and middleware pipeline.
+An adapter that lets LangChain users swap in NeuroLink providers without rewriting their chains. The bridge maps LangChain's `BaseLLM` interface to NeuroLink's `BaseProvider` contract, giving LangChain users access to NeuroLink's full lineup of LLM providers, failover logic, and middleware pipeline.
 
 This is particularly useful for teams that have existing LangChain applications and want to adopt NeuroLink's provider management without a full migration.
 
@@ -118,15 +107,15 @@ Some of the most interesting community projects are experiments that push the bo
 
 ### Multi-Provider Debate Bot
 
-This project uses four different providers simultaneously -- OpenAI, Anthropic, Vertex, and Bedrock -- to generate "debates" between AI models on any topic. Each model argues its position independently, and a fifth model (the "moderator") scores the arguments.
+This project uses several providers simultaneously -- OpenAI, Anthropic, and Vertex, extendable to more -- to generate "debates" between AI models on any topic. Each model argues its position independently.
 
-The implementation demonstrates NeuroLink's uniform API surface. The same code creates providers for four different services and generates responses in parallel:
+The implementation demonstrates NeuroLink's uniform API surface. The same code creates providers for multiple services and generates responses in parallel; extending the pattern with one more `generate()` call lets a separate model act as a "moderator" that scores the arguments:
 
 ```typescript
 import { createAIProvider } from '@juspay/neurolink';
 
 const providers = await Promise.all([
-  createAIProvider('openai', 'gpt-4o'),
+  createAIProvider('openai', 'gpt-5.4'),
   createAIProvider('anthropic', 'claude-sonnet-4-5-20250929'),
   createAIProvider('vertex', 'gemini-2.5-flash'),
 ]);
@@ -148,53 +137,47 @@ responses.forEach((r, i) => {
 });
 ```
 
-The debate bot has been used by AI researchers to compare model reasoning styles, identify provider-specific biases, and test prompt sensitivity across models. The creator reported interesting findings: models from different providers consistently emphasize different aspects of the same topic, making the debates genuinely informative rather than repetitive.
+A tool like this can help AI researchers compare model reasoning styles, surface provider-specific biases, and test prompt sensitivity across models -- since models from different providers often emphasize different aspects of the same topic, the resulting debates tend to be informative rather than repetitive.
 
 ### AI Code Review Agent
 
-An MCP-powered agent that reads codebases, runs tests, and provides code review feedback. The agent uses external MCP server integration with `ExternalServerManager` to connect to filesystem tools, git tools, and test runners.
+Here is a pattern for an MCP-powered agent that reads codebases, runs tests, and provides code review feedback, using external MCP server integration with `ExternalServerManager` to connect to filesystem tools, git tools, and test runners.
 
-Given a pull request, the agent:
+Given a pull request, an agent built this way would:
 
-1. Reads the changed files using filesystem MCP tools
-2. Analyzes code quality, naming conventions, and potential bugs
-3. Runs the existing test suite and reports results
-4. Generates a structured review with specific line-level comments
+1. Read the changed files using filesystem MCP tools
+2. Analyze code quality, naming conventions, and potential bugs
+3. Run the existing test suite and report results
+4. Generate a structured review with specific line-level comments
 
-The project demonstrates how MCP enables AI agents to interact with developer tools in a standardized way, without custom tool implementations for each IDE or CI system.
+This pattern shows how MCP lets AI agents interact with developer tools in a standardized way, without custom tool implementations for each IDE or CI system.
 
 ### Streaming Visualization Dashboard
 
-A real-time visualization of streaming token delivery across providers. Built on NeuroLink's `StreamHandler` events, the dashboard shows:
+A real-time visualization of streaming token delivery across providers. Built by timestamping the chunks NeuroLink's streaming API (`neurolink.stream()` / `provider.stream()`) yields for each provider, a dashboard like this could show:
 
 - Token-by-token delivery timing for each provider
 - First-token latency comparison
 - Throughput (tokens per second) over time
 - Visual diff of how different models generate the same content
 
-The visualization revealed interesting patterns: some providers deliver tokens in bursts (10-20 tokens at a time), while others stream more uniformly. Claude tends to "think" longer before starting to stream, then delivers at a steady rate. GPT models start streaming earlier but with more variable inter-token timing.
+Streaming behavior can vary noticeably across providers -- some tend to deliver tokens in bursts, while others stream more uniformly -- which is exactly the kind of difference a visualization like this is built to surface.
 
 ## Community Contributions
 
-Beyond building projects on NeuroLink, community members have contributed directly to the codebase. Here are some of the most impactful contributions:
+Beyond building projects on NeuroLink, the codebase itself has grown a number of capabilities aimed squarely at making community and third-party integration easier. A few worth knowing about:
 
-### OpenRouter Provider Addition
+### OpenRouter Provider Support
 
-A community contributor added OpenRouter as a provider, instantly giving NeuroLink access to 300+ models through a single integration. The contribution followed the `BaseProvider` pattern and included full streaming support, tool calling, and error handling.
-
-This was the largest provider contribution from the community, and it demonstrated that the provider abstraction is well-designed enough for external contributors to implement without close guidance from the core team.
+NeuroLink includes an OpenRouter provider, giving access to 300+ models from many upstream providers through a single integration. It follows the same `BaseProvider` pattern as every other provider, with full streaming support, tool calling, and error handling -- the same pattern external contributors can follow to add a new provider without deep changes elsewhere in the codebase.
 
 ### OAuth 2.1 Support for MCP HTTP Transport
 
-A security-focused contributor added OAuth 2.1 with PKCE support for the MCP HTTP transport protocol. This enables secure, token-based authentication for remote MCP servers -- critical for enterprise deployments where MCP tools are hosted as microservices.
-
-The implementation includes PKCE code verification, token refresh, and bearer authentication. It follows the OAuth 2.1 specification closely and was reviewed by the core team's security engineers.
+NeuroLink's MCP HTTP transport supports OAuth 2.1 with PKCE, enabling token-based authentication for remote MCP servers -- useful for deployments where MCP tools are hosted as separate services. The implementation covers PKCE code verification, token refresh, and bearer authentication, following the OAuth 2.1 specification.
 
 ### Circuit Breaker Resilience Patterns
 
-An infrastructure engineer contributed the `MCPCircuitBreaker` with configurable thresholds, bringing production-grade resilience to MCP tool calls. The circuit breaker tracks failure rates per MCP server and automatically stops calling a failing server to prevent cascade failures.
-
-The contribution included comprehensive tests, configurable failure thresholds, and automatic recovery after a cooldown period.
+`MCPCircuitBreaker` brings configurable-threshold circuit breaking to MCP tool calls: it tracks failure rates per MCP server and stops calling a server that is failing, to prevent cascade failures, with automatic recovery after a cooldown period.
 
 ## Community Contribution Flow
 
@@ -220,7 +203,7 @@ import { RAGPipeline } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o-mini' },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4-mini' },
   enableHybridSearch: true,
   defaultChunkingStrategy: 'semantic-markdown',
 });

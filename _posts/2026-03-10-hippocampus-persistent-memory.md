@@ -170,7 +170,7 @@ Three template variables are available in custom prompts:
 | `{% raw %}{{NEW_CONTENT}}{% endraw %}` | The new conversation turn |
 | `{% raw %}{{MAX_WORDS}}{% endraw %}` | The configured `maxWords` value |
 
-The choice of condensation model matters. You want a fast, cheap model for this task -- condensation is simpler than the main conversation. We recommend `gemini-2.5-flash` or `gpt-4o-mini`. The condensation LLM can be a completely different provider and model than your main conversation LLM.
+The choice of condensation model matters. You want a fast, cheap model for this task -- condensation is simpler than the main conversation. We recommend `gemini-2.5-flash` or `gpt-5.4-mini`. The condensation LLM can be a completely different provider and model than your main conversation LLM.
 
 ## Storage Backends
 
@@ -228,11 +228,12 @@ const neurolink = new NeuroLink({
       enabled: true,
       storage: {
         type: 'redis',
-        url: 'redis://localhost:6379',
+        host: 'localhost',
+        port: 6379,
       },
       neurolink: {
         provider: 'openai',
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
       },
     },
   },
@@ -333,7 +334,7 @@ const neurolink = new NeuroLink({
     enabled: true,
     memory: {
       enabled: true,
-      storage: { type: 'redis', url: 'redis://localhost:6379' },
+      storage: { type: 'redis', host: 'localhost', port: 6379 },
       neurolink: { provider: 'google-ai', model: 'gemini-2.5-flash' },
     },
   },
@@ -344,7 +345,7 @@ const r1 = await neurolink.generate({
   input: { text: 'My name is Alice and I run a Shopify store selling handmade candles.' },
   context: { userId: 'user-alice-001' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 // Hours later, new session -- the AI remembers
@@ -352,7 +353,7 @@ const r2 = await neurolink.generate({
   input: { text: 'What do I sell?' },
   context: { userId: 'user-alice-001' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 // Response: "You sell handmade candles on your Shopify store."
 ```
@@ -415,27 +416,28 @@ If `userId` is missing, the call proceeds normally without memory -- no error, n
 
 ## Memory Retrieval Tools
 
-Beyond automatic memory injection, NeuroLink provides a `retrieve_context` tool that LLMs can call to search through conversation history. This tool is created by the `createMemoryRetrievalTools()` factory and bound to the `RedisConversationMemoryManager`.
+Beyond automatic memory injection, NeuroLink provides a `retrieve_context` tool that LLMs can call to search through conversation history. Internally, this tool is created by NeuroLink's `createMemoryRetrievalTools()` factory and bound to the `RedisConversationMemoryManager` -- it is registered automatically when Redis-backed conversation memory is configured, so there is nothing to import or wire up yourself.
 
 The tool supports three modes of access:
 
 ```typescript
-import { createMemoryRetrievalTools } from '@juspay/neurolink';
-
-// The tool is automatically registered when Redis memory is configured
+// No import needed -- retrieve_context is registered automatically
+// when Redis-backed conversation memory is configured.
 // The LLM can call it to:
 
 // 1. Retrieve recent messages by role
 // retrieve_context({ sessionId: "sess-123", role: "tool_result", lastN: 5 })
 
-// 2. Search conversation history with regex
-// retrieve_context({ sessionId: "sess-123", search: "payment.*failed" })
+// 2. Search conversation history for literal text (case-insensitive;
+//    regex metacharacters in the search string are matched literally,
+//    not interpreted as a pattern)
+// retrieve_context({ sessionId: "sess-123", search: "payment failed" })
 
 // 3. Paginate through large tool outputs
 // retrieve_context({ sessionId: "sess-123", messageId: "msg-456", offset: 50000, limit: 50000 })
 ```
 
-The retrieval tool has built-in safety limits: a default character limit of 50,000 per retrieval, a hard maximum of 200,000 characters, a 200-character limit on regex patterns (to prevent ReDoS attacks), and a maximum of 50 search matches per query. These limits prevent an LLM from accidentally consuming its entire context window with a single tool call.
+The retrieval tool has built-in safety limits: a default character limit of 50,000 per retrieval, a hard maximum of 200,000 characters, a 200-character limit on the search string, and a maximum of 50 search matches per query. These limits prevent an LLM from accidentally consuming its entire context window with a single tool call.
 
 Every retrieval operation is instrumented with OpenTelemetry spans, so you can monitor retrieval latency, frequency, and error rates in your observability stack.
 
@@ -529,7 +531,7 @@ const result = await neurolink.generate({
   input: { text: 'What do you know about me?' },
   context: { userId: 'user-123' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 // If Redis is down: call succeeds, just without memory context

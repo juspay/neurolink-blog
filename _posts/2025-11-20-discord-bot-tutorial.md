@@ -1,9 +1,9 @@
 ---
 layout: post
-title: Building AI Discord Bots with NeuroLink
+title: 'Building AI Discord Bots with NeuroLink'
 description: >-
   Build intelligent Discord bots with NeuroLink. Slash commands, conversations,
-  and server automation.
+  channel summaries, and mention responses.
 date: '2025-11-20 10:00:00 +0530'
 last_updated: 2026-01-15T00:00:00.000Z
 categories:
@@ -24,7 +24,7 @@ image:
   alt: Building AI Discord Bots with NeuroLink
 ---
 
-You will build a fully-featured AI Discord bot using Discord.js and NeuroLink's generation API. By the end of this tutorial, you will have slash commands, multi-turn conversations, AI-powered moderation, and production deployment -- all using NeuroLink as the AI backend.
+You will build a functional AI Discord bot using Discord.js and NeuroLink's generation API. By the end of this tutorial, you will have slash commands, multi-turn conversations, channel summaries, mention responses, and deployment options -- all using NeuroLink as the AI backend.
 
 > **Tip:** This tutorial builds a custom Discord bot from scratch. NeuroLink does not provide a built-in Discord integration -- you will build the bot infrastructure yourself using Discord.js, with NeuroLink handling AI generation.
 {: .prompt-tip }
@@ -36,29 +36,29 @@ This tutorial requires several npm packages for building Discord bots:
 ```bash
 npm install @juspay/neurolink discord.js
 npm install dotenv
-npm install -D typescript @types/node ts-node nodemon
+npm install -D typescript @types/node tsx nodemon
 ```
 
 **Required Packages:**
 
 - `@juspay/neurolink` - NeuroLink SDK for AI generation
-- `discord.js` (v14.x) - Discord's official JavaScript library
+- `discord.js` (v14.x) - JavaScript library for the Discord API
 - `dotenv` - Environment variable management
 - `typescript` and `@types/node` - TypeScript support
-- `ts-node` and `nodemon` - Development tools
+- `tsx` and `nodemon` - Development tools
 
 ## Prerequisites
 
 Before we begin, ensure you have the following:
 
-- **Node.js 18+** installed
+- **Node.js 22+** installed
 - **A Discord account** with a test server where you have admin permissions
-- **NeuroLink API key** (sign up at neurolink.ink)
+- **An OpenAI API key** for the provider used in this tutorial
 - **Required packages** (see External Dependencies section above)
 - Basic familiarity with JavaScript/TypeScript and async/await
 - A code editor of your choice
 
-> **Important**: This tutorial uses Discord.js v14.x. If you're upgrading from v13 or earlier, review the [Discord.js v14 migration guide](https://discordjs.guide/additional-info/changes-in-v14.html).
+> **Important**: This tutorial uses Discord.js v14.x. If you're upgrading from v13 or earlier, review the [Discord.js v14 migration guide](https://discordjs.guide/additional-info/changes-in-v14).
 
 ## Setting Up Your Discord Application
 
@@ -105,7 +105,7 @@ Install the required packages:
 
 ```bash
 npm install discord.js @juspay/neurolink dotenv
-npm install -D typescript @types/node ts-node nodemon
+npm install -D typescript @types/node tsx nodemon
 ```
 
 Initialize TypeScript:
@@ -120,7 +120,8 @@ Update your `tsconfig.json`:
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -170,7 +171,7 @@ Create a `.env` file in your project root:
 ```env
 DISCORD_TOKEN=your_discord_bot_token
 DISCORD_CLIENT_ID=your_application_client_id
-NEUROLINK_API_KEY=your_neurolink_api_key
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 Create `src/config.ts`:
@@ -184,13 +185,10 @@ export const config = {
     token: process.env.DISCORD_TOKEN!,
     clientId: process.env.DISCORD_CLIENT_ID!,
   },
-  neurolink: {
-    apiKey: process.env.NEUROLINK_API_KEY!,
-  },
 };
 
 // Validate required environment variables
-const requiredEnvVars = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'NEUROLINK_API_KEY'];
+const requiredEnvVars = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'OPENAI_API_KEY'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     throw new Error(`Missing required environment variable: ${envVar}`);
@@ -204,7 +202,6 @@ Create the NeuroLink service layer in `src/services/neurolink.ts`:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
-import { config } from '../config';
 
 const neurolink = new NeuroLink();
 
@@ -234,7 +231,7 @@ export async function generateResponse(
       input: { text: prompt },
       systemPrompt,
       provider: 'openai',
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       maxTokens,
       temperature,
     });
@@ -260,7 +257,7 @@ export async function generateChatResponse(
       input: { text: conversationText },
       systemPrompt: systemPrompt || 'You are a helpful assistant.',
       provider: 'openai',
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       maxTokens: 1000,
       temperature: 0.7,
     });
@@ -286,7 +283,7 @@ export async function summarizeText(text: string): Promise<string> {
 For multi-turn conversations, we need to track message history. Create `src/services/conversation.ts`:
 
 ```typescript
-import { ChatMessage } from './neurolink';
+import { ChatMessage } from './neurolink.js';
 
 interface Conversation {
   messages: ChatMessage[];
@@ -374,7 +371,7 @@ Create `src/commands/index.ts` to handle command registration:
 
 ```typescript
 import { REST, Routes, SlashCommandBuilder } from 'discord.js';
-import { config } from '../config';
+import { config } from '../config.js';
 
 export const commands = [
   new SlashCommandBuilder()
@@ -441,7 +438,7 @@ Create `src/commands/ask.ts`:
 
 ```typescript
 import { ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { generateResponse } from '../services/neurolink';
+import { generateResponse } from '../services/neurolink.js';
 
 export async function handleAskCommand(
   interaction: ChatInputCommandInteraction
@@ -479,8 +476,8 @@ Create `src/commands/chat.ts`:
 
 ```typescript
 import { ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { generateChatResponse, ChatMessage } from '../services/neurolink';
-import { conversationManager } from '../services/conversation';
+import { generateChatResponse, ChatMessage } from '../services/neurolink.js';
+import { conversationManager } from '../services/conversation.js';
 
 const CHAT_SYSTEM_PROMPT = `You are a friendly and helpful Discord bot assistant named NeuroBot.
 You can engage in natural conversations, answer questions, help with coding, and provide information.
@@ -497,14 +494,13 @@ export async function handleChatCommand(
   await interaction.deferReply();
 
   try {
-    // Get existing conversation history
-    const history = conversationManager.getConversation(userId, channelId);
+    // Snapshot existing history before adding the new message
+    const history = [...conversationManager.getConversation(userId, channelId)];
 
-    // Add user's new message
     const userMessage: ChatMessage = { role: 'user', content: message };
     conversationManager.addMessage(userId, channelId, userMessage);
 
-    // Generate response with full history
+    // Generate response with the prior history plus the new message once
     const response = await generateChatResponse(
       [...history, userMessage],
       CHAT_SYSTEM_PROMPT
@@ -545,7 +541,7 @@ import {
   TextChannel,
   ChannelType,
 } from 'discord.js';
-import { summarizeText } from '../services/neurolink';
+import { summarizeText } from '../services/neurolink.js';
 
 export async function handleSummarizeCommand(
   interaction: ChatInputCommandInteraction
@@ -634,10 +630,10 @@ Create `src/events/interactionCreate.ts`:
 
 ```typescript
 import { Interaction, EmbedBuilder } from 'discord.js';
-import { handleAskCommand } from '../commands/ask';
-import { handleChatCommand } from '../commands/chat';
-import { handleSummarizeCommand } from '../commands/summarize';
-import { conversationManager } from '../services/conversation';
+import { handleAskCommand } from '../commands/ask.js';
+import { handleChatCommand } from '../commands/chat.js';
+import { handleSummarizeCommand } from '../commands/summarize.js';
+import { conversationManager } from '../services/conversation.js';
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
   if (!interaction.isChatInputCommand()) return;
@@ -732,17 +728,16 @@ Create `src/index.ts`:
 
 ```typescript
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
-import { config } from './config';
-import { registerCommands } from './commands';
-import { handleReady } from './events/ready';
-import { handleInteraction } from './events/interactionCreate';
+import { config } from './config.js';
+import { registerCommands } from './commands/index.js';
+import { handleReady } from './events/ready.js';
+import { handleInteraction } from './events/interactionCreate.js';
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.Message, Partials.Channel],
 });
@@ -826,6 +821,8 @@ class RateLimiter {
 export const rateLimiter = new RateLimiter(10, 60000); // 10 requests per minute
 ```
 
+Call `rateLimiter.isRateLimited(interaction.user.id)` near the start of each command handler and return an ephemeral response when it returns `true`. The utility does not limit requests until a handler invokes it.
+
 ### Streaming Responses
 
 For long responses, implement streaming updates:
@@ -850,7 +847,7 @@ export async function handleStreamingResponse(
     input: { text: prompt },
     systemPrompt: 'You are a helpful Discord bot assistant.',
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
   });
 
   for await (const chunk of result.stream) {
@@ -885,6 +882,8 @@ Add automatic responses to @mentions:
 
 ```typescript
 // Add to src/index.ts
+import { generateResponse } from './services/neurolink.js';
+
 client.on('messageCreate', async (message) => {
   // Ignore bots and messages without mentions
   if (message.author.bot) return;
@@ -924,11 +923,11 @@ Update `package.json`:
 
 ```json
 {
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "register": "ts-node src/commands/index.ts"
+    "dev": "nodemon --exec tsx src/index.ts"
   }
 }
 ```
@@ -938,7 +937,7 @@ Update `package.json`:
 Create a `Dockerfile`:
 
 ```dockerfile
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -983,7 +982,7 @@ railway up
 
 ```bash
 fly launch
-fly secrets set DISCORD_TOKEN=xxx NEUROLINK_API_KEY=xxx
+fly secrets set DISCORD_TOKEN=your_discord_bot_token DISCORD_CLIENT_ID=your_application_client_id OPENAI_API_KEY=your_openai_api_key
 fly deploy
 ```
 
@@ -991,7 +990,7 @@ fly deploy
 
 1. Connect your GitHub repository
 2. Set environment variables in the dashboard
-3. Deploy with automatic scaling
+3. Deploy one instance; add shared conversation storage and Discord sharding before scaling horizontally
 
 ## Best Practices
 
@@ -1003,16 +1002,10 @@ Always wrap API calls in try-catch blocks and provide user-friendly error messag
 try {
   const response = await generateResponse(prompt);
   await interaction.editReply({ content: response });
-} catch (error) {
-  if (error.code === 'RATE_LIMITED') {
-    await interaction.editReply({
-      content: 'I\'m receiving too many requests. Please wait a moment.',
-    });
-  } else {
-    await interaction.editReply({
-      content: 'Something went wrong. Please try again later.',
-    });
-  }
+} catch (error: unknown) {
+  await interaction.editReply({
+    content: 'Something went wrong. Please try again later.',
+  });
   console.error('API Error:', error);
 }
 ```
@@ -1031,9 +1024,9 @@ try {
 2. **Use connection pooling** - For database connections
 3. **Implement request queuing** - Handle traffic spikes
 4. **Monitor response times** - Set up alerting
-5. **Request cancellation** - Use AbortController for timeout handling
+5. **Bound request time** - Set NeuroLink's `timeout` option, or pass an `AbortSignal` when the caller needs cancellation
 
-> **Note:** Timeout-based cancellation is available via the `timeout` parameter in NeuroLink.
+> **Note:** NeuroLink accepts `timeout` as milliseconds or a duration string such as `'30s'`. It also accepts `abortSignal` for caller-controlled cancellation.
 
 ## Testing Your Bot
 
@@ -1041,7 +1034,7 @@ Create a simple test script:
 
 ```typescript
 // src/test.ts
-import { generateResponse } from './services/neurolink';
+import { generateResponse } from './services/neurolink.js';
 
 async function test() {
   console.log('Testing NeuroLink integration...');
@@ -1055,11 +1048,11 @@ async function test() {
 test().catch(console.error);
 ```
 
-Run with: `npx ts-node src/test.ts`
+Run with: `npx tsx src/test.ts`
 
 ## What You Built
 
-You built an AI Discord bot with slash commands, multi-turn conversations, thread summarization, and mention responses using Discord.js and NeuroLink's generation API. The bot handles natural language queries, maintains conversation context per thread, and provides AI-powered moderation and analysis.
+You built an AI Discord bot with slash commands, multi-turn conversations, channel summarization, and mention responses using Discord.js and NeuroLink's generation API. The bot handles natural language queries, maintains conversation context per user and channel, and summarizes recent channel messages.
 
 Continue with these related tutorials:
 
@@ -1072,11 +1065,10 @@ Continue with these related tutorials:
 - [Discord.js Documentation](https://discord.js.org/)
 - [NeuroLink API Documentation](https://docs.neurolink.ink/)
 - [Discord Developer Portal](https://discord.com/developers/docs)
-- [Example Repository](https://github.com/neurolink/discord-bot-example)
 
 ---
 
-*Have questions about building Discord bots with NeuroLink? Join our [Discord community](https://discord.gg/neurolink) or reach out on [Twitter](https://twitter.com/neurolink).*
+*Have questions about building Discord bots with NeuroLink? Join our [Discord community](https://discord.gg/neurolink) or reach out on [X](https://x.com/Neurolink__).*
 
 ---
 

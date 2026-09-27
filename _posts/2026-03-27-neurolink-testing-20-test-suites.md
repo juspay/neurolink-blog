@@ -25,7 +25,7 @@ image:
   alt: 'How We Test NeuroLink: 20 Continuous Test Suites and Counting'
 ---
 
-We designed NeuroLink's test strategy around one principle: if a feature ships without a dedicated test suite, it does not exist. When you build a universal AI SDK that routes traffic to 13 providers, orchestrates MCP tool chains, manages conversation memory, generates video and presentations, and exposes server adapters for four web frameworks, the surface area for regressions is enormous. Our answer is 20 continuous test suites, each focused on a single capability, all running on every commit. This post walks through why testing AI software is uniquely difficult, how we architected our suite, and what each of those 20 files actually validates.
+We designed NeuroLink's test strategy around one principle: if a feature ships without a dedicated test suite, it does not exist. When you build a universal AI SDK that routes traffic to dozens of providers, orchestrates MCP tool chains, manages conversation memory, generates video and presentations, and exposes server adapters for four web frameworks, the surface area for regressions is enormous. Our answer is 20 continuous test suites, each focused on a single capability, all running on every commit. This post walks through why testing AI software is uniquely difficult, how we architected our suite, and what each of those 20 files actually validates.
 
 ## Why Testing an AI SDK Is Harder Than Testing a CRUD App
 
@@ -41,7 +41,7 @@ NeuroLink talks to OpenAI, Anthropic, Google Vertex, Google AI Studio, AWS Bedro
 
 ### Cost-per-test
 
-Every real API call costs money. A naive integration test suite that hammers GPT-4 for 200 assertions would burn through credits in hours. We need to test thoroughly without bankrupting the project.
+Every real API call costs money. A naive integration test suite that hammers GPT-5.4 for 200 assertions would burn through credits in hours. We need to test thoroughly without bankrupting the project.
 
 ### Streaming and real-time behavior
 
@@ -59,7 +59,7 @@ Our test directory contains 20 continuous test suite files, each named `continuo
 graph TD
     subgraph "20 Continuous Test Suites"
         A["continuous-test-suite.ts<br/>Core MCP + CLI"]
-        B["continuous-test-suite-providers.ts<br/>13 Providers"]
+        B["continuous-test-suite-providers.ts<br/>Providers"]
         C["continuous-test-suite-mcp.ts<br/>MCP Infrastructure"]
         D["continuous-test-suite-mcp-http.ts<br/>MCP HTTP Transport"]
         E["continuous-test-suite-rag.ts<br/>RAG Processing"]
@@ -148,17 +148,20 @@ import { resolveModel } from "../dist/utils/modelAliasResolver.js";
 
 const neurolink = new NeuroLink();
 
-// Validate that model aliases resolve correctly
-const resolved = resolveModel("gpt-4o");
-assert(resolved.provider === "openai");
-assert(resolved.model === "gpt-4o");
+// Validate that deprecated model aliases redirect to their replacement
+const aliasConfig = {
+  aliases: {
+    "gpt-4o": { target: "gpt-5.4", action: "redirect" as const },
+  },
+};
+assert(resolveModel("gpt-4o", aliasConfig) === "gpt-5.4");
 
 // Test generate with structured output (Zod schema)
 const result = await neurolink.generate({
   input: { text: "List 3 colors as JSON" },
   provider: "vertex",
   model: "gemini-2.5-pro",
-  structuredOutput: colorSchema,
+  schema: colorSchema,
 });
 assert(result.content !== "");
 ```

@@ -34,9 +34,9 @@ Most AI applications start with a single model hardcoded in the configuration fi
 
 ```typescript
 // The static configuration trap
-const CHAT_MODEL = "gpt-4o";
-const SUMMARY_MODEL = "gpt-4o-mini";
-const CODE_MODEL = "claude-sonnet-4-20250514";
+const CHAT_MODEL = "gpt-5.4";
+const SUMMARY_MODEL = "gpt-5.4-mini";
+const CODE_MODEL = "claude-sonnet-5";
 const FAST_MODEL = "gemini-2.5-flash";
 
 // Scattered across dozens of files...
@@ -71,12 +71,9 @@ flowchart TD
     F --> H
     G --> H
     H --> I{Selected Tier}
-    I -->|Fast| J["Gemini 2.5 Flash
-    ~800ms, $0.075/1M"]
-    I -->|Balanced| K["GPT-4o
-    ~1.5s, $2.50/1M"]
-    I -->|Premium| L["Claude Sonnet 4
-    ~3s, $3.00/1M"]
+    I -->|Fast| J["Gemini 2.5 Flash"]
+    I -->|Balanced| K["GPT-5.4"]
+    I -->|Premium| L["Claude Sonnet 5"]
     J --> M[Response + Metrics]
     K --> M
     L --> M
@@ -93,31 +90,23 @@ import { dynamicModelProvider } from "@juspay/neurolink";
 await dynamicModelProvider.initialize();
 
 // Resolve a model by provider and hint
-const model = dynamicModelProvider.resolveModel("anthropic", "claude-sonnet-4");
+const model = dynamicModelProvider.resolveModel("anthropic", "claude-sonnet-5");
 console.log(model);
-// {
-//   id: "claude-sonnet-4-20250514",
-//   displayName: "Claude Sonnet 4",
-//   capabilities: ["functionCalling", "vision", "analysis"],
-//   pricing: { input: 0.003, output: 0.015 },
-//   contextWindow: 200000,
-//   deprecated: false
-// }
+// Returns the matching registry entry when your external config includes it.
 
-// Resolve using an alias
+// Resolve using an alias defined by that external registry
 const latest = dynamicModelProvider.resolveModel("anthropic", "claude-latest");
-// Resolves to the current best Anthropic model
 
 // Resolve using fuzzy matching
 const fuzzy = dynamicModelProvider.resolveModel("anthropic", "sonnet");
-// Matches "claude-sonnet-4" via partial string match
+// Returns the first case-insensitive partial match for this provider
 
 // Get the default model for a provider when no hint is given
 const defaultModel = dynamicModelProvider.resolveModel("openai");
 // Returns the configured default for OpenAI
 ```
 
-The resolution chain tries four strategies in order: exact match against the provider's model registry, alias lookup from the global alias map, fuzzy matching via case-insensitive substring search, and finally the provider default. This means your application code can use stable aliases like `"claude-latest"` while the underlying model updates automatically when the configuration changes.
+The resolution chain tries four strategies in order: exact match against the provider's model registry, alias lookup from the global alias map, fuzzy matching via case-insensitive substring search, and finally the provider default. This means your application code can use aliases like `"claude-latest"` when your external registry defines them, while the underlying target changes with that configuration.
 
 ## Task-Complexity Routing
 
@@ -175,8 +164,8 @@ function selectTier(signals: ComplexitySignals): ComplexityTier {
 const MODEL_TIERS: Record<ComplexityTier, { provider: string; model: string }> =
   {
     fast: { provider: "google-ai", model: "gemini-2.5-flash" },
-    balanced: { provider: "openai", model: "gpt-4o" },
-    quality: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    balanced: { provider: "openai", model: "gpt-5.4" },
+    quality: { provider: "anthropic", model: "claude-sonnet-5" },
   };
 
 const neurolink = new NeuroLink();
@@ -196,7 +185,7 @@ async function complexityRoute(prompt: string) {
 }
 ```
 
-The complexity scorer is intentionally simple -- keyword matching with weighted scoring. In production, you can replace it with an embedding-based classifier or a lightweight LLM call, but the keyword approach adds zero latency and handles 80% of routing decisions correctly.
+The complexity scorer is intentionally simple -- keyword matching with weighted scoring. In production, validate it against your own labeled requests, then replace it with an embedding-based classifier or a lightweight LLM call if the measured error rate justifies the added latency and cost.
 
 ## Cost-Based Routing
 
@@ -225,10 +214,12 @@ function selectByCost(constraint: CostConstraint) {
         .filter((m) => m.config.pricing.input <= constraint.maxInputCostPer1K);
 
   // Filter by all required capabilities
-  const qualified = candidates.filter((c) =>
-    constraint.requiredCapabilities.every((cap) =>
-      c.config.capabilities.includes(cap),
-    ),
+  const qualified = candidates.filter(
+    (c) =>
+      c.config.pricing.output <= constraint.maxOutputCostPer1K &&
+      constraint.requiredCapabilities.every((cap) =>
+        c.config.capabilities.includes(cap),
+      ),
   );
 
   // Sort by quality (higher price = usually higher quality) within budget
@@ -264,15 +255,9 @@ Latency-based routing is critical for user-facing interactions where response ti
 ```mermaid
 flowchart LR
     A[Request] --> B{Latency Budget}
-    B -->|< 1s| C["Fast Tier
-    Gemini 2.5 Flash
-    ~800ms P95"]
-    B -->|1-3s| D["Balanced Tier
-    GPT-4o / GPT-4o-mini
-    ~1.5s P95"]
-    B -->|3s+| E["Quality Tier
-    Claude Sonnet 4
-    ~3s P95"]
+    B -->|Tight| C["Fast Tier<br/>Gemini 2.5 Flash"]
+    B -->|Moderate| D["Balanced Tier<br/>GPT-5.4"]
+    B -->|Flexible| E["Quality Tier<br/>Claude Sonnet 5"]
     C --> F[Track Actual Latency]
     D --> F
     E --> F
@@ -323,9 +308,9 @@ async function latencyAwareRoute(
   // Order models by expected latency
   const candidates = [
     { provider: "google-ai", model: "gemini-2.5-flash", key: "google-flash" },
-    { provider: "openai", model: "gpt-4o-mini", key: "openai-mini" },
-    { provider: "openai", model: "gpt-4o", key: "openai-4o" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514", key: "claude-sonnet" },
+    { provider: "openai", model: "gpt-5.4-mini", key: "openai-mini" },
+    { provider: "openai", model: "gpt-5.4", key: "openai-flagship" },
+    { provider: "anthropic", model: "claude-sonnet-5", key: "claude-sonnet" },
   ];
 
   // Select based on tracked P95 latency
@@ -428,12 +413,12 @@ class ModelABTester {
   }
 }
 
-// Register an A/B test comparing GPT-4o against Claude Sonnet
+// Register an A/B test comparing current OpenAI and Anthropic flagship models
 const tester = new ModelABTester();
 tester.registerTest({
   name: "code-review-model",
-  control: { provider: "openai", model: "gpt-4o" },
-  challenger: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+  control: { provider: "openai", model: "gpt-5.4" },
+  challenger: { provider: "anthropic", model: "claude-sonnet-5" },
   trafficSplitPercent: 20, // 20% to challenger
   startDate: new Date("2026-03-30"),
   endDate: new Date("2026-04-13"),
@@ -541,6 +526,8 @@ flowchart TD
 ```
 
 ```typescript
+import type { GenerateResult } from "@juspay/neurolink";
+
 interface FallbackChainConfig {
   models: Array<{
     provider: string;
@@ -556,7 +543,7 @@ async function executeWithFallback(
   chain: FallbackChainConfig,
   neurolink: NeuroLink,
 ): Promise<{
-  result: any;
+  result: GenerateResult;
   attemptedModels: string[];
   finalModel: string;
 }> {
@@ -567,21 +554,19 @@ async function executeWithFallback(
     const modelKey = `${model.provider}/${model.model}`;
     attemptedModels.push(modelKey);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        model.timeoutMs,
-      );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      model.timeoutMs,
+    );
 
+    try {
       const result = await neurolink.generate({
         input: { text: prompt },
         provider: model.provider,
         model: model.model,
-        signal: controller.signal,
+        abortSignal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       return {
         result,
@@ -594,6 +579,8 @@ async function executeWithFallback(
         error instanceof Error ? error.message : String(error),
       );
       continue;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -607,13 +594,13 @@ const codeReviewChain: FallbackChainConfig = {
   models: [
     {
       provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       timeoutMs: 10000,
       priority: 1,
     },
     {
       provider: "openai",
-      model: "gpt-4o",
+      model: "gpt-5.4",
       timeoutMs: 8000,
       priority: 2,
     },
@@ -812,7 +799,7 @@ async function routeWithPolicy(
       routing: {
         tier,
         complexityScore: score,
-        selectedModel: `${selected.provider}/${selected.model}`,
+        selectedModel: `${selected.provider}/${selected.config.id}`,
         latencyMs: Date.now() - startTime,
         policy: policy.name,
       },
@@ -835,7 +822,7 @@ async function routeWithPolicy(
       routing: {
         tier,
         complexityScore: score,
-        selectedModel: `${fallback.provider}/${fallback.model}`,
+        selectedModel: `${fallback.provider}/${fallback.config.id}`,
         latencyMs: Date.now() - startTime,
         policy: policy.name,
         wasFallback: true,
@@ -850,8 +837,8 @@ Deploy this configuration by setting environment variables that override the def
 ```bash
 # Production environment variables for model tiers
 export GOOGLE_AI_FAST_MODEL="gemini-2.5-flash"
-export OPENAI_BALANCED_MODEL="gpt-4o"
-export ANTHROPIC_QUALITY_MODEL="claude-sonnet-4-20250514"
+export OPENAI_BALANCED_MODEL="gpt-5.4"
+export ANTHROPIC_QUALITY_MODEL="claude-sonnet-5"
 
 # Custom model configuration URL for dynamic updates
 export MODEL_CONFIG_URL="https://api.yourcompany.com/ai/models"
@@ -866,7 +853,7 @@ export ANTHROPIC_COST_RATING=1
 
 Runtime model selection transforms your AI application from a static single-model system into an adaptive routing layer that optimizes every request independently. You built a complexity-based classifier that routes simple prompts to cheap models and complex prompts to premium ones. You added cost constraints that enforce per-tier budgets. You implemented latency tracking with a feedback loop that improves routing accuracy over time. You configured A/B testing for safe model evaluation and gradual rollouts for risk-free migrations. And you wrapped it all in a fallback chain that guarantees responses even when providers fail.
 
-The key insight is that no single model is optimal for every request. By evaluating each request on its own merits -- complexity, budget, latency requirement, and provider health -- you reduce costs by 40-60% while maintaining or improving quality where it matters most.
+The key insight is that no single model is optimal for every request. Evaluating each request on complexity, budget, latency requirements, and provider health lets you reserve premium models for the work that benefits from them; measure the actual cost and quality effect on your own traffic.
 
 Start with complexity routing alone. It delivers the largest cost savings with the smallest implementation effort. Add latency-based routing when you have user-facing interactions with strict response time requirements. Introduce A/B testing when you need to evaluate new models in production. The routing dimensions compose naturally, and each one you add makes the system smarter.
 

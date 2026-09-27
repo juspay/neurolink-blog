@@ -28,9 +28,9 @@ image:
   alt: 'From Zero to Production: Deploying Your First NeuroLink App'
 ---
 
-Your NeuroLink prototype works locally and you are not sure what to do next. That is totally normal -- the jump from `npx ts-node app.ts` to a production deployment sounds intimidating, but NeuroLink handles most of the hard parts for you. Let's walk through it step by step.
+Your NeuroLink prototype works locally and you are not sure what to do next. That is totally normal -- the jump from `npx ts-node app.ts` to a deployable service adds several layers beyond the model call. Let's walk through a minimal deployment baseline step by step.
 
-You will take a working NeuroLink script and turn it into a production HTTP API with server adapters, environment configuration, rate limiting, observability, provider failover, conversation memory, and Docker containerization. Each section builds on the last, so by the end you will have a deployment-ready application.
+You will take a working NeuroLink script and add an HTTP server, environment configuration, production-hardening guidance, observability, application-controlled provider fallback, conversation memory, and Docker containerization. The snippets are a baseline to adapt and secure for your own environment, not a complete production stack by themselves.
 
 ## The deployment path
 
@@ -69,7 +69,7 @@ NeuroLink supports four frameworks through its `createServer()` API:
 
 Hono is the default recommendation because it runs on every major JavaScript runtime with zero configuration changes. If you are starting fresh, use Hono. If you have an existing Express or Fastify application, use the corresponding adapter.
 
-Here is a complete production server in 15 lines:
+Here is a minimal server baseline:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -95,14 +95,24 @@ await server.start();
 console.log(`NeuroLink server running on port ${process.env.PORT || 3000}`);
 ```
 
-The server automatically exposes these endpoints:
+Out of the box, `initialize()` registers two endpoints automatically:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/generate` | POST | Synchronous generation |
-| `/stream` | POST | Streaming generation |
-| `/tools` | GET | List available tools |
-| `/health` | GET | Health check |
+| `/api/health` | GET | Health check |
+| `/api/ready` | GET | Readiness check |
+
+To add the AI-facing endpoints, register NeuroLink's built-in route groups before starting the server:
+
+```typescript
+import { createAllRoutes } from '@juspay/neurolink/server';
+
+for (const group of createAllRoutes()) {
+  server.registerRouteGroup(group);
+}
+```
+
+This adds routes under the `/api` prefix (configurable via `basePath`), including `/api/agent/execute` (POST, synchronous generation), `/api/agent/stream` (POST, streaming generation), and `/api/tools` (GET, list available tools).
 
 The `ServerAdapterConfig` type controls framework, port, host, CORS, and logging settings.
 
@@ -178,42 +188,28 @@ The available middleware includes:
 - **`createRequestIdMiddleware()`** -- Correlation IDs for distributed tracing
 - **`createCompressionMiddleware()`** -- Response compression
 
-You can also use the `MiddlewareFactory` for preset configurations. The `"production"` preset enables the most common middleware with sensible defaults.
+Separately, NeuroLink's core `MiddlewareFactory` offers presets for the `generate()` pipeline's analytics/guardrails middleware -- distinct from the HTTP middleware above: the built-in `"all"` preset enables both analytics and guardrails, while `"security"` enables just guardrails.
 
 ## Section 4: Provider fallback for reliability
 
 A single-provider architecture is a single point of failure. When your provider goes down -- and it will -- your application goes down with it.
 
-NeuroLink's fallback system handles this automatically:
+`createAIProviderWithFallback()` creates both provider instances; your application performs the switch explicitly:
 
 ```mermaid
 sequenceDiagram
     participant App as Application
-    participant NL as NeuroLink
-    participant CB as Circuit Breaker
     participant P1 as Primary (Vertex)
     participant P2 as Fallback (Bedrock)
 
-    App->>NL: generate(options)
-    NL->>CB: Check primary status
-    CB-->>NL: Circuit CLOSED (healthy)
-    NL->>P1: Send request
-    P1-->>NL: Error (timeout)
-    NL->>CB: Record failure
-    CB-->>NL: Failure count: 3/5
-    NL->>P2: Fallback request
-    P2-->>NL: Success
-    NL-->>App: GenerateResult (from fallback)
-
-    Note over CB: After threshold failures,<br/>circuit OPENS and<br/>skips primary directly
+    App->>P1: generate(options)
+    P1-->>App: Error
+    Note over App: Application catch block<br/>decides whether to fall back
+    App->>P2: generate(options)
+    P2-->>App: GenerateResult
 ```
 
-The built-in `CircuitBreaker` class prevents cascading failures. After a configurable number of consecutive failures, the circuit "opens" and subsequent requests skip the primary provider entirely, going directly to the fallback. After a cooldown period, the circuit "half-opens" and tests the primary with a single request.
-
-Supporting utilities:
-
-- **`withRetry()`**: Automatic retry with exponential backoff. Controlled by `RETRY_ATTEMPTS` and `RETRY_DELAYS` constants.
-- **`withTimeout()`**: Prevents hanging requests. Controlled by `PROVIDER_TIMEOUTS` constants.
+Retry, timeout, and circuit-breaking policies are separate orchestration concerns. Apply them around the primary operation when appropriate, then invoke the fallback only for errors your policy considers safe to switch.
 
 For multi-region deployments, configure your primary on one cloud provider and your fallback on another:
 
@@ -222,6 +218,19 @@ const { primary, fallback } = await createAIProviderWithFallback(
   'vertex',    // Primary: Google Vertex AI (us-central1)
   'bedrock'    // Fallback: AWS Bedrock (us-east-1)
 );
+
+const options = { input: { text: 'Summarize this incident' } };
+
+const generateWithFallback = async () => {
+  try {
+    return await primary.generate(options);
+  } catch (error) {
+    console.warn('Primary provider failed; trying fallback', error);
+    return fallback.generate(options);
+  }
+};
+
+const result = await generateWithFallback();
 ```
 
 ## Section 5: Observability and monitoring
@@ -234,19 +243,13 @@ NeuroLink provides observability at three levels:
 
 ```typescript
 import {
-  initializeOpenTelemetry,
   shutdownOpenTelemetry,
   flushOpenTelemetry,
   initializeTelemetry,
   getTelemetryStatus
 } from '@juspay/neurolink';
 
-// Initialize observability
-await initializeOpenTelemetry({
-  serviceName: 'my-neurolink-app',
-  exporterUrl: process.env.OTEL_EXPORTER_OTLP_ENDPOINT
-});
-
+// Set OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_SERVICE_NAME in the environment.
 await initializeTelemetry();
 const status = await getTelemetryStatus();
 console.log('Telemetry:', status);
@@ -259,7 +262,7 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-Export traces to any OTLP-compatible backend: Jaeger, Grafana Tempo, Datadog, Honeycomb, or New Relic. Every `generate()` and `stream()` call is traced with provider, model, token usage, latency, and error information.
+For OTLP-only setup, `initializeTelemetry()` reads `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME`. Use `initializeOpenTelemetry()` only when passing its required Langfuse configuration. OTLP traces can be sent to compatible backends such as Jaeger, Grafana Tempo, Datadog, Honeycomb, or New Relic.
 
 ### Langfuse Integration
 
@@ -298,7 +301,7 @@ const neurolink = new NeuroLink({
 const result = await neurolink.generate({
   input: { text: 'Update the configuration file with new settings' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4'
 });
 ```
 
@@ -316,8 +319,9 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    redis: {
-      url: process.env.REDIS_URL || 'redis://localhost:6379'
+    redisConfig: {
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+      ttl: 86_400
     }
   }
 });
@@ -326,54 +330,62 @@ const neurolink = new NeuroLink({
 const result1 = await neurolink.generate({
   input: { text: 'My name is Alice and I work on payments.' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4',
+  context: {
+    sessionId: 'alice-session',
+    userId: 'alice'
+  }
 });
 
-// Second turn -- NeuroLink remembers the context
+// Second turn -- the same session retrieves the earlier context
 const result2 = await neurolink.generate({
   input: { text: 'What did I just tell you about myself?' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4',
+  context: {
+    sessionId: 'alice-session',
+    userId: 'alice'
+  }
 });
 
 console.log(result2.content); // References Alice and payments
 ```
 
-Redis-backed memory provides persistence, shared state across server instances, and automatic expiration of inactive sessions. For long-term memory that spans days or weeks, configure Mem0 integration.
+Redis-backed memory provides persistence, shared state across server instances, and automatic expiration of inactive sessions. For long-term memory that spans days or weeks, configure NeuroLink's Hippocampus integration (`@juspay/hippocampus`, via the `memory` field on `conversationMemory`) instead.
 
 ## Section 8: Containerizing with docker
 
-The final step is packaging your application for deployment. Here is a production-ready Dockerfile:
+The final step is packaging your application for deployment. Here is a minimal multi-stage Docker baseline with a production-only runtime install:
 
 ```dockerfile
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run build
 
-FROM node:20-slim
+FROM node:22-slim
 WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --prod --frozen-lockfile
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
 EXPOSE 3000
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
-HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:3000/api/health || exit 1
 CMD ["node", "dist/server.js"]
 ```
 
 Key decisions in this Dockerfile:
 
-- **Multi-stage build**: The builder stage installs dependencies and compiles TypeScript. The production stage copies only the compiled output and node_modules, reducing image size.
-- **Node.js 20**: NeuroLink requires Node.js >= 20.18.1 (per `engines` in package.json).
-- **Health check**: The `HEALTHCHECK` instruction uses NeuroLink's built-in `/health` endpoint for container orchestrator health checks.
+- **Multi-stage build**: The builder compiles TypeScript, while the runtime stage installs production dependencies only and copies the compiled output.
+- **Node.js 22**: NeuroLink requires Node.js >= 22.0.0 (per `engines` in package.json).
+- **Health check**: The `HEALTHCHECK` instruction uses NeuroLink's default `/api/health` endpoint for container orchestrator health checks.
 - **Secrets via environment**: API keys and credentials are injected via Docker secrets or environment variables at runtime, never baked into the image.
 
 ## Production architecture
 
-Here is the complete production architecture we have built:
+Here is the target architecture these pieces can support once the HTTP middleware from Section 3 is registered in your server layer:
 
 ```mermaid
 flowchart TB
@@ -415,18 +427,18 @@ Before you deploy, verify each item:
 - [ ] **Environment**: API keys in platform secrets, not `.env` files
 - [ ] **Rate limiting**: Configured per-endpoint
 - [ ] **Authentication**: API key or JWT middleware enabled
-- [ ] **Fallback**: Primary + fallback provider configured
+- [ ] **Fallback**: Primary + fallback providers configured with explicit switching policy
 - [ ] **Observability**: OpenTelemetry traces exported
 - [ ] **Logging**: Structured logging with request correlation IDs
-- [ ] **Error handling**: Standardized error responses, circuit breakers active
-- [ ] **Health checks**: `/health` and `/ready` endpoints exposed
-- [ ] **Conversation memory**: Redis or Mem0 configured (for stateful apps)
+- [ ] **Error handling**: Standardized error responses and any application-level retry/circuit policy configured
+- [ ] **Health checks**: `/api/health` and `/api/ready` endpoints exposed
+- [ ] **Conversation memory**: Redis or Hippocampus configured (for stateful apps)
 - [ ] **HITL**: Enabled for regulated domains
 - [ ] **Docker**: Multi-stage build, health check, secrets via env vars
 
 ## What's next
 
-You have come a long way -- from a local script to a production-ready, Dockerized application with middleware, fallback providers, observability, and conversation memory. Every step was incremental, and you can deploy after any step and add more later. That is the point: production readiness is not all-or-nothing.
+You have come a long way -- from a local script to a Dockerized deployment baseline with server adapters, fallback providers, observability, and conversation memory. Before calling it production-ready, register and configure the HTTP middleware that your environment requires, test failure paths, and apply your organization's security and operational controls.
 
 From here, explore the [provider integration guides](/posts/openai-integration-guide/) for detailed provider setup and the [error handling patterns](/posts/error-handling-patterns/) for resilient production systems. You have got this.
 

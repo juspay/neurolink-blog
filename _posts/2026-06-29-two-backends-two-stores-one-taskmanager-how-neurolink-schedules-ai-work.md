@@ -22,7 +22,7 @@ image:
   path: /assets/img/posts/two-backends-two-stores-one-taskmanager-how-neurolink-schedules-ai-work/hero.png
   alt: 'Two backends, two stores, one TaskManager: how NeuroLink schedules AI work'
 ---
-We designed NeuroLink's `TaskManager` because a server restart was killing a multi-hour autoresearch task ninety minutes into its run. The user's request to "write a full competitive analysis of the top 5 players in the observability space" kicked off a long-running job, but because the scheduler lived in server memory, a routine deployment wiped out the task state completely. We needed a durable, persistent, and observable system for scheduling AI work that could survive process death, isolate failures, and report its progress. That meant building a full scheduled-work engine with swappable backends and persistence layers right into the NeuroLink core.
+Consider a multi-hour autoresearch task that's an hour into its run when a routine deployment restarts the server. If the scheduler only ever lived in server memory, that restart wipes out the task state completely — the job simply vanishes. NeuroLink's `TaskManager` exists to rule out that failure mode: a durable, persistent, and observable system for scheduling AI work that survives process death, isolates failures, and reports its progress. That meant building a full scheduled-work engine with swappable backends and persistence layers right into the NeuroLink core.
 
 ## The Public Surface: `TaskManager`
 
@@ -130,10 +130,10 @@ When a task completes, fails, or is cancelled, the `applyRetentionTTL` method se
 
 ```mermaid
 graph TD
-    subgraph RedisTaskStore
-        A["neurolink:tasks (HASH)"] -- "task:123" --> B["{ id: '123', name: '...', status: 'completed' }"];
-        C["neurolink:task:123:runs (LIST)"] --> D["{ runId: 'abc', status: 'success', output: '...' }"];
-        E["neurolink:task:123:history (LIST)"] --> F["{ role: 'user', content: '...' }"];
+    subgraph RTS["RedisTaskStore"]
+        A["neurolink:tasks - HASH"] -- "task:123" --> B["id: task-123, name: example-task, status: completed"];
+        C["neurolink:task:123:runs - LIST"] --> D["runId: run-abc, status: success, output: result-data"];
+        E["neurolink:task:123:history - LIST"] --> F["role: user, content: message-text"];
     end
 ```
 

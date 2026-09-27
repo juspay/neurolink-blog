@@ -69,7 +69,7 @@ The `SageMakerModelConfig` type handles model-specific settings:
 
 Both configurations are validated via Zod schemas (`SageMakerConfigSchema`, `SageMakerModelConfigSchema`), providing clear error messages when configuration is missing or invalid.
 
-> **Note:** SageMaker is the only NeuroLink provider that uses AWS IAM credentials instead of API keys. If you are already using AWS services, you likely have these credentials available in your environment.
+> **Note:** The current NeuroLink SageMaker provider requires AWS access-key credentials: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, with an optional `AWS_SESSION_TOKEN`, or equivalent per-call credentials. It does not currently use the AWS SDK's default IAM-role credential chain.
 {: .prompt-info }
 
 ## Quick Setup
@@ -102,20 +102,23 @@ const result = await neurolink.generate({
 console.log(result?.content);
 ```
 
-That is it. NeuroLink loads the AWS credentials from environment variables, validates them against the Zod schema, connects to the specified SageMaker endpoint, and formats the request according to the configured `modelType`.
+That is it. NeuroLink loads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (plus `AWS_SESSION_TOKEN` when present) from environment variables, validates them against the Zod schema, connects to the specified SageMaker endpoint, and formats the request according to the configured `modelType`. You can instead supply the same access-key fields as per-call credentials.
 
-The constructor accepts optional `modelName`, `endpointName`, and `region` parameters for programmatic configuration:
+For programmatic access to a provider instance -- which the diagnostics below need -- use the exported `AIProviderFactory`, the same factory NeuroLink's provider registry uses internally to build the SageMaker provider:
 
 ```typescript
-import { AmazonSageMakerProvider } from '@juspay/neurolink';
+import { AIProviderFactory } from '@juspay/neurolink';
 
-// Explicit configuration
-const provider = new AmazonSageMakerProvider(
-  "custom-llama-3",      // modelName
-  "my-llama-endpoint",   // endpointName
-  "us-west-2"            // region
+const provider = await AIProviderFactory.createProvider(
+  "sagemaker",
+  "custom-llama-3",   // modelName
+  true,               // enableMCP
+  undefined,          // sdk
+  "us-west-2",        // region
 );
 ```
+
+`AmazonSageMakerProvider` itself is an internal class, not one of `@juspay/neurolink`'s public exports, so this path has no explicit `endpointName` argument -- set `SAGEMAKER_DEFAULT_ENDPOINT` or `SAGEMAKER_ENDPOINT_NAME` instead.
 
 ## Supported Model Types
 
@@ -152,7 +155,7 @@ SageMaker deployments involve multiple moving parts (credentials, endpoints, net
 ### Configuration Check
 
 ```typescript
-const provider = new AmazonSageMakerProvider("my-model", "my-endpoint");
+const provider = await AIProviderFactory.createProvider("sagemaker", "my-model");
 
 // Quick configuration overview
 const info = provider.getSageMakerInfo();
@@ -174,14 +177,13 @@ The `getSageMakerInfo()` method returns a summary of the current configuration w
 const conn = await provider.testConnection();
 if (!conn.connected) {
   console.error("Connection failed:", conn.error);
-  // Possible errors:
+  // Possible errors (configuration-only checks, no API call is made):
   // "AWS credentials not configured"
-  // "SageMaker endpoint not found"
-  // "Endpoint is not in 'InService' state"
+  // "SageMaker endpoint not configured"
 }
 ```
 
-The `testConnection()` method validates credentials and checks endpoint configuration. For deeper testing, `testConnectivity()` tests actual endpoint reachability by making a lightweight inference call.
+The `testConnection()` method checks that credentials and an endpoint name are present -- it does not call AWS. For deeper testing, `testConnectivity()` makes a lightweight inference call to confirm the endpoint actually responds (errors like "endpoint not found" or an endpoint that isn't `InService` surface from that call, or from `generate()`, not from `testConnection()`).
 
 ### Model Capabilities
 
@@ -189,26 +191,32 @@ The `testConnection()` method validates credentials and checks endpoint configur
 const capabilities = provider.getModelCapabilities();
 console.log(capabilities);
 // {
-//   streaming: false,  // Phase 2
-//   toolCalling: true,
-//   embeddings: false,
-//   imageGeneration: false
+//   ...modelInfo,          // modelId, endpointName, modelType, region, ...
+//   capabilities: {
+//     streaming: true,
+//     toolCalling: true,
+//     structuredOutput: true,
+//     batchInference: true,
+//     supportedResponseFormats: ["text", "json_object", "json_schema"],
+//     maxBatchSize: 100,
+//     ...
+//   }
 // }
 ```
 
-> **Tip:** Always run `testConnection()` during your deployment pipeline to catch configuration issues early. A failing SageMaker endpoint at 3 AM is much worse than a failing deployment at 3 PM.
+> **Tip:** Run `testConnection()` during deployment for a fast preflight check of credentials and endpoint configuration. If deployment must also verify that the endpoint responds, run `testConnectivity()`, which sends a lightweight inference request.
 {: .prompt-tip }
 
 ## Configuration Summary for Debugging
 
-When things go wrong, the `getConfigurationSummary()` utility provides a debug-safe view of your entire SageMaker configuration:
+When things go wrong, the provider's public `getSageMakerInfo()` method gives you a concise, non-secret view of the active endpoint configuration:
 
 ```typescript
-const summary = provider.getConfigurationSummary();
-console.log(JSON.stringify(summary, null, 2));
+const info = provider.getSageMakerInfo();
+console.log(JSON.stringify(info, null, 2));
 ```
 
-This output masks sensitive values -- `accessKeyId` shows only the first 4 characters followed by `***`, and `secretAccessKey` is fully masked. The summary includes all configuration values, making it safe to include in logs and error reports without leaking credentials.
+It reports the endpoint name, model type, region, and whether access-key credentials are configured. It does not expose the credential values themselves, so it is suitable for deployment diagnostics.
 
 ## Endpoint Types
 
@@ -233,11 +241,11 @@ For processing large datasets asynchronously. Input data is read from S3, proces
 ```typescript
 // Batch inference configuration (via SageMaker API, not NeuroLink directly)
 // BatchInferenceConfig type includes:
-// - inputDataUri: S3 path to input data
-// - outputDataUri: S3 path for output
+// - inputS3Uri: S3 path to input data
+// - outputS3Uri: S3 path for output
 // - instanceType: e.g., "ml.m5.xlarge"
 // - instanceCount: number of instances
-// - maxPayloadInMB: maximum request size
+// - maxPayloadInMB: maximum request size (optional)
 ```
 
 ### Multi-Model Endpoints
@@ -320,21 +328,13 @@ flowchart TB
     end
 ```
 
-The key architectural distinction from other providers is the `SageMakerLanguageModel` layer. While most NeuroLink providers use off-the-shelf AI SDK packages (like `@ai-sdk/openai`), SageMaker uses a custom `LanguageModelV1` implementation that handles the specifics of AWS authentication, endpoint invocation, and model-type-specific request/response formatting.
+The key architectural distinction from other providers is the `SageMakerLanguageModel` layer. While most NeuroLink providers use off-the-shelf AI SDK packages (like `@ai-sdk/openai`), SageMaker uses a custom implementation that is structurally compatible with the AI SDK v6 `LanguageModelV2` interface. It handles AWS authentication, endpoint invocation, and model-type-specific request/response formatting.
 
 ## Credential Management
 
-### IAM Roles (Recommended for Production)
+### Static Credential Requirement
 
-In production, prefer IAM roles over access keys. When running on EC2, ECS, or Lambda, the AWS SDK automatically picks up the instance role or task role -- no explicit credentials needed in your environment variables.
-
-```bash
-# When using IAM roles, you only need:
-export AWS_REGION=us-east-1
-export SAGEMAKER_DEFAULT_ENDPOINT=my-production-endpoint
-export SAGEMAKER_MODEL_TYPE=llama
-# No AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY needed
-```
+The AWS SDK normally supports instance and task roles through its default credential chain, but the current NeuroLink SageMaker integration does not use that chain. Its configuration validation requires a non-empty access key ID and secret access key, and its runtime client passes those credentials explicitly. Until that implementation changes, configure `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (or pass equivalent per-call credentials) even when the workload itself runs on EC2, ECS, or Lambda.
 
 ### Temporary Credentials (STS)
 
@@ -363,16 +363,17 @@ Configure auto-scaling for your SageMaker endpoints to handle variable load. The
 ```typescript
 // Monitoring endpoint metrics
 // EndpointMetrics type includes:
-// - latency (p50, p95, p99)
+// - invocations (total request count)
+// - averageLatency
 // - errorRate
 // - cpuUtilization
 // - memoryUtilization
-// - requestCount
+// - instanceCount
 ```
 
 ### Cost Management
 
-SageMaker pricing is instance-based, not per-token. The `CostEstimate` type breaks down costs into instance hours, request costs, and data transfer. Monitor these metrics to right-size your instances.
+SageMaker pricing is instance-based, not per-token. The `CostEstimate` type breaks down costs into instance cost, request cost, and total processing hours. Monitor these metrics to right-size your instances.
 
 ### Configuration from File
 
@@ -380,11 +381,11 @@ For complex deployments, use `loadConfigurationFromFile()` to load SageMaker con
 
 ### Key Recommendations
 
-1. **Use IAM roles** instead of access keys whenever possible
+1. **Scope access-key permissions narrowly** to the required SageMaker endpoint while the provider requires explicit credentials
 2. **Configure auto-scaling** for production endpoints to handle traffic spikes
 3. **Monitor with EndpointMetrics** to detect latency degradation and error rate increases
 4. **Use session tokens** for temporary access in CI/CD pipelines
-5. **Test connectivity** during deployment to catch configuration issues early
+5. **Run `testConnectivity()`** during deployment to verify the endpoint responds
 6. **Set appropriate timeouts** -- `SAGEMAKER_TIMEOUT=30000` (30s) is the default; increase for large models
 
 ## What's Next

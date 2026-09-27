@@ -89,7 +89,7 @@ Every evaluation produces three scores on a 0-10 scale:
 
 ### The Judge Model
 
-The "judge" is a separate LLM call that evaluates the response. By default, NeuroLink uses `gemini-1.5-flash` via Vertex AI as the judge because it is fast, cheap, and capable enough for scoring tasks. The judge model is configurable via the `NEUROLINK_RAGAS_EVALUATION_MODEL` environment variable or directly in the evaluation config.
+The "judge" is a separate LLM call that evaluates the response. NeuroLink's current source still falls back to `gemini-1.5-flash` via Vertex AI when no judge is configured, but Google has retired that model. Set `NEUROLINK_RAGAS_EVALUATION_MODEL` or the evaluation config explicitly; the examples below use `gemini-2.5-flash`.
 
 The default threshold is 7/10, configurable via `NEUROLINK_EVALUATION_THRESHOLD`. Responses scoring below this threshold are flagged as potentially low quality.
 
@@ -138,34 +138,31 @@ NeuroLink supports two evaluation modes: automatic middleware (for production pi
 Enable auto-evaluation via the middleware system for automatic quality checks on every response:
 
 ```typescript
-import { NeuroLink, MiddlewareFactory } from '@juspay/neurolink';
+import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
-
-// Configure auto-evaluation through MiddlewareFactory
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    autoEvaluation: {
-      enabled: true,
-      config: {
-        threshold: 7,
-        maxRetries: 2,
-        blocking: true,
-        evaluationModel: "gemini-2.5-flash",
-        onEvaluationComplete: (evaluation) => {
-          console.log(`Score: ${evaluation.overall}/10`);
-          if (evaluation.alertSeverity === "high") {
-            alertOps(evaluation);
-          }
-        },
-      },
-    },
-  },
-});
 
 const result = await neurolink.generate({
   input: { text: "Explain quantum computing" },
   provider: "google-ai",
+  middleware: {
+    middlewareConfig: {
+      autoEvaluation: {
+        enabled: true,
+        config: {
+          threshold: 7,
+          blocking: true,
+          evaluationModel: "gemini-2.5-flash",
+          onEvaluationComplete: (evaluation) => {
+            console.log(`Score: ${evaluation.overall}/10`);
+            if (evaluation.alertSeverity === "high") {
+              alertOps(evaluation);
+            }
+          },
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -174,14 +171,16 @@ The middleware configuration options:
 | Option | Type | Description |
 |---|---|---|
 | `threshold` | number | Minimum acceptable score (0-10) |
-| `maxRetries` | number | Retry attempts if score is below threshold |
-| `blocking` | boolean | Whether to block the response until evaluation completes |
+| `blocking` | boolean | Whether generation waits for evaluation to finish |
 | `evaluationModel` | string | Model to use as judge |
+| `provider` | string | Provider to use for the judge model |
+| `offTopicThreshold` | number | Overall score below which a response is marked off-topic |
+| `highSeverityThreshold` | number | Failing score below which the alert is high severity |
 | `onEvaluationComplete` | function | Callback with evaluation results |
 
-When `blocking: true`, the middleware evaluates the response before returning it to the caller. If the score is below threshold and retries are configured, it regenerates the response and evaluates again, up to `maxRetries` times. This guarantees that every response the user sees meets your quality bar.
+When `blocking: true`, generation waits for evaluation to complete. A judge error is propagated to the caller, but a below-threshold score is reported through `EvaluationData` and the callback; the current middleware does not regenerate the response automatically.
 
-When `blocking: false`, the middleware evaluates asynchronously. The response returns immediately, and the evaluation happens in the background. The `onEvaluationComplete` callback fires when scoring is done. Use this mode when latency is more important than quality guarantees.
+When `blocking: false`, the middleware starts evaluation without holding up the response. The `onEvaluationComplete` callback fires when scoring is done. Use this mode when latency is more important than receiving the score before generation returns.
 
 ### Standalone Evaluation
 
@@ -198,7 +197,7 @@ const evaluator = new Evaluator({
 });
 
 const evaluation = await evaluator.evaluate(
-  callOptions,      // LanguageModelV1CallOptions
+  callOptions,      // LanguageModelV3CallOptions
   generateResult,   // GenerateResult
   7,                // threshold
   {
@@ -295,7 +294,7 @@ const evaluator = new Evaluator({
 });
 ```
 
-Custom evaluators receive the full `LanguageModelV1CallOptions` and `GenerateResult`, giving you access to the prompt, response, tool calls, and all metadata. Your custom evaluator must return the standard `{ evaluationResult, evalContext }` format so it integrates with the rest of the evaluation pipeline.
+Custom evaluators receive the full `LanguageModelV3CallOptions` and `GenerateResult`, giving you access to the prompt, response, tool calls, and all metadata. Your custom evaluator must return the standard `{ evaluationResult, evalContext }` format so it integrates with the rest of the evaluation pipeline.
 
 Common custom evaluation scenarios:
 
@@ -346,9 +345,17 @@ async function generateWithQualityGuarantee(
     });
 
     const evaluation = await evaluator.evaluate(
-      { prompt },
+      {
+        prompt: [
+          { role: "user", content: [{ type: "text", text: prompt }] },
+        ],
+      },
       result,
       threshold,
+      {
+        offTopicThreshold: 5,
+        highSeverityThreshold: 4,
+      },
     );
 
     if (evaluation.overall >= threshold) {
@@ -373,7 +380,7 @@ This pattern incorporates the judge's `suggestedImprovements` into the retry pro
 
 ### Choose the Right Judge Model
 
-The judge model should be fast, capable, and cheap. Gemini Flash is the default for good reason: it scores responses accurately at a fraction of the cost and latency of premium models. Avoid using the same model family that generated the response -- cross-family evaluation reduces bias.
+The judge model should balance capability, latency, and cost. Configure a current fast model such as Gemini 2.5 Flash rather than relying on the retired fallback. Avoid using the same model family that generated the response -- cross-family evaluation can reduce self-evaluation bias.
 
 ### Set Thresholds Based on Use Case
 
@@ -404,7 +411,7 @@ Evaluation data is a goldmine for improving your AI system. Log every evaluation
 
 ## Conclusion
 
-The architecture decisions we have described represent trade-offs that worked for our scale and constraints. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
+These architecture decisions represent trade-offs rather than universal defaults. Start with the simplest evaluation design that handles the current workload, instrument it so quality and latency regressions are visible, and add complexity when concrete use cases justify it. The implementation details will differ, but the underlying constraints -- latency budgets, judge-model variance, and failure handling -- are universal.
 
 ---
 

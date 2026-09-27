@@ -44,7 +44,7 @@ flowchart LR
     B -->|Provider-specific| H[100+ Others]
 ```
 
-Under the hood, the `LiteLLMProvider` uses `createOpenAI` from `@ai-sdk/openai` with a custom `baseURL` pointing to the LiteLLM proxy (typically `http://localhost:4000`). Models are referenced using LiteLLM's `provider/model` naming convention -- for example, `openai/gpt-4o-mini` or `anthropic/claude-3-sonnet-20240229`.
+Under the hood, the `LiteLLMProvider` extends NeuroLink's shared `OpenAIChatCompletionsProvider` base class -- a direct HTTP client, not the Vercel AI SDK -- configured with a custom base URL pointing to the LiteLLM proxy (typically `http://localhost:4000`). Models are referenced using LiteLLM's `provider/model` naming convention -- for example, `openai/gpt-4o-mini` or `anthropic/claude-sonnet-5`.
 
 This architecture gives you several advantages:
 
@@ -114,7 +114,7 @@ The provider implements a 10-minute cache for model discovery results, avoiding 
 const provider = new LiteLLMProvider();
 const models = await provider.getAvailableModels();
 console.log(models);
-// ["openai/gpt-4o", "anthropic/claude-3-sonnet", "google/gemini-pro", ...]
+// ["openai/gpt-5.4", "anthropic/claude-sonnet-5", "google/gemini-2.5-pro", ...]
 ```
 
 ### Fallback Models
@@ -129,7 +129,7 @@ If the LiteLLM proxy is temporarily unavailable for model discovery, NeuroLink f
 You can customize the fallback list via the `LITELLM_FALLBACK_MODELS` environment variable (comma-separated):
 
 ```bash
-LITELLM_FALLBACK_MODELS=openai/gpt-4o,anthropic/claude-3-sonnet,mistral/mistral-large
+LITELLM_FALLBACK_MODELS=openai/gpt-5.4,anthropic/claude-sonnet-5,mistral/mistral-large-latest
 ```
 
 > **Note:** Model discovery is a convenience feature for development and debugging. In production, always set `LITELLM_MODEL` explicitly to skip the discovery step and reduce startup latency.
@@ -143,16 +143,16 @@ NeuroLink's LiteLLM provider supports full streaming with tool calling, structur
 
 ```typescript
 import { z } from "zod";
-import { tool } from "ai";
+import { tool } from "@juspay/neurolink";
 
 const result = await neurolink.stream({
   input: { text: "Analyze this dataset for outliers" },
   provider: "litellm",
-  model: "anthropic/claude-3-sonnet-20240229",
+  model: "anthropic/claude-sonnet-5",
   tools: {
     analyze: tool({
       description: "Run statistical analysis on a dataset",
-      parameters: z.object({
+      inputSchema: z.object({
         type: z.string().describe("Type of analysis: mean, median, outliers"),
       }),
       execute: async ({ type }) => ({
@@ -178,21 +178,21 @@ The real power of LiteLLM shines when you switch between models from different p
 const analysisResult = await neurolink.stream({
   input: { text: "Analyze this code for security vulnerabilities" },
   provider: "litellm",
-  model: "anthropic/claude-3-sonnet-20240229",
+  model: "anthropic/claude-sonnet-5",
 });
 
-// Use GPT-4o for summarization
+// Use GPT-5.4 for summarization
 const summaryResult = await neurolink.stream({
   input: { text: "Summarize the key findings" },
   provider: "litellm",
-  model: "openai/gpt-4o",
+  model: "openai/gpt-5.4",
 });
 
 // Use Gemini for creative writing
 const creativeResult = await neurolink.stream({
   input: { text: "Write a blog post about these findings" },
   provider: "litellm",
-  model: "google/gemini-pro",
+  model: "google/gemini-2.5-pro",
 });
 ```
 
@@ -204,14 +204,14 @@ The LiteLLM provider includes special handling for Gemini 2.5 models: `maxTokens
 
 ### Structured Output
 
-For tasks that need structured responses, the provider supports `analysisSchema` via `Output.object()`:
+For tasks that need structured responses, the provider supports structured output via the `schema` option:
 
 ```typescript
 const result = await neurolink.stream({
   input: { text: "Extract key metrics from this report" },
   provider: "litellm",
-  model: "openai/gpt-4o",
-  analysisSchema: z.object({
+  model: "openai/gpt-5.4",
+  schema: z.object({
     revenue: z.number(),
     growth: z.number(),
     risks: z.array(z.string()),
@@ -270,11 +270,11 @@ Here are the most common model identifiers:
 
 | Model ID | Provider | Description |
 |---|---|---|
-| `openai/gpt-4o-mini` | OpenAI | GPT-4o Mini -- fast and affordable |
-| `openai/gpt-4o` | OpenAI | GPT-4o -- flagship OpenAI model |
-| `openai/gpt-3.5-turbo` | OpenAI | GPT-3.5 Turbo -- legacy fast model |
-| `anthropic/claude-3-sonnet-20240229` | Anthropic | Claude 3 Sonnet |
-| `google/gemini-pro` | Google | Gemini Pro |
+| `openai/gpt-5.4-mini` | OpenAI | GPT-5.4 Mini -- fast and affordable |
+| `openai/gpt-5.4` | OpenAI | GPT-5.4 -- flagship OpenAI model |
+| `openai/gpt-5.4-nano` | OpenAI | GPT-5.4 Nano -- fast, affordable model |
+| `anthropic/claude-sonnet-5` | Anthropic | Claude Sonnet 5 |
+| `google/gemini-2.5-pro` | Google | Gemini 2.5 Pro |
 | `meta-llama/llama-3.1-8b-instruct` | Meta | Llama 3.1 8B Instruct |
 | `mistral/mistral-large-latest` | Mistral | Mistral Large |
 
@@ -288,16 +288,16 @@ Here is the full architecture showing how NeuroLink, LiteLLM, and upstream provi
 flowchart TB
     A[Your App] --> B[NeuroLink SDK]
     B --> C[LiteLLMProvider]
-    C --> D["createOpenAI(@ai-sdk/openai)<br/>baseURL: localhost:4000"]
+    C --> D["OpenAIChatCompletionsProvider direct HTTP client<br/>baseURL: localhost:4000"]
     D --> E[LiteLLM Proxy Server]
 
     E --> F[/v1/models - Discovery/]
     E --> G[/v1/chat/completions/]
 
     subgraph "Model Routing"
-        G --> H[openai/gpt-4o]
-        G --> I[anthropic/claude-3]
-        G --> J[google/gemini-pro]
+        G --> H[openai/gpt-5.4]
+        G --> I[anthropic/claude-sonnet-5]
+        G --> J[google/gemini-2.5-pro]
         G --> K[meta-llama/llama-3.1]
     end
 
@@ -321,25 +321,25 @@ Create a `litellm_config.yaml` with your production model configuration:
 
 ```yaml
 model_list:
-  - model_name: gpt-4o
+  - model_name: gpt-5.4
     litellm_params:
-      model: openai/gpt-4o
+      model: openai/gpt-5.4
       api_key: sk-your-openai-key
 
-  - model_name: claude-3-sonnet
+  - model_name: claude-sonnet-5
     litellm_params:
-      model: anthropic/claude-3-sonnet-20240229
+      model: anthropic/claude-sonnet-5
       api_key: sk-ant-your-anthropic-key
 
-  - model_name: gemini-pro
+  - model_name: gemini-2.5-pro
     litellm_params:
-      model: google/gemini-pro
+      model: google/gemini-2.5-pro
       api_key: your-google-key
 
   # Load balancing: multiple deployments of the same model
-  - model_name: gpt-4o
+  - model_name: gpt-5.4
     litellm_params:
-      model: openai/gpt-4o
+      model: openai/gpt-5.4
       api_key: sk-your-second-openai-key
 
 litellm_settings:
@@ -362,10 +362,10 @@ litellm --config litellm_config.yaml --port 4000
 # Point to your production LiteLLM instance
 LITELLM_BASE_URL=https://litellm.your-company.com
 LITELLM_API_KEY=sk-your-production-master-key
-LITELLM_MODEL=openai/gpt-4o
+LITELLM_MODEL=openai/gpt-5.4
 
 # Optional: custom fallback models
-LITELLM_FALLBACK_MODELS=openai/gpt-4o,anthropic/claude-3-sonnet,google/gemini-pro
+LITELLM_FALLBACK_MODELS=openai/gpt-5.4,anthropic/claude-sonnet-5,google/gemini-2.5-pro
 ```
 
 ### Production Best Practices

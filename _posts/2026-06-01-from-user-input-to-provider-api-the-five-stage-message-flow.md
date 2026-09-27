@@ -9,7 +9,9 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  From User Input to Provider API: The Five-Stage Message Flow — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  How NeuroLink turns a raw user message — text, file paths, URLs, or image buffers — into a
+  provider-ready request through five stages: normalization, file processing, multimodal
+  assembly, budget enforcement, and provider adaptation.
 toc: true
 mermaid: true
 pin: false
@@ -18,7 +20,7 @@ image:
   alt: 'From User Input to Provider API: The Five-Stage Message Flow'
 ---
 
-We built NeuroLink's message pipeline after a production incident took down a customer-facing chatbot. The root cause was a single user message containing a mix of text and an unsupported image format, which bypassed our validation, reached the Anthropic provider API as a malformed request, and triggered a cascading failure. The core problem wasn't just the image; it was the lack of a standardized, multi-stage process to sanitize, interpret, and structure user input before it ever touches a provider. Our ad-hoc validation checks were scattered, leading to gaps. That incident forced us to create a single, unified pipeline that converts any combination of user input into a provider-ready request.
+Consider a failure mode that any multimodal AI application can hit: a single user message mixes text with an unsupported image format, slips past ad-hoc validation, reaches the provider API as a malformed request, and triggers a cascading failure. The image format is just the trigger; the real problem is the lack of a standardized, multi-stage pipeline to sanitize, interpret, and structure user input before it ever touches a provider. Scattered, one-off validation checks leave exactly this kind of gap. That's why NeuroLink funnels every message through a single, unified pipeline that converts any combination of user input into a provider-ready request.
 
 A single user message can be deceptively complex. It might contain text, file paths, data URIs, or even raw image buffers. It could be a simple string or a rich array of mixed content types. Getting from that raw input to a valid, structured request for a specific model like Claude or Gemini is a multi-stage journey. In NeuroLink, we've formalized this into a five-stage flow that ensures every message is processed consistently, safely, and efficiently.
 
@@ -65,7 +67,7 @@ This initial pass separates content from instructions, preparing the ground for 
 
 ## Stage 2: From File Paths to Content
 
-Once we have a normalized list of messages and file references, we need to resolve those references into actual content. The pipeline hands each file to `FileDetector.detectAndProcess`, which identifies the type and routes it through an internal switch/case to the matching processor — `CSVProcessor`, `ImageProcessor`, `PDFProcessor`, and friends. At Juspay, we deal with dozens of file formats, from PDFs and spreadsheets to proprietary document types.
+Once we have a normalized list of messages and file references, we need to resolve those references into actual content. The pipeline hands each file to `FileDetector.detectAndProcess`, which identifies the type and routes it through an internal switch/case to the matching processor — `CSVProcessor`, `ImageProcessor`, `PDFProcessor`, and friends. In practice, file inputs span dozens of formats, from PDFs and spreadsheets to proprietary document types.
 
 For formats beyond those built-ins, there's a separate extensibility layer: the `ProcessorRegistry`. It's a singleton that maps file types (by MIME type or extension) to custom processor classes, so you can add a new format without touching the core detector.
 
@@ -99,7 +101,7 @@ With text and file content now in memory, the third stage assembles them into a 
 
 The `ProviderImageAdapter` is central to this stage. It's a specialized class that handles all image-related logic.
 
-- `supportsVision`: Checks if a given provider and model (e.g., `openai`, `gpt-4o`) can handle images.
+- `supportsVision`: Checks if a given provider and model (e.g., `openai`, `gpt-5.4`) can handle images.
 - `validateImageCount`: Enforces provider-specific limits on the number of images per request.
 - `convertToContent`: Takes an image buffer or path and wraps it into a standardized content block, detecting the media type as it goes. (The actual base64 encoding happens later, in `processImageToBase64`, when the simple-image path builds the final SDK parts.)
 
@@ -193,7 +195,7 @@ The other stages are deliberately forgiving. An unrecognized message role is fil
 
 That split is intentional. A capability mismatch is unrecoverable, so we fail loudly and early, by name. A too-big or partly-unreadable input usually still has a useful request inside it, so we sanitize and proceed rather than block the user.
 
-Every drop and every truncation is logged. That audit trail is what lets us tell a deliberate degradation apart from a real bug — and it is exactly what was missing the day a malformed request slipped through our scattered checks and failed deep inside a provider call.
+Every drop and every truncation is logged. That audit trail is what lets us tell a deliberate degradation apart from a real bug — the visibility that's missing entirely when ad-hoc checks let a malformed request slip through and fail deep inside a provider call.
 
 ## The Payoff: One Pipeline, Every Provider
 

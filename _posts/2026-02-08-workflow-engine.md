@@ -26,9 +26,7 @@ image:
   alt: 'The Workflow Engine: Multi-Model Orchestration with Judge Scoring'
 ---
 
-We designed NeuroLink's workflow engine to orchestrate multi-model pipelines where different AI providers handle different stages, and a judge model scores the outputs. This deep dive examines the DAG-based execution model, the scoring and selection algorithms, how we handle partial failures in multi-step workflows, and the cost-quality trade-offs of judge-based consensus.
-
-NeuroLink's workflow engine provides exactly this: a system for orchestrating multiple LLM calls into structured pipelines with judge-based scoring and consensus mechanisms. Instead of one model producing one answer, you can have multiple models produce competing answers, judge panels that evaluate quality, and adaptive routing that escalates to more capable models only when needed.
+NeuroLink's workflow engine orchestrates multi-model pipelines, where different AI providers handle different stages and judge-based scoring with consensus mechanisms decides which output to accept. Instead of one model producing one answer, you can have multiple models produce competing answers, judge panels that evaluate quality, and adaptive routing that escalates to more capable models only when needed.
 
 This deep dive covers the three execution strategies (Ensemble, Chain, Adaptive), multi-judge consensus voting, workflow graph construction, checkpointing for suspend/resume, and production patterns for cost-aware orchestration.
 
@@ -103,7 +101,7 @@ async function ensembleGenerate(prompt: string): Promise<{
   selectedModel: string;
 }> {
   const models = [
-    { provider: 'openai', model: 'gpt-4o' },
+    { provider: 'openai', model: 'gpt-5.4' },
     { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
     { provider: 'vertex', model: 'gemini-2.5-pro' },
   ];
@@ -168,7 +166,7 @@ async function chainGenerate(prompt: string): Promise<string> {
   const draft = await neurolink.generate({
     input: { text: `Write a comprehensive response: ${prompt}` },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     temperature: 0.8,
   });
 
@@ -188,7 +186,7 @@ Original: ${draft.content}
 Critique: ${critique.content}
 Produce an improved version.` },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     temperature: 0.5,
   });
 
@@ -212,8 +210,8 @@ The adaptive strategy is the most cost-efficient approach. It starts with the ch
 // Adaptive: escalate based on quality scores
 async function adaptiveGenerate(prompt: string): Promise<string> {
   const modelTiers = [
-    { provider: 'openai', model: 'gpt-4o-mini', threshold: 8 },  // Cheap, fast
-    { provider: 'openai', model: 'gpt-4o', threshold: 7 },        // Mid-tier
+    { provider: 'openai', model: 'gpt-5.4-mini', threshold: 8 },  // Cheap, fast
+    { provider: 'openai', model: 'gpt-5.4', threshold: 7 },        // Mid-tier
     { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', threshold: 0 }, // Best, always accept
   ];
 
@@ -244,14 +242,14 @@ Question: ${question}
 Answer: ${answer}
 Respond with ONLY a number.` },
     provider: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
     temperature: 0,
   });
   return parseInt(result.content.trim(), 10);
 }
 ```
 
-The key insight: most queries (60-80%) are simple enough for `gpt-4o-mini`. Only the difficult ones escalate to `gpt-4o` or `claude-sonnet`. The scoring model (`gpt-4o-mini` at temperature 0) is cheap enough that adding a quality check to every response is affordable.
+The key insight: most queries (60-80%) are simple enough for `gpt-5.4-mini`. Only the difficult ones escalate to `gpt-5.4` or `claude-sonnet-4-5-20250929`. The scoring model (`gpt-5.4-mini` at temperature 0) is cheap enough that adding a quality check to every response is affordable.
 
 **Threshold tuning**: Start with thresholds of 8 for the cheapest tier and 7 for the mid tier. Monitor your escalation rate. If more than 40% of requests escalate past the first tier, either lower the threshold or improve your prompts for the cheaper model.
 
@@ -269,7 +267,7 @@ async function threeJudgeConsensus(
   answer: string
 ): Promise<{ approved: boolean; scores: number[]; average: number }> {
   const judges = [
-    { provider: 'openai', model: 'gpt-4o' },
+    { provider: 'openai', model: 'gpt-5.4' },
     { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
     { provider: 'vertex', model: 'gemini-2.5-pro' },
   ];
@@ -452,7 +450,7 @@ The decision framework is simple: if a single call is enough, use `generate()`. 
 A practical application of the workflow engine: a content moderation pipeline where user-generated content goes through multi-model review:
 
 1. **Fast screening** (Gemini Flash): Quick toxicity check. 95% of benign content passes immediately.
-2. **Detailed analysis** (GPT-4o): Content flagged by screening gets deeper analysis for nuance, sarcasm, and context.
+2. **Detailed analysis** (GPT-5.4): Content flagged by screening gets deeper analysis for nuance, sarcasm, and context.
 3. **3-Judge consensus**: Borderline content goes to a 3-judge panel. Majority vote determines the outcome.
 4. **HITL escalation**: Content where judges disagree (high variance) gets routed to a human moderator with the judge scores and reasoning.
 

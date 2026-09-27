@@ -115,7 +115,7 @@ Here is a practical example that tracks streaming progress and reports throughpu
 const result = await neurolink.stream({
   input: { text: "Write a technical overview of middleware patterns" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   onChunk: ({ type, textDelta, sequenceNumber }) => {
     if (type === "text-delta" && textDelta) {
       // Track characters received for throughput calculation
@@ -147,13 +147,13 @@ import { NeuroLink } from '@juspay/neurolink';
 
 // Cost tracking with onFinish
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  "gpt-4o":               { input: 0.0025, output: 0.010 },
+  "gpt-5.4":              { input: 0.0025, output: 0.010 },
   "claude-sonnet-4-20250514": { input: 0.003,  output: 0.015 },
-  "gemini-2.0-flash":     { input: 0.0001, output: 0.0004 },
+  "gemini-2.5-flash":     { input: 0.0001, output: 0.0004 },
 };
 
 const neurolink = new NeuroLink();
-const model = "gpt-4o";
+const model = "gpt-5.4";
 
 const result = await neurolink.generate({
   input: { text: "Summarize the benefits of middleware patterns" },
@@ -192,7 +192,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: "Analyze this dataset" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   onError: async ({ error, duration, recoverable }) => {
     // Log to your monitoring system
     await fetch("https://monitoring.internal/api/events", {
@@ -201,7 +201,7 @@ const result = await neurolink.generate({
       body: JSON.stringify({
         event: "ai_generation_error",
         provider: "openai",
-        model: "gpt-4o",
+        model: "gpt-5.4",
         error: error.message,
         duration,
         recoverable,
@@ -326,10 +326,10 @@ interface CostRecord {
 }
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  "gpt-4o":               { input: 0.0025, output: 0.010 },
-  "gpt-4o-mini":          { input: 0.00015, output: 0.0006 },
+  "gpt-5.4":              { input: 0.0025, output: 0.010 },
+  "gpt-5.4-mini":         { input: 0.00015, output: 0.0006 },
   "claude-sonnet-4-20250514": { input: 0.003, output: 0.015 },
-  "gemini-2.0-flash":     { input: 0.0001, output: 0.0004 },
+  "gemini-2.5-flash":     { input: 0.0001, output: 0.0004 },
 };
 
 class CostTracker {
@@ -630,7 +630,7 @@ Lifecycle middleware inherits NeuroLink's conditional execution system. You can 
 const result = await neurolink.generate({
   input: { text: "Analyze this" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   middleware: {
     middlewareConfig: {
       lifecycle: {

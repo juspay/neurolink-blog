@@ -135,7 +135,7 @@ jobs:
         with:
           anthropic_api_key: {% raw %}${{ secrets.ANTHROPIC_API_KEY }}{% endraw %}
           provider: anthropic
-          model: claude-3-5-haiku
+          model: claude-haiku-4-5-20251001
           prompt: "Respond with exactly: CI health check passed"
           max_tokens: "50"
           temperature: "0"
@@ -155,7 +155,7 @@ jobs:
 
 Key decisions in this workflow:
 
-- **`claude-3-5-haiku`** is the cheapest Anthropic model. Use it for CI validation where you need to confirm the integration works, not the model quality.
+- **`claude-haiku-4-5-20251001`** is the cheapest Anthropic model. Use it for CI validation where you need to confirm the integration works, not the model quality.
 - **`temperature: "0"`** makes the output as deterministic as possible, which is what you want for a smoke test.
 - **`enable_analytics: true`** activates token counting and cost estimation, which feeds the `tokens_used` and `cost` outputs.
 
@@ -169,8 +169,8 @@ The action supports all 13 NeuroLink providers. Here is the quick reference for 
 
 | Provider     | Action Input            | CI Model Recommendation |
 |---|---|---|
-| Anthropic    | `anthropic_api_key`     | `claude-3-5-haiku`      |
-| OpenAI       | `openai_api_key`        | `gpt-4o-mini`           |
+| Anthropic    | `anthropic_api_key`     | `claude-haiku-4-5-20251001`      |
+| OpenAI       | `openai_api_key`        | `gpt-5.4-mini`           |
 | Google AI    | `google_ai_api_key`     | `gemini-2.5-flash`      |
 | Mistral      | `mistral_api_key`       | `mistral-small-latest`  |
 | OpenRouter   | `openrouter_api_key`    | Any via unified routing |
@@ -190,14 +190,14 @@ A successful API call is not enough. You need to know whether the response is ac
         with:
           anthropic_api_key: {% raw %}${{ secrets.ANTHROPIC_API_KEY }}{% endraw %}
           provider: anthropic
-          model: claude-sonnet-4-20250514
+          model: claude-sonnet-5
           prompt: |
             Generate a concise summary of the following changelog:
 
             - Added multi-provider failover support
             - Fixed token counting for streaming responses
             - Improved error messages for rate limit errors
-            - Updated OpenAI integration to use gpt-4o-mini as default
+            - Updated OpenAI integration to use gpt-5.4-mini as default
           enable_evaluation: true
           enable_analytics: true
 
@@ -296,8 +296,8 @@ When your application is configured for failover across providers, test each one
 ```mermaid
 flowchart TB
     MATRIX["Matrix Strategy"]
-    MATRIX --> ANTHROPIC["Anthropic<br/>claude-3-5-haiku"]
-    MATRIX --> OPENAI["OpenAI<br/>gpt-4o-mini"]
+    MATRIX --> ANTHROPIC["Anthropic<br/>claude-haiku-4-5-20251001"]
+    MATRIX --> OPENAI["OpenAI<br/>gpt-5.4-mini"]
     MATRIX --> GOOGLE["Google AI<br/>gemini-2.5-flash"]
 
     ANTHROPIC --> COLLECT["Collect Results"]
@@ -334,10 +334,10 @@ jobs:
       matrix:
         include:
           - provider: anthropic
-            model: claude-3-5-haiku
+            model: claude-haiku-4-5-20251001
             key_secret: ANTHROPIC_API_KEY
           - provider: openai
-            model: gpt-4o-mini
+            model: gpt-5.4-mini
             key_secret: OPENAI_API_KEY
           - provider: google-ai
             model: gemini-2.5-flash
@@ -350,7 +350,9 @@ jobs:
         uses: juspay/neurolink@v1
         id: test
         with:
-          api_key: {% raw %}${{ secrets[matrix.key_secret] }}{% endraw %}
+          anthropic_api_key: {% raw %}${{ matrix.provider == 'anthropic' && secrets[matrix.key_secret] || '' }}{% endraw %}
+          openai_api_key: {% raw %}${{ matrix.provider == 'openai' && secrets[matrix.key_secret] || '' }}{% endraw %}
+          google_ai_api_key: {% raw %}${{ matrix.provider == 'google-ai' && secrets[matrix.key_secret] || '' }}{% endraw %}
           provider: {% raw %}${{ matrix.provider }}{% endraw %}
           model: {% raw %}${{ matrix.model }}{% endraw %}
           prompt: "Return a JSON object with key 'status' and value 'ok'"
@@ -423,7 +425,7 @@ For AWS Bedrock and Google Vertex AI, use OIDC authentication instead of static 
       - uses: juspay/neurolink@v1
         with:
           provider: bedrock
-          bedrock_model_id: anthropic.claude-3-5-sonnet-20241022-v2:0
+          bedrock_model_id: anthropic.claude-sonnet-4-6
           prompt: "Your prompt here"
 ```
 
@@ -582,7 +584,7 @@ The gating job uses `needs` to depend on all upstream jobs and `if` conditions t
           anthropic_api_key: {% raw %}${{ secrets.ANTHROPIC_API_KEY }}{% endraw %}
           prompt: "Health check: confirm staging deployment is operational"
           provider: anthropic
-          model: claude-3-5-haiku
+          model: claude-haiku-4-5-20251001
           temperature: "0"
           max_tokens: "50"
 
@@ -635,10 +637,10 @@ jobs:
       matrix:
         include:
           - provider: anthropic
-            model: claude-3-5-haiku
+            model: claude-haiku-4-5-20251001
             key_secret: ANTHROPIC_API_KEY
           - provider: openai
-            model: gpt-4o-mini
+            model: gpt-5.4-mini
             key_secret: OPENAI_API_KEY
     steps:
       - uses: actions/checkout@v4
@@ -647,7 +649,8 @@ jobs:
         uses: juspay/neurolink@v1
         id: validate
         with:
-          api_key: {% raw %}${{ secrets[matrix.key_secret] }}{% endraw %}
+          anthropic_api_key: {% raw %}${{ matrix.provider == 'anthropic' && secrets[matrix.key_secret] || '' }}{% endraw %}
+          openai_api_key: {% raw %}${{ matrix.provider == 'openai' && secrets[matrix.key_secret] || '' }}{% endraw %}
           provider: {% raw %}${{ matrix.provider }}{% endraw %}
           model: {% raw %}${{ matrix.model }}{% endraw %}
           prompt: "Return JSON: {\"status\": \"ok\", \"provider\": \"{% raw %}${{ matrix.provider }}{% endraw %}\"}"
@@ -730,7 +733,7 @@ For intermittent failures, check the action's `error` output:
 
 Use this checklist when setting up AI CI/CD with the NeuroLink GitHub Action:
 
-- [ ] Use the cheapest model tier for CI validation (`haiku`, `gpt-4o-mini`, `gemini-flash`)
+- [ ] Use the cheapest model tier for CI validation (`haiku`, `gpt-5.4-mini`, `gemini-2.5-flash`)
 - [ ] Set `temperature: "0"` for deterministic smoke tests
 - [ ] Enable `enable_analytics: true` for cost tracking on every run
 - [ ] Store all API keys as GitHub Secrets with consistent naming

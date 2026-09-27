@@ -26,7 +26,7 @@ image:
 
 We built NeuroLink's event system to solve an observability problem that request-response logging cannot: understanding what happens inside a multi-step AI pipeline. When a generation triggers three tool calls, each taking different durations, followed by a streaming response, you need visibility into every stage -- not just the final result.
 
-The design decision was to build on Node.js `EventEmitter` with typed events via `TypedEventEmitter<NeuroLinkEvents>`. We chose this over external observability infrastructure because events fire synchronously at every lifecycle stage with zero network overhead. The trade-off is that event handlers run in-process and must be non-blocking. The payoff is compile-time safety for event names and handler signatures, with IDE autocompletion for every event you subscribe to.
+The design decision was to build on Node.js `EventEmitter` with a typed surface via `TypedEventEmitter<NeuroLinkEvents>`. This keeps lifecycle notifications in-process instead of requiring external observability infrastructure. The trade-off is that event handlers run synchronously and must not block the pipeline. The interface documents the listener-management methods and provides IDE autocompletion for the built-in event names; event payloads are typed as `unknown`, so handlers should narrow them before reading fields.
 
 This deep dive covers the event architecture, every event category, real-time dashboard patterns, and best practices for production event handler management.
 
@@ -54,7 +54,7 @@ flowchart TD
     L --> P[externalMCP:serverDisconnected]
 ```
 
-The `TypedEventEmitter<NeuroLinkEvents>` interface provides the standard EventEmitter methods with type safety: `on()`, `off()`, `emit()`, `removeAllListeners()`, `listenerCount()`, and `listeners()`.
+Call `neurolink.getEventEmitter()` to access the typed emitter. Its public interface includes `on()`, `off()`, `emit()`, `removeAllListeners()`, `listenerCount()`, and `listeners()`.
 
 Events are synchronous by default, following Node.js EventEmitter behavior. When an event fires, all registered handlers execute in the order they were registered, before the next line of code continues. This means event handlers should be fast -- heavy processing should be queued for async execution rather than blocking the pipeline.
 
@@ -72,12 +72,13 @@ Generation events bracket the `neurolink.generate()` call, providing timing and 
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
+const events = neurolink.getEventEmitter();
 
-neurolink.on("generation:start", (data) => {
+events.on("generation:start", (data) => {
   console.log("Generation started:", data);
 });
 
-neurolink.on("generation:end", (data) => {
+events.on("generation:end", (data) => {
   console.log("Generation completed:", data);
 });
 
@@ -87,29 +88,31 @@ const result = await neurolink.generate({
 });
 ```
 
-The `generation:start` event fires when a generate call begins. The payload includes the provider, model, and input metadata. This is useful for logging which model handles each request and tracking generation frequency.
+The `generation:start` event fires when a generate call begins. Its current payload includes the provider and start timestamp, which are useful for request-volume tracking.
 
-The `generation:end` event fires when generation completes, whether successfully or with an error. The payload includes the response time, token usage, and success status. This is the primary event for latency tracking and cost monitoring.
+The `generation:end` event fires on success, failure, or cancellation. Its payload includes provider and response time, with result metadata on successful calls and error, `success: false`, and an `aborted` flag on failures or caller cancellation. This makes it the primary event for latency and outcome tracking.
 
 ### Stream Events
 
 Streaming events provide fine-grained visibility into the stream lifecycle, from initiation through every chunk to completion or error.
 
 ```typescript
-neurolink.on("stream:start", (data) => {
-  console.log("Stream initiated");
+events.on("stream:start", (data) => {
+  console.log("Stream initiated:", data);
 });
 
-neurolink.on("stream:chunk", (chunk) => {
-  // Fires for every chunk received
-  process.stdout.write(chunk.content || "");
+events.on("stream:chunk", (event) => {
+  // Event payloads are unknown; narrow before reading fields.
+  if (event && typeof event === "object" && "content" in event) {
+    process.stdout.write(String(event.content ?? ""));
+  }
 });
 
-neurolink.on("stream:complete", (data) => {
+events.on("stream:complete", (data) => {
   console.log("Stream finished:", data);
 });
 
-neurolink.on("stream:error", (error) => {
+events.on("stream:error", (error) => {
   console.error("Stream failed:", error);
 });
 
@@ -119,11 +122,12 @@ const result = await neurolink.stream({
 });
 ```
 
-The `StreamEvent` type provides a structured payload: `{ type, content?, metadata?, timestamp }`. Four events cover the full stream lifecycle:
+The chunk, completion, and error payloads use the internal `{ type, content?, metadata?, timestamp }` event shape, while `stream:start` and `stream:end` carry lifecycle metadata. Five events cover the full stream lifecycle:
 
 - **`stream:start`** fires once when the stream is initiated.
-- **`stream:chunk`** fires for every received chunk. This is a high-frequency event -- a typical streaming response might produce 50-200 chunk events.
+- **`stream:chunk`** fires for every received text chunk, so it can be a high-frequency event.
 - **`stream:complete`** fires when all chunks have been received and the stream ends normally.
+- **`stream:end`** reports the end of the stream lifecycle.
 - **`stream:error`** fires if the stream encounters an error (network failure, provider error, timeout).
 
 > **Note:** The `stream:chunk` event fires at high frequency during active streams. If your handler performs expensive operations (database writes, HTTP calls), batch the chunks and process them periodically rather than on every event. A common pattern is to buffer chunks for 100ms and flush the buffer as a batch.
@@ -134,39 +138,39 @@ The `StreamEvent` type provides a structured payload: `{ type, content?, metadat
 Tool events track the execution of tools called by the AI model during generation. These are essential for debugging tool selection, measuring tool performance, and building audit trails.
 
 ```typescript
-neurolink.on("tool:start", (data) => {
-  console.log(`Tool invoked: ${data.toolName}`);
+events.on("tool:start", (data) => {
+  console.log("Tool invoked:", data);
 });
 
-neurolink.on("tool:end", (data) => {
-  console.log(`Tool completed: ${data.toolName} in ${data.executionTime}ms`);
+events.on("tool:end", (data) => {
+  console.log("Tool completed:", data);
 });
 ```
 
-The `tool:end` payload includes the tool name, execution time in milliseconds, success status, the result (if successful), and the error (if failed). This gives you complete visibility into every tool call:
+The `tool:end` payload includes `tool` and `toolName`, plus fields such as `responseTime`, `success`, `result`, and `error` when the execution path provides them. This gives you visibility into tool calls:
 
 - Which tools does the model call most frequently?
 - Which tools are slow and might need optimization?
 - Which tools fail often and might need better error handling?
 - What results is the model receiving from tools?
 
-Tool events also integrate with the circuit breaker. Failed tools are tracked via `toolCircuitBreakers`, and repeated failures can trigger automatic circuit breaking for specific tools.
+Tool execution also integrates with NeuroLink's private per-tool circuit breakers. Repeated failures can open a breaker for a specific server-and-tool key; applications can monitor the resulting failures through tool events, but the breaker map itself is not public API.
 
 ### MCP Events
 
 MCP events monitor the lifecycle of external MCP server connections: connections, disconnections, tool discovery, and failures.
 
 ```typescript
-neurolink.on("externalMCP:serverConnected", (data) => {
-  console.log(`MCP server connected: ${data.serverName}`);
+events.on("externalMCP:serverConnected", (data) => {
+  console.log("MCP server connected:", data);
 });
 
-neurolink.on("externalMCP:toolDiscovered", (data) => {
-  console.log(`New tool discovered: ${data.toolName}`);
+events.on("externalMCP:toolDiscovered", (data) => {
+  console.log("New tool discovered:", data);
 });
 
-neurolink.on("externalMCP:serverFailed", (data) => {
-  console.error(`MCP server failed: ${data.serverName}`, data.error);
+events.on("externalMCP:serverFailed", (data) => {
+  console.error("MCP server failed:", data);
 });
 ```
 
@@ -189,6 +193,7 @@ Combining all event categories, you can build a real-time operational dashboard 
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
+const events = neurolink.getEventEmitter();
 
 // Metrics collector
 const metrics = {
@@ -202,13 +207,16 @@ const metrics = {
 };
 
 // Generation tracking
-neurolink.on("generation:start", () => {
+events.on("generation:start", () => {
   metrics.totalGenerations++;
 });
 
-neurolink.on("generation:end", (data: any) => {
-  if (data?.responseTime) {
-    metrics.responseTimes.push(data.responseTime);
+events.on("generation:end", (payload) => {
+  if (!payload || typeof payload !== "object" || !("responseTime" in payload)) return;
+
+  const responseTime = Number(payload.responseTime);
+  if (Number.isFinite(responseTime)) {
+    metrics.responseTimes.push(responseTime);
     metrics.avgResponseTime =
       metrics.responseTimes.reduce((a, b) => a + b, 0) /
       metrics.responseTimes.length;
@@ -216,28 +224,31 @@ neurolink.on("generation:end", (data: any) => {
 });
 
 // Stream tracking
-neurolink.on("stream:start", () => {
+events.on("stream:start", () => {
   metrics.totalStreams++;
   metrics.activeStreams++;
 });
 
-neurolink.on("stream:end", () => {
+events.on("stream:end", () => {
   metrics.activeStreams--;
 });
 
 // Error tracking
-neurolink.on("stream:error", () => {
+events.on("stream:error", () => {
   metrics.totalErrors++;
 });
 
-neurolink.on("error", () => {
+events.on("error", () => {
   metrics.totalErrors++;
 });
 
 // Tool tracking
-neurolink.on("tool:end", (data: any) => {
-  const count = metrics.toolUsage.get(data?.toolName) || 0;
-  metrics.toolUsage.set(data?.toolName, count + 1);
+events.on("tool:end", (payload) => {
+  if (!payload || typeof payload !== "object" || !("toolName" in payload)) return;
+
+  const toolName = String(payload.toolName);
+  const count = metrics.toolUsage.get(toolName) || 0;
+  metrics.toolUsage.set(toolName, count + 1);
 });
 
 // Periodic dashboard output
@@ -271,21 +282,17 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 // Structured logging for all events
-neurolink.on("log-event", (event) => {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    ...event,
-  };
-  // Send to your logging infrastructure
-  console.log(JSON.stringify(logEntry));
+events.on("log-event", (event) => {
+  // Payloads are unknown at the public boundary; log the value as emitted.
+  console.log(JSON.stringify(event));
 });
 
 // Error alerting
-neurolink.on("error", (error) => {
-  // Send to error tracking (Sentry, Datadog, etc.)
+events.on("error", (error) => {
+  const normalized = error instanceof Error ? error : new Error(String(error));
   sendToErrorTracker({
-    message: error.message,
-    stack: error.stack,
+    message: normalized.message,
+    stack: normalized.stack,
     context: { sdk: "neurolink" },
   });
 });
@@ -293,7 +300,7 @@ neurolink.on("error", (error) => {
 
 The `log-event` is a general-purpose event that the SDK emits for significant internal activities. It produces structured JSON entries that can be parsed by any log aggregation tool: CloudWatch Logs, Datadog Logs, Elasticsearch, or Splunk.
 
-The `error` event captures SDK-level errors that are not associated with a specific generation or stream. This includes initialization failures, configuration errors, and unexpected internal exceptions. Routing these to an error tracking service like Sentry ensures that SDK-level issues get the same attention as application-level errors.
+The `error` event surfaces selected SDK errors when at least one error listener is registered. Routing these to an error-tracking service gives SDK-level failures the same operational path as application errors.
 
 > **Note:** Log events are structured JSON by design. Avoid converting them to formatted strings -- the JSON format is what makes them searchable and aggregatable in log analysis tools. Store the raw JSON and use your logging platform's query capabilities for analysis.
 {: .prompt-info }
@@ -305,37 +312,37 @@ Proper listener management prevents memory leaks and ensures clean application s
 ```typescript
 // Add a listener
 const handler = (data: unknown) => console.log(data);
-neurolink.on("generation:end", handler);
+events.on("generation:end", handler);
 
 // Remove a specific listener
-neurolink.off("generation:end", handler);
+events.off("generation:end", handler);
 
 // Remove all listeners for an event
-neurolink.removeAllListeners("generation:end");
+events.removeAllListeners("generation:end");
 
 // Check listener count
-const count = neurolink.listenerCount("generation:end");
+const count = events.listenerCount("generation:end");
 
 // Get all listeners
-const listeners = neurolink.listeners("generation:end");
+const listeners = events.listeners("generation:end");
 ```
 
 Four rules for listener management:
 
-**Always store handler references.** When you call `neurolink.on("event", handler)`, store the `handler` reference so you can remove it later with `neurolink.off("event", handler)`. Anonymous functions cannot be removed.
+**Always store handler references.** When you call `events.on("event", handler)`, store the `handler` reference so you can remove it later with `events.off("event", handler)`. Anonymous functions cannot be removed.
 
 **Clean up in application shutdown.** Use `removeAllListeners()` in your graceful shutdown handler to prevent event handlers from firing during teardown. This is especially important for handlers that write to external systems (databases, metrics services) that may already be shutting down.
 
 **Monitor listener counts.** If `listenerCount()` grows unboundedly, you have a listener leak. This typically happens when code in a request handler registers a listener without removing it, causing one new listener per request.
 
-**Be selective with high-frequency events.** The `stream:chunk` event fires many times per stream. If you have 100 concurrent streams and each produces 100 chunks, that is 10,000 chunk events per second. Make sure your handler can keep up or batch the events.
+**Be selective with high-frequency events.** The `stream:chunk` event can fire many times per stream. Make sure your handler can keep up under your expected concurrency or batch the events.
 
 ## Best Practices
 
 **Keep event handlers fast.** Event handlers execute synchronously on the main thread. A handler that takes 100ms to execute adds 100ms to every generation that fires that event. If you need to do heavy processing (database writes, HTTP requests, complex calculations), push the work to an async queue:
 
 ```typescript
-neurolink.on("generation:end", (data) => {
+events.on("generation:end", (data) => {
   // Fast: just queue the work
   metricsQueue.push(data);
   // Do not: await db.insert(data) -- this blocks the pipeline
@@ -345,7 +352,7 @@ neurolink.on("generation:end", (data) => {
 **Never throw in event handlers.** An uncaught exception in an event handler can crash the Node.js process. Always wrap handler bodies in try-catch:
 
 ```typescript
-neurolink.on("tool:end", (data) => {
+events.on("tool:end", (data) => {
   try {
     recordToolMetric(data);
   } catch (error) {
@@ -359,13 +366,13 @@ neurolink.on("tool:end", (data) => {
 
 **Consider batching for external systems.** If you are sending events to Datadog, CloudWatch, or Elasticsearch, batch them rather than sending one HTTP request per event. Most observability platforms have batch APIs that are both more efficient and cheaper.
 
-**Test with `stream:chunk` volume.** The stream chunk event can fire hundreds of times per request. Load test your event handlers under realistic stream volumes to ensure they do not become a bottleneck.
+**Test with `stream:chunk` volume.** Load test your event handlers under realistic stream volumes to ensure they do not become a bottleneck.
 
 ## Design Decisions and Trade-offs
 
 We built the event system on Node.js's standard `EventEmitter` rather than introducing a custom pub/sub mechanism. This means zero learning curve for developers who already know Node.js, but it also means in-process only -- events do not cross process boundaries without explicit bridging to an external message bus.
 
-The `TypedEventEmitter` wrapper adds compile-time safety at the cost of slightly more complex type definitions. We made this trade-off because runtime handler signature mismatches are notoriously difficult to debug -- a handler receiving the wrong event payload shape silently produces incorrect metrics rather than throwing an obvious error.
+The `TypedEventEmitter` surface makes the built-in event names discoverable while retaining an extensible string index for custom events. Payloads remain `unknown`, so narrowing at the handler boundary is what prevents a wrong payload assumption from silently producing incorrect metrics.
 
 Start with logging events for debugging, add metrics for operational dashboards, then build reactive workflows that respond to tool failures, stream errors, and MCP disconnections in real-time.
 

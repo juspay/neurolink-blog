@@ -89,21 +89,25 @@ The server object is a lightweight container that holds tool registrations and p
 
 ## Step 2 -- Register Tools
 
-Tools are the core of your MCP server. Each tool needs a `name`, a `description` (used by the LLM to decide when to call it), a `parameters` schema (defined with Zod for runtime validation and type inference), and an `execute` function that contains your business logic.
+Tools are the core of your MCP server. Each tool needs a `name`, a `description` (used by the LLM to decide when to call it), an `inputSchema` (defined with Zod for runtime validation and type inference), and an `execute` function that contains your business logic.
 
 ```typescript
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
 import { z } from "zod";
+import type { NeuroLinkMCPTool } from "@juspay/neurolink/types";
 
-// Tool 1: Database query tool
-server.registerTool({
+const QueryDatabaseInput = z.object({
+  query: z.string().describe("SQL SELECT query"),
+  limit: z.number().optional().default(100).describe("Max rows"),
+});
+
+const queryDatabaseTool: NeuroLinkMCPTool = {
   name: "queryDatabase",
   description: "Execute a read-only SQL query against the analytics database",
-  parameters: z.object({
-    query: z.string().describe("SQL SELECT query"),
-    limit: z.number().optional().default(100).describe("Max rows"),
-  }),
+  inputSchema: QueryDatabaseInput,
   execute: async (params) => {
-    const { query, limit } = params;
+    const { query, limit } = QueryDatabaseInput.parse(params);
     if (!query.trim().toUpperCase().startsWith("SELECT")) {
       return { success: false, error: "Only SELECT queries allowed" };
     }
@@ -111,44 +115,58 @@ server.registerTool({
     const results = await db.query(`${query} LIMIT $1`, [limit]);
     return { success: true, data: results, rowCount: results.length };
   },
+};
+server.registerTool(queryDatabaseTool);
+
+const SendNotificationInput = z.object({
+  channel: z.enum(["slack", "email"]).describe("Notification channel"),
+  recipient: z.string().describe("Channel ID or email address"),
+  message: z.string().describe("Notification message"),
 });
 
-// Tool 2: Send notification tool
-server.registerTool({
+const sendNotificationTool: NeuroLinkMCPTool = {
   name: "sendNotification",
   description: "Send a notification to a Slack channel or email",
-  parameters: z.object({
-    channel: z.enum(["slack", "email"]).describe("Notification channel"),
-    recipient: z.string().describe("Channel ID or email address"),
-    message: z.string().describe("Notification message"),
-  }),
+  inputSchema: SendNotificationInput,
   execute: async (params) => {
-    if (params.channel === "slack") {
-      await slackClient.postMessage(params.recipient, params.message);
+    const { channel, recipient, message } = SendNotificationInput.parse(params);
+    if (channel === "slack") {
+      await slackClient.postMessage(recipient, message);
     } else {
-      await emailClient.send(params.recipient, "AI Notification", params.message);
+      await emailClient.send(recipient, "AI Notification", message);
     }
-    return { success: true, channel: params.channel };
+    return { success: true, channel };
   },
+};
+server.registerTool(sendNotificationTool);
+
+const ReadFileInput = z.object({
+  path: z.string().describe("Relative file path"),
 });
 
-// Tool 3: File operations
-server.registerTool({
+const readFileTool: NeuroLinkMCPTool = {
   name: "readFile",
   description: "Read the contents of a file from the project directory",
-  parameters: z.object({
-    path: z.string().describe("Relative file path"),
-  }),
+  inputSchema: ReadFileInput,
   execute: async (params) => {
+    const { path: requestedPath } = ReadFileInput.parse(params);
     const PROJECT_DIR = path.resolve(process.cwd());
-    const safePath = path.resolve(PROJECT_DIR, params.path);
-    if (!safePath.startsWith(PROJECT_DIR)) {
+    const safePath = path.resolve(PROJECT_DIR, requestedPath);
+    const relativePath = path.relative(PROJECT_DIR, safePath);
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
       return { success: false, error: "Path traversal detected" };
     }
-    const content = await fs.readFile(safePath, "utf-8");
-    return { success: true, content, size: content.length };
+    try {
+      const content = await fs.readFile(safePath, "utf-8");
+      return { success: true, content, size: content.length };
+    } catch (error) {
+      // Return a structured error so the model can respond to the failure.
+      const code = error instanceof Error && "code" in error ? error.code : undefined;
+      return { success: false, error: code === "ENOENT" ? "File not found" : String(error) };
+    }
   },
-});
+};
+server.registerTool(readFileTool);
 ```
 
 > **Security:** This example allows the LLM to submit arbitrary SELECT queries. In production, use a read-only database role, restrict queries to an allowlist of approved tables, and consider a query builder like Knex or Drizzle instead of raw SQL. The `startsWith("SELECT")` check is a minimal guard — it does not prevent data exfiltration via `UNION` or subqueries. Always use parameterized queries for user-supplied values (like `limit`), and never interpolate untrusted input into SQL identifiers (table or column names).
@@ -158,7 +176,7 @@ A few important design principles for tool definitions:
 
 **Descriptions matter more than names.** The LLM reads the description to decide when to call the tool. Write descriptions that clearly state what the tool does, what inputs it expects, and what it returns. A vague description leads to incorrect tool selection.
 
-**Zod schemas enforce contracts.** The `parameters` schema defines the exact shape of the input the tool accepts. Zod validates inputs at runtime, so malformed parameters from the LLM are caught before your business logic runs. Use `.describe()` on each field to give the LLM hints about expected values.
+**Zod schemas document and validate contracts.** The `inputSchema` defines the exact shape of the input the tool accepts and exposes that shape to tool consumers. `createMCPServer()` stores the schema but does not parse direct calls to `server.tools[name].execute()` for you, so each example calls `Schema.parse(params)` at the start of its implementation. Use `.describe()` on each field to give the LLM hints about expected values.
 
 **Execute functions should be defensive.** Always validate inputs beyond what Zod checks. In the database tool example, we verify the query starts with SELECT even though the description says "read-only" -- because LLMs do not always follow instructions perfectly.
 
@@ -188,9 +206,9 @@ console.log(`Tools registered: ${info.toolCount}`);
 console.log(`Category: ${info.category}`);
 ```
 
-Validation checks include: tool names are non-empty strings, descriptions exist and are meaningful, execute functions are callable, and parameter schemas are valid Zod objects. Running validation at startup catches configuration errors early, before any user request hits a broken tool.
+Validation checks include: tool names follow the supported character and length rules, descriptions are present and descriptive, execute functions are callable and async, and optional schemas have object-like shapes. Running validation at startup catches configuration errors early, before any user request hits a broken tool.
 
-The `getServerInfo()` function provides a summary of the server's state: how many tools are registered, what category it belongs to, and its version. This is useful for health check endpoints and operational dashboards.
+The `getServerInfo()` function provides a summary of the server's state: its ID, title, description, category, registered tool count, and capabilities. This is useful for health check endpoints and operational dashboards.
 
 ## Step 4 -- Use Tools with NeuroLink
 
@@ -198,35 +216,27 @@ Now connect your MCP tools to the NeuroLink SDK so that LLMs can discover and ca
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { tool } from "ai";
-import { z } from "zod";
 
 const neurolink = new NeuroLink();
 
-// Convert MCP tools to AI SDK format for use with generate/stream
+// Bridge MCP server tools into the shape generate()'s `tools` option expects:
+// an object of { description, inputSchema, execute } entries.
 const aiTools = {
-  queryDatabase: tool({
-    description: "Execute a read-only SQL query against the analytics database",
-    parameters: z.object({
-      query: z.string().describe("SQL SELECT query"),
-      limit: z.number().optional().default(100),
-    }),
-    execute: async (params) => {
-      // Delegate to MCP server tool
-      return server.tools["queryDatabase"].execute(params);
+  queryDatabase: {
+    description: queryDatabaseTool.description,
+    inputSchema: QueryDatabaseInput,
+    execute: async (params: z.infer<typeof QueryDatabaseInput>) => {
+      // Delegate to the MCP server tool (second arg is the execution context)
+      return queryDatabaseTool.execute(params, {});
     },
-  }),
-  sendNotification: tool({
-    description: "Send a notification to a Slack channel or email",
-    parameters: z.object({
-      channel: z.enum(["slack", "email"]),
-      recipient: z.string(),
-      message: z.string(),
-    }),
-    execute: async (params) => {
-      return server.tools["sendNotification"].execute(params);
+  },
+  sendNotification: {
+    description: sendNotificationTool.description,
+    inputSchema: SendNotificationInput,
+    execute: async (params: z.infer<typeof SendNotificationInput>) => {
+      return sendNotificationTool.execute(params, {});
     },
-  }),
+  },
 };
 
 // Use tools in generation
@@ -235,7 +245,7 @@ const result = await neurolink.generate({
     text: "How many orders did we process last week? Send a summary to #analytics on Slack.",
   },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tools: aiTools,
 });
 
@@ -244,9 +254,9 @@ console.log(result.content);
 
 When you pass tools to `neurolink.generate()`, the LLM receives the tool schemas as part of its system context. It then decides whether to call tools based on the user's request. In this example, the model would likely call `queryDatabase` to get order counts, then call `sendNotification` to post the summary to Slack, and finally synthesize a natural language response.
 
-The delegation pattern (AI tool wrapping MCP server tool) keeps your MCP server as the single source of truth for tool logic. The AI SDK tools are thin wrappers that forward execution to the MCP server. This means you can update tool logic in one place and all consumers get the update automatically.
+The delegation pattern (generation tool wrapping MCP server tool) keeps your MCP server as the single source of truth for tool logic. The `tools` entries are thin wrappers that forward execution to the MCP server. This means you can update tool logic in one place and all consumers get the update automatically.
 
-> **Note:** The `tools` option in `generate()` accepts tools in the AI SDK format. The MCP server's `registerTool()` uses a slightly different shape. The wrapper pattern shown above bridges the two formats cleanly. In the future, NeuroLink will support direct MCP tool passthrough.
+> **Note:** `generate()`'s `tools` option and the MCP server's `registerTool()` both use `inputSchema` for the Zod schema, but their `execute` signatures differ: an MCP tool's `execute(params, context)` takes a `NeuroLinkExecutionContext`, while a generation tool's `execute(input, options)` takes AI SDK call options. The wrapper pattern shown above bridges the two by passing an empty context object through.
 {: .prompt-info }
 
 ## Step 5 -- Add Rate Limiting and Circuit Breaking
@@ -260,34 +270,41 @@ import {
   DEFAULT_RATE_LIMIT_CONFIG,
 } from "@juspay/neurolink";
 
-// Rate limit: 100 requests per minute
+// Allow bursts of 10 requests, then refill at 100 / 60 tokens per second.
 const rateLimiter = new HTTPRateLimiter({
   ...DEFAULT_RATE_LIMIT_CONFIG,
-  maxRequests: 100,
+  requestsPerWindow: 100,
   windowMs: 60000,
+  refillRate: 100 / 60,
+  maxBurst: 10,
 });
 
-// Circuit breaker: Open after 5 failures, reset after 30s
-const circuitBreaker = new MCPCircuitBreaker({
+// Circuit breaker: named per protected operation, opens after 5 failures, resets after 30s
+const dbCircuitBreaker = new MCPCircuitBreaker("queryDatabase", {
   failureThreshold: 5,
-  resetTimeoutMs: 30000,
+  resetTimeout: 30000,
+});
+
+await rateLimiter.acquire();
+const dbResult = await dbCircuitBreaker.execute(async () => {
+  return queryDatabaseTool.execute({ query: "SELECT 1", limit: 1 }, {});
 });
 ```
 
-The rate limiter prevents any single client from overwhelming your tools. At 100 requests per minute, a runaway agent loop would be throttled before it racks up significant costs or overwhelms your database.
+The rate limiter uses a token-bucket algorithm: each request consumes one token, tokens replenish at `refillRate` per second, and the bucket is capped at `maxBurst`. Set `refillRate` explicitly when changing `requestsPerWindow`; the current implementation stores `requestsPerWindow` and `windowMs` for configuration and statistics but uses `refillRate` for replenishment.
 
-The circuit breaker monitors failure rates for tool execution. After five consecutive failures (a database connection timeout, an API outage, etc.), the circuit opens and immediately returns errors without attempting execution. After 30 seconds, the circuit enters a half-open state and allows a single test request through. If it succeeds, the circuit closes and normal operation resumes. If it fails, the circuit stays open for another 30 seconds.
+`MCPCircuitBreaker` is constructed per named operation -- pass a name identifying what it protects (here, `"queryDatabase"`), then wrap the call in `.execute()`. Once at least `minimumCallsBeforeCalculation` calls have been recorded (default 10), the circuit opens when failures in the statistics window reach `failureThreshold` (here, 5). It then rejects with `CircuitBreakerOpenError` without attempting execution. After 30 seconds (`resetTimeout`), the circuit enters a half-open state and allows up to `halfOpenMaxCalls` test requests (default 3). All three successful probes close it; a failed probe reopens it.
 
-Together, rate limiting and circuit breaking give your MCP server production-grade resilience without complex custom implementation.
+Together, rate limiting and circuit breaking provide reusable resilience controls for the operations you explicitly wrap.
 
 ## Tool validation deep dive
 
-The `validateTool()` function provides fine-grained validation for individual tools, useful during development and testing:
+The `validateMCPTool()` function provides fine-grained validation for individual tools, useful during development and testing. (NeuroLink also exports a separate `validateTool(name, tool)` for its simpler SDK tool-registration API, which throws on an invalid tool instead of returning a boolean -- for the `createMCPServer()`/`NeuroLinkMCPTool` shape used throughout this tutorial, `validateMCPTool()` is the one that matches.)
 
 ```typescript
-import { validateTool } from "@juspay/neurolink";
+import { validateMCPTool } from "@juspay/neurolink";
 
-const isValid = validateTool({
+const isValid = validateMCPTool({
   name: "myTool",
   description: "Does something useful",
   execute: async (params) => ({ result: "ok" }),
@@ -298,12 +315,12 @@ console.log("Valid:", isValid); // true
 
 Validation checks cover several categories:
 
-- **Name validation**: Names must be non-empty strings, ideally camelCase.
-- **Description validation**: Descriptions must exist and provide meaningful context for the LLM.
+- **Name validation**: Names must start with a letter, use only letters, numbers, underscores, or hyphens, stay within 64 characters, and avoid reserved names.
+- **Description validation**: Descriptions must be 10-500 characters and contain enough meaningful words.
 - **Execute validation**: The execute field must be a callable async function.
-- **Parameter validation**: If parameters are provided, they must be valid Zod schemas with correct types and descriptions.
+- **Schema shape checks**: Optional `inputSchema` and `outputSchema` values must be objects; non-object values produce validation warnings.
 
-Running validation in your CI/CD pipeline ensures that no malformed tool definitions ship to production.
+Running validation in your CI/CD pipeline catches malformed tool definitions before deployment.
 
 ## Architecture overview
 
@@ -328,7 +345,7 @@ flowchart TD
     N[Circuit Breaker] --> I
 ```
 
-The flow is straightforward: create a server, register tools, validate them, and connect to NeuroLink. During generation, the LLM calls tools as needed, with rate limiting and circuit breaking protecting every execution. Results flow back to the LLM for synthesis into a final response.
+The flow is straightforward: create a server, register tools, validate them, and connect to NeuroLink. During generation, the LLM calls tools as needed. The example wraps the database call in a circuit breaker; apply `rateLimiter.acquire()` and the breaker to each external operation you want to protect. Results flow back to the LLM for synthesis into a final response.
 
 ## Testing Your MCP Tools
 
@@ -336,10 +353,13 @@ Testability is one of the strongest benefits of the MCP pattern. Because tools h
 
 ```typescript
 // Unit test
-const result = await server.tools["queryDatabase"].execute({
-  query: "SELECT COUNT(*) FROM orders WHERE date > '2025-01-01'",
-  limit: 1,
-});
+const result = await queryDatabaseTool.execute(
+  {
+    query: "SELECT COUNT(*) FROM orders WHERE date > '2025-01-01'",
+    limit: 1,
+  },
+  {}
+);
 assert(result.success === true);
 ```
 
@@ -349,22 +369,23 @@ Test edge cases thoroughly: What happens when the database returns zero rows? Wh
 
 ```typescript
 // Edge case test: invalid SQL
-const invalidResult = await server.tools["queryDatabase"].execute({
-  query: "DROP TABLE orders",
-  limit: 1,
-});
+const invalidResult = await queryDatabaseTool.execute(
+  {
+    query: "DROP TABLE orders",
+    limit: 1,
+  },
+  {}
+);
 assert(invalidResult.success === false);
 assert(invalidResult.error === "Only SELECT queries allowed");
 
 // Edge case test: missing file
-try {
-  await server.tools["readFile"].execute({
-    path: "./nonexistent.txt",
-  });
-  assert.fail("Should have thrown");
-} catch (error) {
-  assert(error.code === "ENOENT");
-}
+const missingFileResult = await readFileTool.execute(
+  { path: "./nonexistent.txt" },
+  {}
+);
+assert(missingFileResult.success === false);
+assert(missingFileResult.error === "File not found");
 ```
 
 > **Tip:** Always return structured error objects from your tools rather than throwing exceptions. The LLM can interpret a `{ success: false, error: "..." }` response and adjust its approach, but an unhandled exception terminates the tool call chain entirely.
@@ -380,15 +401,20 @@ Beyond the basics, here are patterns we see in production MCP deployments:
 
 ```typescript
 // Authentication middleware for MCP tool execution
-function withAuth(tool: MCPTool, requiredRole: string): MCPTool {
+import type { NeuroLinkMCPTool } from "@juspay/neurolink/types";
+
+function withAuth(tool: NeuroLinkMCPTool, requiredRole: string): NeuroLinkMCPTool {
   return {
     ...tool,
     execute: async (params, context) => {
-      const user = await verifyToken(context.headers?.authorization);
+      // Pass the caller's token through context.metadata (NeuroLinkExecutionContext's
+      // generic extension point) -- it has no dedicated headers/auth field.
+      const token = context.metadata?.authorization as string | undefined;
+      const user = await verifyToken(token);
       if (!user || !user.roles.includes(requiredRole)) {
         return { success: false, error: "Unauthorized: insufficient permissions" };
       }
-      return tool.execute(params, { ...context, user });
+      return tool.execute(params, { ...context, metadata: { ...context.metadata, user } });
     },
   };
 }
@@ -404,7 +430,7 @@ server.registerTool(withAuth(sendNotificationTool, "admin"));
 
 ## What you built
 
-You built a fully functional MCP server with three validated tools, rate limiting, circuit breaker resilience, and end-to-end NeuroLink integration. Your tools are discoverable, testable, and usable by any AI agent without code changes.
+You built an in-process MCP server definition with three tools, startup validation, explicit rate limiting and circuit-breaker wrappers, and NeuroLink generation integration. To expose it to remote agents, add an MCP transport, authentication, authorization, audit logging, and deployment-specific controls.
 
 Continue with these related tutorials:
 

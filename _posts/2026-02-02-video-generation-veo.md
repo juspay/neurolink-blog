@@ -28,21 +28,21 @@ image:
 > **Warning:** The video generation APIs shown in this post are based on preview/early-access documentation and may change before general availability. Verify current API availability and parameters with your provider's documentation.
 {: .prompt-warning }
 
-In this guide, you will generate videos using Veo 3.1 through NeuroLink's unified API. You will configure video generation parameters, implement prompt engineering for video content, handle asynchronous generation workflows, and build a pipeline that combines text generation with video synthesis.
+In this guide, you will generate videos using Veo 3.1 through NeuroLink's unified API. You will configure video generation parameters, implement prompt engineering for video content, handle long-running generation workflows, and build a pipeline that combines text generation with video synthesis.
 
-Video generation is the newest frontier in generative AI, and the use cases are already tangible: product demos without hiring a videographer, marketing content without a production budget, social media clips without an editing suite, educational videos without a studio. The technology is still evolving, but for short-form content (3-8 seconds), the quality is production-ready.
+Video generation is the newest frontier in generative AI, and the use cases are already tangible: product demos without hiring a videographer, marketing content without a production budget, social media clips without an editing suite, educational videos without a studio. The technology is still evolving, and output quality varies by prompt, reference image, and provider, so review generated clips before publishing them.
 
-In this tutorial, you will learn how to generate videos from text and reference images, configure duration and aspect ratio for different platforms, handle the asynchronous nature of video generation, and build a complete social media video pipeline.
+In this tutorial, you will learn how to animate reference images with text prompts, configure duration and aspect ratio for different platforms, handle the long-running generation workflow, and build a complete social media video pipeline.
 
 ## Architecture: How Video Generation Works
 
-The critical difference between video generation and text or image generation is that video generation is inherently asynchronous. Generating a 5-second video clip can take anywhere from 30 seconds to several minutes, depending on the complexity of the prompt, the duration, and the resolution.
+The critical difference between video generation and text or image generation is that video generation is inherently asynchronous. Generating a short video clip can take from tens of seconds to several minutes, depending on the provider, prompt, duration, and resolution.
 
 ```mermaid
 flowchart TB
     subgraph Input["Input Options"]
         TEXT["Text Prompt"]
-        IMG["Reference Image<br/>(optional)"]
+        IMG["Reference Image<br/>(required)"]
         CFG["Configuration<br/>duration, resolution"]
     end
 
@@ -79,40 +79,45 @@ NeuroLink handles the polling internally. When you call `generate()` with a vide
 
 ## Basic Video Generation
 
-Generating a video uses the same `generate()` method with the output mode set to `"video"`:
+Generating a video uses the same `generate()` method with the output mode set to `"video"` and one reference image in `input.images`:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Generate a video from a text prompt using generate() with video output mode
+// Veo video mode currently requires an input image
+const fs = await import('fs/promises');
+const referenceImage = await fs.readFile('mountain-lake.png');
+
 const result = await neurolink.generate({
-  input: { text: 'A serene mountain lake at sunrise, mist rising from the water, cinematic quality, slow camera pan' },
+  input: {
+    text: 'A serene mountain lake at sunrise, mist rising from the water, cinematic quality, slow camera pan',
+    images: [referenceImage],
+  },
   provider: 'vertex',
-  model: 'veo-3.1',
+  model: 'veo-3.1-generate-001',
   output: {
     mode: 'video',
     video: {
       aspectRatio: '16:9',
-      durationSeconds: 5,
+      length: 6,
     },
   },
 });
 
 // Save the video
 if (result.video) {
-  const fs = await import('fs/promises');
-  await fs.writeFile('mountain-lake.mp4', Buffer.from(result.video.data, 'base64'));
+  await fs.writeFile('mountain-lake.mp4', result.video.data);
 
   console.log('Video generated:');
-  console.log('  Duration:', result.video.duration, 'seconds');
-  console.log('  Resolution:', result.video.resolution);
-  console.log('  Format:', result.video.mimeType);
+  console.log('  Duration:', result.video.metadata?.duration, 'seconds');
+  console.log('  Dimensions:', result.video.metadata?.dimensions);
+  console.log('  Format:', result.video.mediaType);
 }
 ```
 
-The result object includes a `video` property containing the video data as a base64-encoded string, the duration in seconds, the resolution, and the MIME type (typically `video/mp4`).
+The result object includes a `video` property containing the raw video `Buffer`, its `mediaType`, and optional metadata such as duration and pixel dimensions.
 
 > **Note:** Video generation can take 30 seconds to several minutes depending on duration and complexity. Plan your application's UX accordingly -- display a loading state, use background job processing, or notify the user when the video is ready.
 {: .prompt-info }
@@ -132,18 +137,18 @@ const result = await neurolink.generate({
     images: [referenceImage],
   },
   provider: 'vertex',
-  model: 'veo-3.1',
+  model: 'veo-3.1-generate-001',
   output: {
     mode: 'video',
     video: {
-      aspectRatio: '1:1',
-      durationSeconds: 4,
+      aspectRatio: '9:16',
+      length: 4,
     },
   },
 });
 
 if (result.video) {
-  await fs.writeFile('product-rotation.mp4', Buffer.from(result.video.data, 'base64'));
+  await fs.writeFile('product-rotation.mp4', result.video.data);
 }
 ```
 
@@ -156,30 +161,40 @@ This is transformative for e-commerce: take your existing product photography an
 Different platforms and use cases demand different video specifications:
 
 ```typescript
-// Short clip (2-4 seconds) - social media
+const fs = await import('fs/promises');
+const abstractReferenceImage = await fs.readFile('abstract-particles.png');
+const officeReferenceImage = await fs.readFile('office-desk.png');
+
+// Short clip (4 seconds) - social media
 const shortClip = await neurolink.generate({
-  input: { text: 'Colorful abstract particles flowing and merging' },
+  input: {
+    text: 'Colorful abstract particles flowing and merging',
+    images: [abstractReferenceImage],
+  },
   provider: 'vertex',
-  model: 'veo-3.1',
+  model: 'veo-3.1-generate-001',
   output: {
     mode: 'video',
     video: {
       aspectRatio: '9:16',  // Vertical for TikTok/Reels
-      durationSeconds: 3,
+      length: 4,
     },
   },
 });
 
 // Longer clip (6-8 seconds) - product demo
 const demoClip = await neurolink.generate({
-  input: { text: 'Hands typing on a keyboard with code appearing on screen, professional office environment' },
+  input: {
+    text: 'Hands typing on a keyboard with code appearing on screen, professional office environment',
+    images: [officeReferenceImage],
+  },
   provider: 'vertex',
-  model: 'veo-3.1',
+  model: 'veo-3.1-generate-001',
   output: {
     mode: 'video',
     video: {
       aspectRatio: '16:9',
-      durationSeconds: 8,
+      length: 8,
     },
   },
 });
@@ -193,8 +208,9 @@ Choose the right aspect ratio for your target platform:
 |-------------|----------|----------|
 | `16:9` | Landscape | YouTube, websites, presentations |
 | `9:16` | Portrait | TikTok, Instagram Reels, YouTube Shorts |
-| `1:1` | Square | Instagram feed, Twitter/X |
-| `4:3` | Classic | Presentations, legacy displays |
+| `1:1` | Square | Available in the public option type, but not accepted by the current Vertex Veo validator |
+
+For the Vertex Veo path used in this guide, choose `16:9` or `9:16`.
 
 ## Prompt Engineering for Video
 
@@ -217,19 +233,23 @@ Video prompts differ from image prompts in one critical way: they need to descri
 
 ```typescript
 // Good prompt with motion, style, and camera direction
+const fs = await import('fs/promises');
+const cityReferenceImage = await fs.readFile('city-skyline.png');
+
 const result = await neurolink.generate({
   input: {
     text: `Cinematic aerial drone shot slowly descending over a futuristic city at sunset,
     neon lights beginning to glow on skyscrapers, flying cars in the distance,
     warm golden hour lighting transitioning to cool blue twilight, 4K quality`,
+    images: [cityReferenceImage],
   },
   provider: 'vertex',
-  model: 'veo-3.1',
+  model: 'veo-3.1-generate-001',
   output: {
     mode: 'video',
     video: {
       aspectRatio: '16:9',
-      durationSeconds: 6,
+      length: 6,
     },
   },
 });
@@ -237,41 +257,33 @@ const result = await neurolink.generate({
 
 This prompt works well because it specifies: the camera movement (aerial descent), the subject (futuristic city), the timing (sunset transitioning to twilight), the lighting (golden hour to blue), and a quality modifier (4K). Each element gives Veo 3.1 clear guidance on what to generate.
 
-> **Note:** Keep video duration between 3 and 8 seconds for the best quality. Longer durations increase generation time significantly and may produce less coherent motion in the later frames.
+> **Note:** The Vertex Veo handler accepts durations of 4, 6, or 8 seconds. Longer supported clips take more time to generate and can make complex motion harder to keep coherent.
 {: .prompt-info }
 
 ## Handling Async Generation
 
-Since video generation is long-running, you need patterns for handling the wait time in your application:
+Video generation is long-running, but NeuroLink handles the provider's polling internally and resolves once the finished video is available:
 
 ```typescript
-// Option 1: Await completion (blocks until done)
-const result = await neurolink.generate({
-  input: { text: 'Animated logo reveal with particle effects' },
-  provider: 'vertex',
-  model: 'veo-3.1',
-  output: {
-    mode: 'video',
-    video: { durationSeconds: 3 },
-  },
-});
-
-// Option 2: Fire and poll (for web applications)
-async function generateVideoAsync(prompt: string): Promise<string> {
-  // Start generation
-  const operation = await neurolink.generate({
-    input: { text: prompt },
+async function generateVideo(
+  prompt: string,
+  referenceImage: Buffer
+): Promise<Buffer> {
+  const result = await neurolink.generate({
+    input: { text: prompt, images: [referenceImage] },
     provider: 'vertex',
-    model: 'veo-3.1',
+    model: 'veo-3.1-generate-001',
     output: {
       mode: 'video',
-      video: { durationSeconds: 5 },
+      video: { length: 6 },
     },
+    timeout: 300000,
   });
 
-  // In a web app, you might store the operation ID and
-  // notify the user via webhook when complete
-  return operation.video?.data ?? '';
+  if (!result.video) {
+    throw new Error('No video generated');
+  }
+  return result.video.data;
 }
 ```
 
@@ -288,19 +300,21 @@ Here is a complete example that combines LLM-powered prompt optimization with pl
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
+import { readFile } from 'fs/promises';
 
 const neurolink = new NeuroLink();
 
 interface VideoRequest {
   topic: string;
+  referenceImage: Buffer;
   platform: 'youtube' | 'tiktok' | 'instagram';
   style: 'cinematic' | 'animated' | 'minimalist';
 }
 
 const platformConfig = {
-  youtube: { aspectRatio: '16:9', duration: 6 },
-  tiktok: { aspectRatio: '9:16', duration: 4 },
-  instagram: { aspectRatio: '1:1', duration: 5 },
+  youtube: { aspectRatio: '16:9' as const, duration: 6 as const },
+  tiktok: { aspectRatio: '9:16' as const, duration: 4 as const },
+  instagram: { aspectRatio: '9:16' as const, duration: 6 as const },
 };
 
 async function generateSocialVideo(request: VideoRequest): Promise<Buffer> {
@@ -316,20 +330,20 @@ Duration: ${config.duration} seconds
 Include camera movements, lighting, and pacing appropriate for the platform.
 Return ONLY the video prompt.` },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     temperature: 0.7,
   });
 
-  // Step 2: Generate the video using generate() with video output mode
+  // Step 2: Generate the video from the supplied reference image
   const videoResult = await neurolink.generate({
-    input: { text: promptResult.content },
+    input: { text: promptResult.content, images: [request.referenceImage] },
     provider: 'vertex',
-    model: 'veo-3.1',
+    model: 'veo-3.1-generate-001',
     output: {
       mode: 'video',
       video: {
         aspectRatio: config.aspectRatio,
-        durationSeconds: config.duration,
+        length: config.duration,
       },
     },
   });
@@ -337,12 +351,13 @@ Return ONLY the video prompt.` },
   if (!videoResult.video?.data) {
     throw new Error('No video generated');
   }
-  return Buffer.from(videoResult.video.data, 'base64');
+  return videoResult.video.data;
 }
 
 // Usage
 const video = await generateSocialVideo({
   topic: 'Launch of our new AI features',
+  referenceImage: await readFile('launch-keyframe.png'),
   platform: 'tiktok',
   style: 'animated',
 });
@@ -365,7 +380,7 @@ flowchart LR
     style CDN fill:#22c55e,stroke:#16a34a,color:#fff
 ```
 
-The two-stage pattern (LLM for prompt optimization, then Veo for generation) produces better videos because GPT-4o understands platform conventions and video composition in ways that improve the raw prompt significantly.
+The two-stage pattern lets the LLM turn a short content brief into a detailed prompt with camera, lighting, and pacing instructions before Veo animates the reference image.
 
 ## Error Handling and Limitations
 
@@ -374,19 +389,20 @@ The two-stage pattern (LLM for prompt optimization, then Veo for generation) pro
 Video generation can exceed default HTTP timeout values. Always set generous timeouts for video operations:
 
 ```typescript
+// videoPrompt and referenceImage are assumed to be defined earlier in your pipeline
 try {
   const result = await neurolink.generate({
-    input: { text: videoPrompt },
+    input: { text: videoPrompt, images: [referenceImage] },
     provider: 'vertex',
-    model: 'veo-3.1',
+    model: 'veo-3.1-generate-001',
     output: {
       mode: 'video',
-      video: { durationSeconds: 8 },
+      video: { length: 8 },
     },
     timeout: 300000, // 5 minutes
   });
-} catch (error) {
-  if (error.message?.includes('timeout')) {
+} catch (error: unknown) {
+  if (error instanceof Error && error.message.includes('timeout')) {
     console.log('Video generation timed out. Try a shorter duration or simpler prompt.');
   }
 }
@@ -398,16 +414,16 @@ Video generation APIs include content safety filters similar to image generation
 
 ### Current Limitations
 
-- **Maximum duration**: Current models handle 3-8 seconds reliably. Longer durations are possible but may produce less coherent motion.
-- **Resolution**: Output resolution is determined by the model and aspect ratio. Full 4K output may not be available for all configurations.
+- **Duration**: The Vertex Veo handler accepts 4, 6, or 8 seconds. Other video providers have their own supported lengths.
+- **Resolution**: The Vertex Veo handler accepts `720p` or `1080p`; 4K is not an available option in this API.
 - **Consistency**: Complex scenes with multiple moving subjects can produce inconsistent motion. Simpler scenes with fewer moving elements produce better results.
-- **Generation time**: Longer durations and higher complexity increase wait times linearly.
+- **Generation time**: Longer durations and higher complexity generally increase wait times.
 
 ### Cost Considerations
 
-Video generation is significantly more expensive than image generation. A single 5-second video clip can cost 10-50x what a single image generation costs. Budget carefully and use these cost management strategies:
+Video generation is typically more expensive than image generation, and provider pricing changes over time. Check current pricing for your chosen provider and use these cost management strategies:
 
-- Generate short clips (3-4 seconds) for social media where brevity is expected
+- Generate 4-second clips for social media where brevity is expected
 - Use LLM prompt optimization to reduce the number of generation attempts
 - Cache generated videos aggressively -- video content is rarely personalized
 - Set per-user or per-project generation limits
@@ -443,7 +459,7 @@ const worker = new Worker('video-generation', async (job) => {
 
 ### Storage and Delivery
 
-Generated videos should be stored in object storage (AWS S3, Google Cloud Storage) and served through a CDN. The base64-encoded video data from the API response is a transfer format, not a storage format -- decode it and store the raw MP4 file.
+Generated videos should be stored in object storage (AWS S3, Google Cloud Storage) and served through a CDN. `result.video.data` is already a raw `Buffer`, so write or upload it directly using `result.video.mediaType` as the content type.
 
 ### Progress Notifications
 

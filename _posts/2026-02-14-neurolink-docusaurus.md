@@ -16,8 +16,8 @@ tags:
   - open-source
 author: neurolink
 description: >-
-  How NeuroLink uses Docusaurus to document a 13-provider AI SDK with 200+
-  exports. API reference generation, versioning, and developer experience.
+  How NeuroLink builds its Docusaurus site from Markdown, keeps separate TypeDoc
+  output current in CI, and prepares searchable documentation snapshots.
 toc: true
 mermaid: true
 pin: false
@@ -26,20 +26,21 @@ image:
   alt: 'NeuroLink + Docusaurus: How We Document an AI SDK'
 ---
 
-We designed NeuroLink's documentation system on Docusaurus to support 13 providers, hundreds of API methods, and a rapidly evolving SDK -- without the docs falling out of sync with the code. This deep dive examines our documentation architecture, the automated generation pipeline that keeps API references current, the versioning strategy for multi-release support, and the trade-offs we made between comprehensive coverage and maintainability.
+We designed NeuroLink's documentation system on Docusaurus to cover its growing provider catalog, thousands of generated API pages, and a rapidly evolving SDK. This deep dive examines the documentation architecture, the TypeDoc drift gate that keeps the generated reference current, the release-snapshot workflow, and the trade-offs between comprehensive coverage and maintainability.
 
 Nobody reads documentation for fun. Developers arrive with a specific goal -- configure a provider, set up streaming, understand a type -- and they need the answer fast. Slow docs, stale examples, or missing API reference entries cost you users. Good documentation is the difference between "I adopted this SDK" and "I moved on after 10 minutes."
 
-NeuroLink uses Docusaurus for its developer documentation, combined with TypeDoc for automated API reference and custom plugins for interactive examples. This post explains how we set it up, what we learned, and the patterns that keep 200+ exports documented accurately as the SDK evolves.
+NeuroLink uses Docusaurus for its developer documentation, TypeDoc for the generated API reference, and custom plugins for search indexing, new-doc badges, and social-card images. This post explains how those pieces fit together and how CI checks generated output as the SDK evolves.
 
 ```mermaid
 flowchart LR
-    A["TypeScript Source"] -->|"TypeDoc"| B["API Reference MD"]
-    C["Hand-written MDX"] --> D["Docusaurus Build"]
-    B --> D
-    D --> E["Versioned Docs Site"]
-    D -->|"Algolia"| F["Search Index"]
-    G["CI: tsc --noEmit"] -->|"Verify"| C
+    A["TypeScript Source"] -->|"TypeDoc"| B["Generated API Markdown"]
+    B --> H["CI Drift Check"]
+    C["Hand-written Markdown"] -->|"sync-docs"| D["Docusaurus Docs"]
+    D --> E["Docs Site"]
+    D -->|"Build plugin"| F["Local Search Index"]
+    F -->|"Deploy workflow"| G["Algolia Index"]
+    I["CI Build Checks"] --> D
     style A fill:#0f4c75,stroke:#1b262c,color:#fff
     style D fill:#3282b8,stroke:#1b262c,color:#fff
     style E fill:#00b4d8,stroke:#1b262c,color:#fff
@@ -53,9 +54,7 @@ We evaluated several documentation platforms before settling on Docusaurus. The 
 
 ### React-Based Architecture
 
-Docusaurus is built on React, which means you can embed interactive components directly in your documentation pages. For an AI SDK with 13 providers, this is not a luxury -- it is a necessity. A static table of environment variables cannot show you which variables apply to your chosen provider. A React component can.
-
-We built interactive components for provider selection, code playgrounds, and diff viewers. These components live alongside the documentation content and render as part of the page. No iframes, no external widgets, no loading spinners.
+Docusaurus is built on React, which means the site can embed interactive components directly in documentation pages. NeuroLink's docs site includes reusable components such as `CodeTabs`, `ProviderModelsTable`, copy-page controls, and a keyboard-accessible search modal. These live alongside the documentation content and render as part of the site without an iframe.
 
 ### MDX Support
 
@@ -63,34 +62,32 @@ MDX lets you mix Markdown with JSX. Write your tutorial in Markdown for readabil
 
 ```mdx
 ---
-title: Provider Setup
+title: Provider Models
 sidebar_position: 2
 ---
 
-import ProviderSelector from '@site/src/components/ProviderSelector';
+import { ProviderModelsTable } from '@site/src/components/ProviderModelsTable';
 
-Select your AI provider to see configuration instructions:
-
-<ProviderSelector
-  providers={['openai', 'anthropic', 'vertex', 'bedrock', 'ollama']}
-  defaultProvider="openai"
+<ProviderModelsTable
+  models={[
+    {
+      name: 'gpt-5.4',
+      provider: 'openai',
+      contextWindow: 1050000,
+    },
+  ]}
 />
-
-## Environment Variables
-
-Each provider requires specific environment variables.
-The `ProviderSelector` above shows the exact variables needed.
 ```
 
-This pattern lets us maintain a single page for provider setup instead of 13 separate pages. The interactive component adapts the content to the reader's context.
+The component owns the presentation while the page supplies explicit model metadata. That keeps repetitive table markup out of the content without pretending that documentation data updates itself automatically.
 
 ### Built-In Versioning
 
-SDK documentation has a hard requirement that most documentation platforms handle poorly: versioning. When NeuroLink v9 ships, v8 users still need v8 docs. Docusaurus supports versioned documentation natively, with separate URL paths, sidebars, and search indexes for each version.
+SDK documentation needs release snapshots so readers can match docs to the version they run. Docusaurus provides the snapshot mechanism, and NeuroLink has a release workflow that opens a PR containing a `major.minor` documentation version for published `.0` releases. The mechanism is configured, but `docs-site/versions.json` is currently empty, so the site serves only the `current` documentation set today.
 
-### Algolia DocSearch Integration
+### Algolia with a Local Search Fallback
 
-Full-text search across API reference, guides, and blog content is critical for a 200+ export SDK. Docusaurus integrates with Algolia DocSearch, which indexes every page and provides instant search results with category filtering.
+The docs app uses a custom search interface. When Algolia credentials are configured it queries the `neurolink_docs_v1` index; otherwise it loads the generated `/search-index.json` into MiniSearch in the browser. The deploy workflow builds that index and pushes it to Algolia when the required credentials are available.
 
 ### Community Ecosystem
 
@@ -104,45 +101,44 @@ The documentation site follows a deliberate structure that separates concerns.
 
 ```mermaid
 flowchart TD
-    A["docs.neurolink.dev"] --> B["Guides"]
-    A --> C["API Reference"]
-    A --> D["Blog"]
-    B --> E["Getting Started"]
-    B --> F["Provider Guides"]
-    B --> G["RAG Pipeline"]
-    B --> H["MCP Integration"]
-    C --> I["Core API"]
-    C --> J["Provider API"]
-    C --> K["Types"]
-    D --> L["Release Notes"]
-    D --> M["Engineering Blog"]
+    A["docs.neurolink.ink"] --> B["Getting Started"]
+    A --> C["SDK and CLI"]
+    A --> D["Features"]
+    A --> E["MCP"]
+    A --> F["Reference"]
+    B --> G["Provider Guides"]
+    D --> H["Input, Output, Generation"]
+    F --> I["Generated API Pages"]
     style A fill:#0f4c75,stroke:#1b262c,color:#fff
     style B fill:#3282b8,stroke:#1b262c,color:#fff
     style C fill:#3282b8,stroke:#1b262c,color:#fff
     style D fill:#3282b8,stroke:#1b262c,color:#fff
 ```
 
+_(Simplified illustration of the site's information architecture — see `sidebars.ts` for the full top-level category list.)_
+
 ### Directory Layout
 
-The file system mirrors the information architecture:
+The file system mirrors the build pipeline:
 
-- **`/docs/`** -- Guides and tutorials, hand-written in MDX. These are narrative, opinionated, and walk through complete workflows.
-- **`/docs/api/`** -- Auto-generated API reference from TypeDoc. These are exhaustive, factual, and programmatically updated.
-- **`/docs/providers/`** -- Per-provider setup guides with environment variable tables, authentication instructions, and provider-specific configuration.
-- **`/blog/`** -- Release notes and engineering blog posts. Time-stamped content that does not version with the SDK.
-- **`docusaurus.config.js`** -- Sidebar configuration, navbar structure, Algolia configuration, and plugin setup.
+- **`/docs/`** -- Hand-written Markdown plus generated TypeDoc pages under `/docs/api/`.
+- **`/docs/getting-started/providers/`** -- Per-provider setup guides with authentication and configuration instructions.
+- **`/docs-site/scripts/sync-docs.ts`** -- Transforms the source Markdown into Docusaurus-compatible content and maps legacy paths.
+- **`/docs-site/src/`** -- React components, search hooks, theme overrides, and CSS.
+- **`/docs-site/docusaurus.config.ts`** -- Site, versioning, theme, sitemap, and plugin configuration.
+- **`/docs-site/sidebars.ts`** -- Task-oriented navigation for the generated site.
 
 ### The Key Insight: Separation of Written and Generated Content
 
-Hand-written guides and auto-generated API reference live in separate directory trees. This separation prevents merge conflicts when TypeDoc regenerates the API reference on every CI run. A human editing a tutorial page never conflicts with the automated pipeline updating a type definition page.
+Hand-written guides and auto-generated API reference live in separate subtrees under `/docs/`. This reduces overlap between narrative edits and TypeDoc output. `sync-docs.ts` stages the source tree for the site, while Docusaurus explicitly excludes `**/api/**` from the published build; the generated API pages remain a separately checked documentation artifact.
 
-It also creates clear ownership. Guides are authored and reviewed by humans. API reference is authored by JSDoc annotations in source code and generated by tooling. The update cadence, review process, and quality criteria differ for each.
+It also creates clear ownership. Guides are authored and reviewed by humans. API reference is authored by JSDoc annotations in source code and generated by tooling. CI regenerates `/docs/api/`, formats it, and fails when the checked-in output differs.
 
 ---
 
 ## API Reference from Source Code
 
-The API reference for 200+ exports cannot be maintained by hand. We use a JSDoc-first approach where every exported function, type, and class carries rich annotations that TypeDoc converts into browsable documentation.
+The generated API reference spans thousands of Markdown pages and cannot be maintained by hand. NeuroLink uses a JSDoc-first approach: TypeDoc reads the root entry point, follows public exports, and `typedoc-plugin-markdown` writes the browsable reference under `/docs/api/`.
 
 ### The JSDoc Pattern
 
@@ -153,9 +149,7 @@ Every exported symbol follows a consistent JSDoc template:
  * Quick start factory function for creating AI provider instances.
  *
  * Creates a configured AI provider instance ready for immediate use.
- * Supports all 13 providers: OpenAI, Anthropic, Google AI Studio,
- * Google Vertex, AWS Bedrock, AWS SageMaker, Azure OpenAI, Hugging Face,
- * LiteLLM, Mistral, Ollama, OpenAI Compatible, and OpenRouter.
+ * Resolves a registered provider through NeuroLink's provider factory.
  *
  * @category Factory
  *
@@ -173,7 +167,7 @@ Every exported symbol follows a consistent JSDoc template:
  *
  * @example With custom model
  * ```typescript
- * const provider = await createAIProvider('vertex', 'gemini-3-flash');
+ * const provider = await createAIProvider('vertex', 'gemini-3-flash-preview');
  * ```
  *
  * @see {@link AIProviderFactory.createProvider}
@@ -206,144 +200,105 @@ The key annotations serve specific purposes:
 
 TypeDoc runs on CI to generate Markdown files from TypeScript declarations. The process is straightforward in principle but has nuances for a large SDK.
 
-**The re-export challenge.** NeuroLink's `index.ts` re-exports from 15+ internal modules. TypeDoc must follow the re-export chain to capture all documentation. A naive configuration would only document the re-export statements themselves, not the underlying symbols.
+**The re-export challenge.** NeuroLink's `index.ts` re-exports from many internal modules. TypeDoc must follow that public surface without exposing private or internal symbols.
 
-**The solution.** A custom TypeDoc plugin resolves re-exports and groups by `@category` tag. The plugin walks the re-export chain, finds the original declaration, extracts the JSDoc, and generates a documentation page at the re-exported path. The result is that `createAIProvider` documented in `src/lib/index.ts` appears under the "Factory" category in the API reference, with all examples, parameters, and cross-references intact.
+**The solution.** `typedoc.json` sets `src/lib/index.ts` as the single entry point, loads `typedoc-plugin-markdown`, excludes private and internal symbols, and enables category grouping. CI runs `pnpm run docs:api`, formats `/docs/api/`, and checks `git status` so newly added, removed, or changed generated pages all count as drift.
 
 > **Note:** Treating JSDoc as a first-class deliverable -- not an afterthought -- pays dividends. When every exported symbol has complete JSDoc, the API reference is always up to date because it is generated from the same source code that ships to users.
 {: .prompt-info }
 
 ---
 
-## The Interactive Provider Selector
+## The Search Component
 
-Static documentation struggles with multi-provider SDKs. A page that lists environment variables for all 13 providers is overwhelming. A page that shows only the variables for your chosen provider is useful.
+A large documentation site needs one consistent search experience even when its hosted search service is unavailable. NeuroLink solves that in the Docusaurus theme rather than in individual pages.
 
 ### How It Works
 
-The provider selector is a custom React component embedded in MDX pages. When a user selects a provider:
+The custom navbar search component follows two paths:
 
-1. The component reads provider metadata from `ProviderFactory.getAvailableProviders()`.
-2. It filters the environment variable table to show only the selected provider's variables.
-3. It renders a working code example with the selected provider pre-filled.
-4. It provides a copy button for the configuration block.
+1. `useAlgoliaSearch` initializes an Algolia client when an application ID and search API key are configured.
+2. `useLocalSearch` fetches `/search-index.json` and loads it into MiniSearch as the fallback.
+3. The shared modal renders results from either path and supports `Cmd/Ctrl+K` and `/` keyboard shortcuts.
+4. A build plugin walks the generated docs, strips Markdown for indexing, and emits stable record IDs based on each URL.
 
-The component is powered by the `AIProviderName` enum and provider metadata that already exists in the SDK. No duplicate data. When a new provider is added to the SDK, it automatically appears in the documentation selector because the selector reads from the same source of truth.
+The deployment workflow can then publish the same generated records to the `neurolink_docs_v1` Algolia index. Search remains usable without Algolia because the local index ships with the site.
 
 ### Why This Matters
 
-Interactive documentation reduces time-to-first-success. A developer evaluating NeuroLink can select their cloud provider, see the exact environment variables they need, copy the configuration, and have a working example in under two minutes. Static documentation would require scrolling past twelve irrelevant provider configurations to find the one that matters.
+The fallback makes search a property of the built documentation, not a dependency on one hosted service. A failed or unconfigured Algolia integration does not remove search from the site; it changes which index the same interface queries.
 
 ---
 
 ## Versioning Strategy
 
-SDK versioning creates a documentation challenge that most frameworks handle poorly. When v9 introduces breaking changes, v8 users cannot be left with broken documentation.
+SDK versioning creates a documentation challenge: readers need docs that match the package they installed, while authors need a current set that keeps moving.
 
-### Major Version Documentation
+### Current State
 
-Each major version -- v7.x, v8.x, v9.x -- has its own versioned documentation set. The URL structure reflects this:
+The production URL is `https://docs.neurolink.ink`, with current documentation under `/docs/`. Docusaurus versioning is configured, but `docs-site/versions.json` is currently empty. That means the version menu has no historical snapshot to serve yet; claiming v7, v8, or v9 routes would be inaccurate.
 
-- `docs.neurolink.dev/docs/` -- Current (latest) version
-- `docs.neurolink.dev/docs/8.x/` -- v8 documentation
-- `docs.neurolink.dev/docs/7.x/` -- v7 documentation
+### Release Snapshot Workflow
 
-Docusaurus manages the version snapshots. When we cut a new major version, the current docs are frozen into a versioned directory, and the main docs path begins tracking the new version.
+A dedicated GitHub Actions workflow runs when a release ending in `.0` is published. It:
 
-### Migration Guides
+1. Syncs the source documentation into the Docusaurus site.
+2. Converts the release tag to a `major.minor` documentation version.
+3. Runs `docusaurus docs:version` when that version is not already listed.
+4. Opens a PR containing the versioned docs, sidebar, and updated `versions.json`.
 
-Each major version includes a dedicated migration page listing every breaking change with before/after code examples. Migration guides are the most-read pages in versioned documentation because they answer the question every upgrading user has: "what do I need to change?"
+The PR step is intentional: a release event prepares the snapshot, but a maintainer still reviews and merges the generated documentation before it becomes part of the deployed site.
 
-### Deprecation Notices
+### Migration and Deprecation Guidance
 
-Older documentation pages include inline admonitions pointing to the new API. When a v8 user reads a deprecated function's documentation, they see a notice like:
+Migration guides and deprecation notices remain hand-written content. The generated API reference can carry JSDoc `@deprecated` metadata, while narrative guides explain the replacement and any behavior changes. Keeping those roles separate lets tooling report the fact of deprecation and humans explain the upgrade path.
 
-> **Note:** This function is deprecated in v9. Use `createAIProvider()` instead. See the [v9 Migration Guide](https://docs.neurolink.ink/docs/migration/v9/) for details.
-{: .prompt-info }
+### Deployment
 
-These notices are added manually during the deprecation process and are part of the deprecation checklist in the contributing guide.
-
-### Automated Deployment
-
-CI deploys versioned docs on release tag push. When a `v9.0.0` tag is pushed, the pipeline:
-
-1. Freezes the current docs into `docs/8.x/`.
-2. Generates fresh API reference from the tagged source.
-3. Builds and deploys the full documentation site.
-4. Updates the Algolia search index.
-
-No manual steps. No opportunity for documentation to drift from the released code.
+The documentation deploy workflow runs on changes to `/docs/` or `/docs-site/` on `main` and `release`, or by manual dispatch. It syncs content, builds the Docusaurus site, uploads the GitHub Pages artifact, and pushes the generated search records to Algolia only when its credentials are configured.
 
 ---
 
-## Code Example Validation
+## Documentation Validation
 
-Documentation rot is the silent killer of developer trust. An example that worked with v8.2 but breaks with v8.5 erodes confidence in the entire documentation set.
+Documentation rot is the silent killer of developer trust. A stale API page or broken link makes readers question every other example on the site.
 
-### The Problem
+### The Checks That Exist
 
-Code examples in documentation are not compiled or type-checked by default. They are strings in Markdown files. When the SDK API changes -- a parameter is renamed, a return type changes, a function is moved -- the examples silently become incorrect.
+NeuroLink uses complementary CI checks rather than a single "docs passed" signal:
 
-Incorrect examples are worse than missing examples because they waste the developer's time. They copy the example, run it, get an error, and then wonder whether the SDK is broken or their setup is wrong.
+1. **API reference drift:** the main CI job runs TypeDoc, formats `/docs/api/`, and fails if `git status` shows generated changes.
+2. **Site validation:** the documentation PR workflow runs `sync-docs`, validates front matter, type-checks the Docusaurus application, and performs a production build.
+3. **Broken links and anchors:** `docusaurus.config.ts` treats these as build errors in production.
+4. **Search artifact drift:** a path-filtered workflow rebuilds the site and fails if the committed `docs-site/static/search-index.json` changed.
 
-### The Solution: Compile-Time Verification
+### The Boundary
 
-A CI step extracts code blocks from MDX files and type-checks them against the current SDK build.
+These checks validate generated API output, site code, front matter, links, and the search index. They do **not** extract and compile every TypeScript fence in prose. A code sample still needs review against the current public exports and types; the build alone is not proof that the snippet compiles.
 
-```typescript
-// scripts/verify-docs-examples.ts
-import { glob } from 'glob';
-import { readFile } from 'fs/promises';
-
-const mdxFiles = await glob('docs/**/*.mdx');
-
-for (const file of mdxFiles) {
-  const content = await readFile(file, 'utf-8');
-  const codeBlocks = content.match(/```typescript\n\/\/ @verify\n([\s\S]*?)```/g);
-
-  if (codeBlocks) {
-    for (const block of codeBlocks) {
-      // Extract code, write to temp file, run tsc --noEmit
-      const code = block.replace(/```typescript\n\/\/ @verify\n/, '').replace(/```$/, '');
-      // ... type-check the extracted code
-    }
-  }
-}
-```
-
-The `// @verify` pragma is the opt-in mechanism. Not every code example needs verification -- pseudocode, partial snippets, and configuration examples are exempt. But any example that claims to be a working TypeScript snippet gets the `// @verify` tag and is type-checked on every CI run.
-
-### The Result
-
-Zero broken examples in production documentation. When a developer copies a verified example, it compiles. When an API change breaks an example, CI catches it before the documentation is deployed.
-
-The verification script runs in under 30 seconds because it only type-checks the extracted snippets, not the entire documentation build. The cost of correctness is minimal.
-
-> **Note:** If you maintain SDK documentation with code examples, type-check them in CI. The cost is 30 seconds of CI time. The benefit is every example in your documentation actually works.
+> **Note:** Be precise about what a documentation gate measures. A green Docusaurus build catches structural failures, but code examples need their own source-level verification.
 {: .prompt-info }
 
 ---
 
 ## Search and Discovery
 
-For a 200+ export SDK, search is not a feature. It is the primary navigation mechanism.
+For a large guide and reference set, search is not a secondary feature. It is a primary navigation mechanism. The Docusaurus search index intentionally follows the site's exclusions, so the separate `/docs/api/` TypeDoc tree is not indexed as site content.
 
-### Algolia DocSearch
+### One Record Shape, Two Backends
 
-Algolia DocSearch indexes all documentation pages including auto-generated API reference. The search experience is instant -- results appear as you type, with highlighted matches and category labels.
+The build-time plugin emits records with a title, URL, heading hierarchy, and stripped text content. The search UI uses the same shape whether results come from Algolia or the local MiniSearch index.
 
-The search integration supports:
+The integration supports:
 
-- **Full-text search** across guides, API reference, and blog content.
-- **Faceted filtering** by category: Providers, RAG, MCP, Core.
-- **In-page navigation** via auto-generated table of contents from headings.
-- **Provider-specific search**: Searching "bedrock streaming" returns both the Bedrock provider guide and the streaming API reference.
+- **Full-text search** across the pages included in the Docusaurus documentation build.
+- **Highlighted matches** for title, content, and heading hierarchy when Algolia is active.
+- **Prefix and fuzzy matching** in the local MiniSearch fallback.
+- **Keyboard navigation** through the shared search modal.
 
 ### Cross-Linking
 
-Every documentation page is connected to related pages through explicit cross-links. The API reference links to relevant guides. Guides link to the API reference for the functions they use. Blog posts link to both.
-
-This web of links serves two purposes: it helps readers find related content, and it helps the search engine understand the relationships between pages, improving result relevance.
+Guides use explicit cross-links to connect setup, feature, migration, and reference topics. Those links help readers move from an overview to the specific configuration or behavior they need, and the production build fails on broken links or anchors.
 
 ### Discoverability Patterns
 
@@ -351,15 +306,15 @@ We follow three patterns for discoverability:
 
 1. **Task-oriented navigation**: The sidebar is organized by what the user wants to accomplish (Getting Started, Provider Setup, RAG Pipeline) not by the SDK's internal structure (core, factories, providers).
 
-2. **Progressive disclosure**: Overview pages list all options at a glance. Detail pages go deep on one option. A developer scanning the provider overview sees all 13 providers. Clicking one provider takes them to the full setup guide.
+2. **Progressive disclosure**: Overview pages list options at a glance. Detail pages go deep on one option. A developer can scan the provider overview and then open the setup guide for the provider they use.
 
-3. **Contextual examples**: Every API reference entry includes at least one `@example` block. Every guide includes at least one complete, copy-pasteable code snippet. Developers should never have to imagine what the code looks like.
+3. **Contextual examples**: Add complete snippets where readers need to see an API in context, and use JSDoc `@example` blocks on important public symbols. Do not claim universal example coverage unless a gate measures it.
 
 ---
 
 ## Lessons Learned
 
-Documenting a 200+ export AI SDK taught us five lessons about documentation engineering.
+Maintaining a documentation set with thousands of generated API pages reinforced five lessons about documentation engineering.
 
 ### 1. Documentation Is a Product
 
@@ -371,15 +326,15 @@ Machines are better at keeping API reference in sync with source code. Humans ar
 
 ### 3. Verify Everything
 
-If a code example is in your documentation, it should compile against the current SDK. If an environment variable table is in your documentation, it should match the current configuration schema. Verification is cheap. Broken documentation is expensive.
+If a code example claims to be runnable, verify it against the current SDK. If an environment variable table is in your documentation, compare it with the current configuration schema. A site build cannot substitute for those checks. Broken documentation is expensive.
 
 ### 4. Version Early, Version Often
 
-Start versioning documentation from the first major release. Retrofitting versioning onto an existing documentation site is painful and error-prone. Docusaurus makes it easy to set up from the start.
+Configure documentation snapshots before you need the first historical set. Docusaurus supplies the mechanism, but the release trigger, review path, and deployment policy still need explicit automation.
 
-### 5. Interactive Beats Static
+### 5. Build Resilient Interactions
 
-For multi-provider SDKs, interactive documentation is not a nice-to-have. It is a necessity. A provider selector that shows relevant configuration is worth more than a comprehensive table that shows everything at once.
+Interactive documentation should degrade gracefully. NeuroLink's search is useful with Algolia, but it remains available through the local index when hosted search is not configured. The same principle applies to any future provider-aware component: keep the underlying content explicit and accessible.
 
 ---
 

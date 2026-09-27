@@ -172,7 +172,7 @@ NeuroLink supports model aliases like `claude-latest` or `fastest`. The `resolve
 
 ```bash
 # Compare models side by side
-neurolink models compare gpt-4o claude-sonnet-4-5-20250929 gemini-2.5-pro
+neurolink models compare gpt-5.4 claude-sonnet-5 gemini-2.5-pro
 ```
 
 The `compare` subcommand generates a side-by-side comparison table showing context window, pricing, capabilities, and performance characteristics for up to any number of models. Perfect for architecture decision records.

@@ -1,11 +1,12 @@
 ---
 layout: post
-title: "Multimodal Document Processing with NeuroLink"
+title: 'Multimodal Document Processing with NeuroLink'
 date: 2025-10-14 10:00:00 +0530
 categories: [Tutorials, Features]
 tags: [multimodal, pdf, csv, documents, processing]
 author: neurolink
-description: "Learn how to process PDFs, CSVs, images, and text files using NeuroLink's unified multimodal API."
+description: >-
+  Learn how to process PDFs, CSVs, images, and text files using NeuroLink's unified multimodal API.
 image:
   path: /assets/img/posts/multimodal-document-processing/hero.png
   alt: Multimodal Document Processing Tutorial
@@ -18,7 +19,7 @@ You will process PDFs, CSVs, images, and text files through a single TypeScript 
 
 Each document format requires different parsing: PDFs need visual analysis, CSVs need tabular understanding, images need vision capabilities. You will handle all of them through one code path instead of maintaining separate libraries for each format.
 
-> **Note:** Currently supported file types are **PDF, CSV, images, and plain text**. Office document support (.xlsx, .docx, .pptx) is defined in the type system but not yet implemented.
+> **Note:** Supported file types in this tutorial include **PDF, CSV, images, plain text, and modern Office documents (.xlsx, .docx, and .pptx)**. Legacy `.xls`, `.doc`, and `.ppt` files need conversion or dedicated binary-format parsers before use.
 
 ```mermaid
 flowchart LR
@@ -132,11 +133,9 @@ Different formats require different processing strategies:
 | CSV | Text conversion (markdown) | All providers | Data analysis |
 | Images | Native binary (visual) | Vision-capable providers | Screenshots, photos |
 | Text | Direct text input | All providers | Plain text files |
-| Excel* | Planned | - | Multi-sheet data |
-| Word* | Planned | - | Contract analysis |
-| PowerPoint* | Planned | - | Presentation summary |
-
-*Office formats are defined in the type system but not yet implemented.
+| Excel (.xlsx) | Text conversion (per-sheet tables) | All providers | Multi-sheet data |
+| Word (.docx) | Text extraction | All providers | Contract analysis |
+| PowerPoint (.pptx) | Text extraction (slide text) | All providers | Presentation summary |
 
 ---
 
@@ -170,7 +169,7 @@ const result = await ai.generate({
     files: ["quarterly-report.pdf"]
   },
   provider: "vertex",  // PDF-capable provider
-  model: 'gemini-2.0-flash-001',
+  model: 'gemini-2.5-flash',
   maxTokens: 1000
 });
 
@@ -236,7 +235,7 @@ const comparison = await ai.generate({
     files: ["q1-report.pdf", "q2-report.pdf"]
   },
   provider: "vertex",
-  model: 'gemini-2.0-flash-001',
+  model: 'gemini-2.5-flash',
   maxTokens: 2000
 });
 
@@ -356,7 +355,7 @@ const verification = await ai.generate({
     ]
   },
   provider: "vertex",  // Supports both formats
-  model: 'gemini-2.0-flash-001',
+  model: 'gemini-2.5-flash',
 });
 ```
 
@@ -376,13 +375,33 @@ npx @juspay/neurolink generate "Compare datasets" --file q1.csv --file q2.csv
 
 ---
 
-## Part 3: Office Documents (Future Support)
+## Part 3: Office Documents
 
-> **Important:** Office document processing (.xlsx, .docx, .pptx) is defined in the SDK's type system but **not yet implemented**. The file type definitions exist for forward compatibility, but attempting to process these formats will result in an error. Currently supported file types are: **PDF, CSV, images, and plain text**.
->
-> This section describes the planned API design. Check the [NeuroLink changelog](https://github.com/juspay/neurolink/releases) for implementation updates.
+Excel, Word, and PowerPoint files go through the same unified API pattern shown above for PDFs and CSVs -- pass them in the `files` array and NeuroLink's FileDetector routes them automatically.
 
-When Office document support is implemented, you will be able to process Excel, Word, and PowerPoint files using the same unified API pattern shown above for PDFs and CSVs
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+const ai = new NeuroLink();
+
+// Analyze a spreadsheet
+const result = await ai.generate({
+  input: {
+    text: "Summarize the key figures in this spreadsheet",
+    files: ["quarterly-budget.xlsx"]
+  }
+});
+
+console.log(result.content);
+```
+
+Each format is converted to text before it reaches the model, so any provider works -- no vision capability is required:
+
+- **Excel (.xlsx)**: Each worksheet is rendered as a labeled table (sheet name, headers, row count), with the first 20 rows of each sheet included as a sample and a note of how many rows were omitted.
+- **Word (.docx)**: Text is extracted from the document body.
+- **PowerPoint (.pptx)**: Text is extracted from each slide, in slide order.
+
+Default generation receives only the first 20 rows from each worksheet. For questions about omitted rows, precompute the required aggregates or extract the relevant row range before calling the model; prompt wording cannot recover data that was not included.
 
 ---
 
@@ -479,7 +498,7 @@ async function processDocumentSafely(filePath: string, query: string) {
         files: [filePath]
       },
       provider: "vertex",
-      model: 'gemini-2.0-flash-001',
+      model: 'gemini-2.5-flash',
     });
 
     return { success: true, content: result.content };
@@ -636,7 +655,7 @@ function validateDocument(filePath: string): ValidationResult {
   }
 
   // Validate supported extensions (currently implemented)
-  const supportedExtensions = [".pdf", ".csv", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+  const supportedExtensions = [".pdf", ".csv", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".xlsx", ".docx", ".pptx"];
   if (!supportedExtensions.includes(ext)) {
     return { valid: false, error: `Unsupported extension: ${ext}` };
   }
@@ -727,7 +746,7 @@ async function batchProcess(files: string[]) {
               files: [file]
             },
             provider: "vertex",
-            model: 'gemini-2.0-flash-001',
+            model: 'gemini-2.5-flash',
           });
           return { file, success: true, content: result.content };
         } catch (error: any) {
@@ -754,19 +773,19 @@ async function batchProcess(files: string[]) {
 
 Not all providers handle documents equally:
 
-| Provider | Native PDF | Max Size | Max Pages | CSV | Excel* | Word* |
-|----------|------------|----------|-----------|-----|--------|-------|
-| vertex | Yes | 5 MB | 100 | Yes | Planned | Planned |
-| Anthropic | Yes | 5 MB | 100 | Yes | Planned | Planned |
-| google-ai | Yes | 2 GB | 100 | Yes | Planned | Planned |
-| OpenAI | Yes | 10 MB | 100 | Yes | Planned | Planned |
-| Bedrock | Yes | 5 MB | 100 | Yes | Planned | Planned |
-| LiteLLM | Yes | 10 MB | 100 | Yes | Planned | Planned |
-| Azure OpenAI | Yes (via Files API) | 10 MB | 100 | Yes | Planned | Planned |
-| Mistral | No | - | - | Yes | Planned | Planned |
-| Ollama | No | - | - | Yes | Planned | Planned |
+| Provider | Native PDF | Max Size | Max Pages | CSV | Excel | Word |
+|----------|------------|----------|-----------|-----|-------|------|
+| vertex | Yes | 5 MB | 100 | Yes | Yes | Yes |
+| Anthropic | Yes | 5 MB | 100 | Yes | Yes | Yes |
+| google-ai | Yes | 2 GB | 100 | Yes | Yes | Yes |
+| OpenAI | Yes | 10 MB | 100 | Yes | Yes | Yes |
+| Bedrock | Yes | 5 MB | 100 | Yes | Yes | Yes |
+| LiteLLM | Yes | 10 MB | 100 | Yes | Yes | Yes |
+| Azure OpenAI | Yes (via Files API) | 10 MB | 100 | Yes | Yes | Yes |
+| Mistral | No | - | - | Yes | Yes | Yes |
+| Ollama | No | - | - | Yes | Yes | Yes |
 
-*Excel and Word support is defined in the type system but not yet implemented. Mistral and Ollama do not currently support PDF input.
+Excel and Word (like CSV) are converted to text before reaching the model, so every provider supports them regardless of vision capability. Mistral and Ollama do not currently support PDF input.
 
 > **Note:** LiteLLM limits depend on upstream model configuration.
 >
@@ -821,7 +840,7 @@ async function processLargePDF(filePath: string) {
       files: [filePath]
     },
     provider: "vertex",  // Native PDF support with 100 page limit
-    model: 'gemini-2.0-flash-001',
+    model: 'gemini-2.5-flash',
     maxTokens: 4000
   });
 
@@ -841,7 +860,7 @@ async function processMultiPartPDF(pdfParts: string[]) {
         files: [partPath]
       },
       provider: "vertex",
-      model: 'gemini-2.0-flash-001',
+      model: 'gemini-2.5-flash',
     });
     summaries.push(result.content);
   }
@@ -1011,7 +1030,7 @@ You now have everything needed to process any business document with AI. Here's 
 ### Reference Documentation
 
 - **[Full SDK API Reference](https://docs.neurolink.ink/sdk/api-reference/)** - Complete TypeScript API documentation
-- **[Provider Configuration Options](https://docs.neurolink.ink/getting-started/provider-setup/)** - Detailed setup for all 13 supported providers
+- **[Provider Configuration Options](https://docs.neurolink.ink/getting-started/provider-setup/)** - Detailed setup for all supported providers
 - **[CLI Command Reference](https://docs.neurolink.ink/cli/commands/)** - Every CLI command with examples
 
 ### Get Started Now
@@ -1033,9 +1052,9 @@ You built a complete document processing pipeline: PDF analysis with native visi
 
 Continue with these related tutorials:
 
-- Processing Any Document: 50+ File Types for the full `ProcessorRegistry` architecture
+- [Processing Any Document: 50+ File Types]({% post_url 2025-10-16-processing-any-document-50-file-types %}) for the full `ProcessorRegistry` architecture
 - [Enterprise HITL and Guardrails Guide](https://docs.neurolink.ink/features/hitl/) for adding human review to high-stakes documents
-- OpenRouter Integration Guide for accessing 500+ models through a single API
+- [OpenRouter Integration Guide]({% post_url 2025-12-30-openrouter-integration-guide %}) for accessing 500+ models through a single API
 
 ```mermaid
 flowchart LR
@@ -1064,7 +1083,7 @@ flowchart LR
     style I1 fill:#22c55e,stroke:#16a34a,color:#fff
 ```
 
-**One API. Supported Documents. Real Intelligence.**
+**One API. Supported Document Formats. Real Intelligence.**
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Building Multi-Tenant AI SaaS with NeuroLink
+title: 'Building Multi-Tenant AI SaaS with NeuroLink'
 date: '2025-11-22 10:00:00 +0530'
 categories:
   - Deep Dive
@@ -25,9 +25,9 @@ image:
   alt: Building Multi-Tenant AI SaaS with NeuroLink
 ---
 
-We designed NeuroLink's multi-tenant architecture around a constraint that standard AI SDKs do not address: Tenant A needs OpenAI with HIPAA-compliant data handling, Tenant B needs Vertex AI with aggressive cost optimization, and both share the same application code and API surface. Provider credentials, model selection, rate limits, cost attribution, and conversation isolation all vary per tenant.
+A multi-tenant AI architecture has to solve a constraint that a single shared provider configuration does not address: Tenant A may require OpenAI with strict data-handling controls, Tenant B may prefer Vertex AI for cost optimization, and both still share the same application code and API surface. Provider credentials, model selection, rate limits, cost attribution, and conversation isolation can all vary per tenant.
 
-The design decision was to make per-tenant NeuroLink instances the isolation boundary. Each tenant gets its own configured instance with its own provider credentials, model preferences, and conversation memory scope. We chose per-instance isolation over middleware-level routing because it eliminates an entire class of cross-tenant data leakage bugs at the architectural level. The trade-off is memory overhead from multiple instances, which we mitigate through lazy initialization and instance pooling.
+A practical design is to use per-tenant NeuroLink instances as the application-level isolation boundary. Each tenant gets its own configured instance, model preferences, and conversation-memory namespace. This pattern favors explicit boundaries over middleware-only routing; the trade-off is the memory cost of caching multiple instances, which lazy initialization and bounded instance pools can control.
 
 This deep dive covers the full architecture: per-tenant provider instantiation, fallback chains, session isolation, server adapters for multi-tenant APIs, and cost attribution.
 
@@ -75,14 +75,15 @@ graph TB
 
 ## Per-Tenant Provider Instantiation
 
-The foundation of multi-tenant AI is giving each tenant its own NeuroLink instance configured with their specific provider, model, and credentials. This is not a hack or workaround -- it is the intended architecture. Each NeuroLink instance manages its own provider connections, conversation memory, and tool registry independently.
+This design gives each tenant its own NeuroLink instance and selects that tenant's provider, model, and credentials at request time. Pair the per-instance setup with tenant-prefixed conversation memory and explicit request authorization.
 
 Start by defining what a tenant's AI configuration looks like:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
+import type { NeurolinkCredentials } from '@juspay/neurolink';
 
-// Tenant configuration store (from your database)
+// Tenant configuration store; resolve secrets from a secret manager.
 interface TenantAIConfig {
   tenantId: string;
   provider: string;
@@ -90,14 +91,16 @@ interface TenantAIConfig {
   region?: string;
   fallbackProvider?: string;
   maxTokens?: number;
+  credentials?: NeurolinkCredentials;
 }
 
 // Create per-tenant NeuroLink instances
 function createTenantNeuroLink(config: TenantAIConfig): NeuroLink {
   return new NeuroLink({
+    credentials: config.credentials,
     conversationMemory: {
       enabled: true,
-      redis: {
+      redisConfig: {
         url: process.env.REDIS_URL,
         keyPrefix: `tenant:${config.tenantId}:`
       }
@@ -134,7 +137,7 @@ function getTenantInstance(tenantId: string): NeuroLink {
     // Evict oldest entry if cache is full (simple LRU)
     if (tenantInstances.size >= MAX_CACHED_TENANTS) {
       const oldest = tenantInstances.keys().next().value;
-      tenantInstances.delete(oldest);
+      if (oldest !== undefined) tenantInstances.delete(oldest);
     }
     const config = loadTenantConfig(tenantId); // From your database
     tenantInstances.set(tenantId, createTenantNeuroLink(config));
@@ -143,53 +146,34 @@ function getTenantInstance(tenantId: string): NeuroLink {
 }
 ```
 
-For tenants that need automatic provider selection based on their preferences (cost optimization, latency requirements, feature needs), NeuroLink's `AIProviderFactory` provides `createBestProvider()` which evaluates available providers against the tenant's criteria and returns the optimal match.
+When you want environment-driven provider selection rather than a tenant-specific policy, NeuroLink's `AIProviderFactory.createBestProvider()` selects the requested provider when available or discovers a configured provider from the supported credential environment variables.
 
 ## Provider Fallback Chains Per Tenant
 
-Each tenant can define their own fallback chain. Tenant A might primary on OpenAI with Bedrock as fallback (for HIPAA reasons, both are compliant). Tenant B might primary on Vertex AI with OpenAI as fallback (optimizing for cost with quality backup).
-
-NeuroLink's `AIProviderFactory` supports this directly:
+Each tenant can define its own fallback policy. Tenant A might use OpenAI first and Bedrock second, while Tenant B might use Vertex AI first and OpenAI as a backup. This extends the `createTenantNeuroLink` helper above with a `providerFallback` callback; configure it when you construct the tenant's NeuroLink instance:
 
 ```typescript
-// From src/lib/core/factory.ts - Provider fallback pattern
-// NeuroLink supports per-tenant fallback chains
-static async createProviderWithFallback(
-  primaryProvider: string,
-  fallbackProvider: string,
-  modelName?: string | null,
-  enableMCP: boolean = true,
-): Promise<ProviderPairResult<AIProvider>> {
-  const primary = await this.createProvider(primaryProvider, modelName, enableMCP);
-  const fallback = await this.createProvider(fallbackProvider, modelName, enableMCP);
-  return { primary, fallback };
+function createTenantNeuroLinkWithFallback(config: TenantAIConfig): NeuroLink {
+  return new NeuroLink({
+    credentials: config.credentials,
+    conversationMemory: {
+      enabled: true,
+      redisConfig: {
+        url: process.env.REDIS_URL,
+        keyPrefix: `tenant:${config.tenantId}:`,
+      },
+    },
+    providerFallback: async (error: unknown) => {
+      reportProviderFailure(config.tenantId, error);
+      return config.fallbackProvider
+        ? { provider: config.fallbackProvider }
+        : null;
+    },
+  });
 }
 ```
 
-In your multi-tenant setup, you configure fallbacks per tenant:
-
-```typescript
-async function createTenantProviders(config: TenantAIConfig) {
-  if (config.fallbackProvider) {
-    // Tenant has a fallback preference
-    const { primary, fallback } = await AIProviderFactory.createProviderWithFallback(
-      config.provider,
-      config.fallbackProvider,
-      config.model,
-    );
-    return { primary, fallback };
-  }
-
-  // Single provider tenant
-  const provider = await AIProviderFactory.createProvider(
-    config.provider,
-    config.model,
-  );
-  return { primary: provider, fallback: null };
-}
-```
-
-The circuit breaker pattern works per provider per tenant. If Tenant A's OpenAI connection starts failing, the circuit breaker trips for Tenant A's OpenAI usage only. Tenant B's OpenAI connection (if they use it) is unaffected. This isolation prevents one tenant's provider issues from cascading to others.
+`providerFallback` receives the original error and returns the next `{ provider, model }` to try, or `null` to let the error propagate. Because the callback closes over one tenant's configuration, routing policy remains tenant-specific. `providerFallback` is consulted on the first qualifying failure -- any error except one caused by the caller's own AbortSignal firing.
 
 Retry logic via the `withRetry()` utility adds another layer of resilience. Configure retries per tenant based on their latency tolerance:
 
@@ -207,8 +191,8 @@ async function resilientGenerate(tenantId: string, prompt: string) {
       model: config.model,
     }),
     {
-      maxAttempts: config.maxRetries || 3,
-      initialDelay: 1000,
+      maxRetries: config.maxRetries || 3,
+      baseDelayMs: 1000,
     }
   );
 }
@@ -218,32 +202,33 @@ async function resilientGenerate(tenantId: string, prompt: string) {
 
 Conversation memory in a multi-tenant system requires strict isolation at two levels: tenant isolation (Tenant A cannot see Tenant B's conversations) and session isolation (User 1 within Tenant A cannot see User 2's sessions).
 
-NeuroLink achieves this through session context scoping on the provider level:
+NeuroLink achieves this through session context scoping under the hood -- internally, each provider carries a `setSessionContext(sessionId, userId)` method that scopes tool state to the caller. At the public API level, you reach the same isolation by passing tenant-prefixed identifiers through `context` on `generate()`:
 
 ```typescript
-// From src/lib/core/baseProvider.ts - Session context isolation
-public setSessionContext(sessionId?: string, userId?: string): void {
-  this.sessionId = sessionId;
-  this.userId = userId;
-  this.toolsManager.setSessionContext(sessionId, userId);
-}
-
 // In multi-tenant context
-async function handleRequest(tenantId: string, sessionId: string, prompt: string) {
+async function handleRequest(
+  tenantId: string,
+  sessionId: string,
+  userId: string,
+  prompt: string,
+) {
   const neurolink = getTenantInstance(tenantId);
-  const provider = await neurolink.createProvider(tenantConfig.provider);
+  const tenantConfig = loadTenantConfig(tenantId);
 
-  // Scope session to tenant
-  provider.setSessionContext(
-    `${tenantId}:${sessionId}`,
-    `${tenantId}:${userId}`
-  );
-
-  return await provider.generate({ prompt });
+  // Scope session and user identifiers to the tenant
+  return await neurolink.generate({
+    input: { text: prompt },
+    provider: tenantConfig.provider,
+    model: tenantConfig.model,
+    context: {
+      sessionId: `${tenantId}:${sessionId}`,
+      userId: `${tenantId}:${userId}`,
+    },
+  });
 }
 ```
 
-By prefixing session IDs with the tenant ID, you create a natural namespace that guarantees isolation. The tool execution context is also scoped per session, so tool state (in-progress operations, cached results) never leaks between tenants or users.
+Prefixing session and user IDs with the tenant ID creates a natural namespace. Treat that namespace as defense in depth: authorize each request before generation and test that session-scoped tool state cannot cross tenant or user boundaries.
 
 For HITL (Human-in-the-Loop) workflows, the HITLManager supports tenant-specific approval flows. A healthcare tenant might require approval for any action that accesses patient data, while a marketing tenant might only require approval for content publication:
 
@@ -258,7 +243,7 @@ const neurolink = new NeuroLink({
 });
 ```
 
-> **Note:** Always prefix Redis keys and session IDs with the tenant identifier. This is the simplest and most reliable isolation mechanism for shared infrastructure.
+> **Note:** Prefix Redis keys and session IDs with the tenant identifier, and pair that namespace with request authorization and tenant-scoped credentials. Prefixes alone are not a security boundary.
 {: .prompt-info }
 
 ## Server Adapter for Multi-Tenant APIs
@@ -268,20 +253,30 @@ When you need to expose your multi-tenant AI as an API (rather than embedding Ne
 The `BaseServerAdapter` creates a `ServerContext` for each request that includes the NeuroLink reference, tool registry, and request metadata:
 
 ```typescript
-// From src/lib/server/abstract/baseServerAdapter.ts
+// Simplified from src/lib/server/abstract/baseServerAdapter.ts
 protected createContext(options: {
   requestId: string;
   method: string;
   path: string;
   headers: Record<string, string>;
+  query?: Record<string, string>;
+  params?: Record<string, string>;
   body?: unknown;
 }): ServerContext {
   return {
     requestId: options.requestId,
+    method: options.method,
+    path: options.path,
+    headers: options.headers,
+    query: options.query ?? {},
+    params: options.params ?? {},
+    body: options.body,
     neurolink: this.neurolink,
     toolRegistry: this.toolRegistry,
+    externalServerManager: this.externalServerManager,
     timestamp: Date.now(),
     metadata: {},
+    redaction: this.redactionConfig,
   };
 }
 ```
@@ -303,7 +298,7 @@ const server = await ServerAdapterFactory.create({
       enabled: true,
       windowMs: 60000,
       maxRequests: 100,
-      keyGenerator: (req) => extractTenantId(req), // Per-tenant rate limits
+      keyGenerator: (ctx) => extractTenantId(ctx), // Per-tenant rate limits
     },
   },
 });
@@ -327,8 +322,11 @@ const result = await neurolink.generate({
 });
 
 // Access usage data for billing
-const usage = result.usage;
-console.log(`Tokens - Input: ${usage.input}, Output: ${usage.output}, Total: ${usage.total}`);
+if (result.usage) {
+  console.log(
+    `Tokens - Input: ${result.usage.input}, Output: ${result.usage.output}, Total: ${result.usage.total}`,
+  );
+}
 ```
 
 For per-tenant observability, the Langfuse integration supports scoped tracing. Each tenant's AI operations appear in their own trace group, making it straightforward to debug issues and analyze performance per tenant:
@@ -338,11 +336,11 @@ For per-tenant observability, the Langfuse integration supports scoped tracing. 
 const neurolink = new NeuroLink({
   conversationMemory: { enabled: true },
   observability: {
-    tracing: true,
     langfuse: {
+      enabled: true,
       publicKey: process.env.LANGFUSE_PUBLIC_KEY,
       secretKey: process.env.LANGFUSE_SECRET_KEY,
-      tags: [`tenant:${tenantId}`], // Tag traces by tenant
+      userId: `tenant:${tenantId}`, // Attach traces to the tenant
     },
   },
 });
@@ -351,6 +349,8 @@ const neurolink = new NeuroLink({
 Build a cost attribution pipeline that aggregates token usage by tenant:
 
 ```typescript
+import type { GenerateResult } from '@juspay/neurolink';
+
 interface TenantUsageRecord {
   tenantId: string;
   provider: string;
@@ -363,17 +363,20 @@ interface TenantUsageRecord {
 }
 
 async function trackUsage(tenantId: string, result: GenerateResult) {
-  const usage = result.usage;
-  const costPerToken = getCostPerToken(result.provider, result.model);
+  if (!result.usage || !result.provider || !result.model) return;
 
+  const costPerToken = getCostPerToken(result.provider, result.model);
   const record: TenantUsageRecord = {
     tenantId,
     provider: result.provider,
     model: result.model,
-    inputTokens: usage.input,
-    outputTokens: usage.output,
-    total: usage.total,
-    estimatedCost: (usage.input * costPerToken.input + usage.output * costPerToken.output) / 1_000_000,
+    inputTokens: result.usage.input,
+    outputTokens: result.usage.output,
+    total: result.usage.total,
+    estimatedCost:
+      (result.usage.input * costPerToken.input +
+        result.usage.output * costPerToken.output) /
+      1_000_000,
     timestamp: new Date(),
   };
 
@@ -383,7 +386,7 @@ async function trackUsage(tenantId: string, result: GenerateResult) {
 
 This usage data feeds into your billing system, enabling usage-based pricing, cost alerts, and tenant-level budgets.
 
-> **Note:** Token costs vary significantly between providers and models. A tenant using Claude Opus will cost roughly 10x more per token than one using Gemini Flash. Per-tenant cost tracking is essential for sustainable SaaS economics.
+> **Note:** Token prices vary by provider, model, token direction, and date. Calculate tenant costs from measured usage and your providers' current pricing rather than embedding a fixed model-to-model ratio.
 {: .prompt-warning }
 
 ## Putting It All Together
@@ -406,12 +409,13 @@ function getTenantNeuroLink(tenant: TenantAIConfig): NeuroLink {
     // Evict oldest entry if cache is full (simple LRU)
     if (tenantInstances.size >= MAX_CACHED_TENANTS) {
       const oldest = tenantInstances.keys().next().value;
-      tenantInstances.delete(oldest);
+      if (oldest !== undefined) tenantInstances.delete(oldest);
     }
     tenantInstances.set(tenant.tenantId, new NeuroLink({
+      credentials: tenant.credentials,
       conversationMemory: {
         enabled: true,
-        redis: {
+        redisConfig: {
           url: process.env.REDIS_URL,
           keyPrefix: `tenant:${tenant.tenantId}:`
         }
@@ -442,11 +446,11 @@ async function handleAIRequest(req: Request) {
 
 ## Design Decisions and Trade-offs
 
-We chose per-tenant NeuroLink instances over a shared instance with tenant context because isolation failures in multi-tenant AI have catastrophic consequences -- one tenant's conversation leaking into another's response is a trust-destroying event. Per-tenant instances consume more memory (each instance holds its own provider connections and configuration), but the isolation guarantee is absolute rather than probabilistic.
+Per-tenant NeuroLink instances make configuration boundaries explicit, while a shared instance with tenant context uses less memory. The per-tenant pattern does not replace authorization checks, secret isolation, or tests that prove one tenant cannot access another tenant's conversations.
 
-Redis key prefixing (`tenant:{id}:`) for conversation memory trades storage efficiency for simplicity. A shared key space with tenant metadata columns would be more storage-efficient, but prefix-based isolation means a misconfigured query can never return another tenant's data. The blast radius of a bug is limited to a single tenant.
+Redis key prefixing (`tenant:{id}:`) provides a simple conversation-memory namespace. Treat the prefix as defense in depth rather than a complete security boundary: validate tenant ownership on every request and keep provider credentials in a tenant-scoped secret store.
 
-The server adapter approach -- one HTTP endpoint, tenant resolution via middleware -- trades deployment simplicity for operational complexity. A per-tenant deployment model would provide stronger isolation but would not scale beyond a few dozen tenants. The middleware approach scales from two tenants to two thousand without fundamental architectural changes, which is the right trade-off for a SaaS platform.
+A server adapter with one HTTP endpoint and tenant resolution middleware simplifies deployment, but it concentrates authorization and rate-limit enforcement in the request path. If stronger infrastructure isolation is required, use separate deployments or accounts for those tenants rather than relying only on application-level namespaces.
 
 ---
 

@@ -28,20 +28,23 @@ The provider layer was a liability. Thirteen SDKs, thirteen authentication flows
 
 We decomposed it. NeuroLink supports 13 providers -- OpenAI, Anthropic, Google AI Studio, Google Vertex, AWS Bedrock, Azure OpenAI, Mistral, Ollama, LiteLLM, HuggingFace, OpenRouter, OpenAI-Compatible, and Amazon SageMaker -- behind a single `generate()` and `stream()` interface. From your application code, they all look identical.
 
-The constraint that shaped the architecture: **adding a new provider must not require changing any existing code.** Not a single line. No growing switch statements, no conditional imports, no feature flag checks. The right abstraction is not a wrapper -- it is a contract. This post traces how we built that contract.
+The constraint that shaped the architecture: **adding a provider must not require changing the factory's routing algorithm.** Built-in providers still add an enum or catalog entry and a registration call, but there is no growing switch statement, conditional import chain, or feature-flag branch to rewrite. The right abstraction is not a wrapper -- it is a contract. This post traces how we built that contract.
 
-## The AIProvider Interface Contract
+## The Public AIProvider Contract
 
-Everything starts with the `AIProvider` interface. This is the contract that every provider must honor. It defines the methods that consumers (your application code) can call, and the return types they can expect.
+Everything starts with the public `AIProvider` type. This is the contract consumers call, and it is broader than the protected hooks a provider subclass implements.
 
-The key methods are:
+Its required public methods are:
 
-- **`generate()`** -- Non-streaming text generation, returns an `EnhancedGenerateResult`
-- **`stream()`** -- Streaming generation, returns an async generator yielding `{ content: string }` chunks
-- **`embed()`** -- Generate embeddings for text input
-- **`generateText()`** -- Backward-compatible alias for `generate()`
+- **`generate()`** and **`gen()`** -- Non-streaming text generation returning an `EnhancedGenerateResult`
+- **`stream()`** -- Streaming generation returning normalized content chunks
+- **`embed()`** and **`embedMany()`** -- Single and batch embedding operations
+- **`setupToolExecutor()`** -- Connects the provider to NeuroLink's tool executor
+- **`setTraceContext()`** -- Propagates tracing context across provider calls
 
-The critical design decision was the return types. Every provider returns the same `EnhancedGenerateResult` from `generate()`, regardless of whether the underlying model is GPT-4o, Claude 3.5 Sonnet, or a custom Llama on SageMaker. This means consumer code never needs to handle provider-specific response formats.
+The base class also keeps `generateText()` as a backward-compatibility method, but it is not part of the public `AIProvider` type. Optional capabilities such as `decide()`, file-root policy, tool-support checks, and runtime model-limit discovery extend the contract where relevant.
+
+The critical design decision was the return types. Every provider returns the same `EnhancedGenerateResult` from `generate()`, regardless of whether the underlying model is GPT-5.4, Claude Sonnet 5, or a custom Llama on SageMaker. This means consumer code never needs to handle provider-specific response formats.
 
 For streaming, we made another deliberate choice: the stream yields `{ content: string }` objects via an `AsyncGenerator`. This is simpler than exposing provider-specific stream types (like OpenAI's delta events or Anthropic's content blocks). The normalization happens inside the provider, not in your code.
 
@@ -53,19 +56,24 @@ export abstract class BaseProvider implements AIProvider {
   protected readonly defaultTimeout: number = 30000;
 
   // Abstract methods every provider MUST implement
-  protected abstract executeStream(
-    options: StreamOptions,
-    analysisSchema?: ValidationSchema,
-  ): Promise<StreamResult>;
-
   protected abstract getProviderName(): AIProviderName;
   protected abstract getDefaultModel(): string;
-  protected abstract getAISDKModel(): LanguageModelV1 | Promise<LanguageModelV1>;
-  protected abstract handleProviderError(error: unknown): Error;
+  protected abstract getAISDKModel(): LanguageModel | Promise<LanguageModel>;
+  protected abstract formatProviderError(error: unknown): Error;
+
+  // Streaming has a default implementation that delegates to an optional
+  // doStream() hook -- override executeStream() directly only if you need
+  // full control over the streaming loop.
+  protected async executeStream(
+    options: StreamOptions,
+    analysisSchema?: ValidationSchema,
+  ): Promise<StreamResult> {
+    /* default implementation */
+  }
 }
 ```
 
-Five abstract methods. That is the entire contract a new provider must fulfill. Everything else -- message building, timeout handling, tool management, telemetry, analytics -- is inherited from `BaseProvider`.
+These four protected abstract methods are the required `BaseProvider` subclass hooks, not the complete public `AIProvider` interface. A subclass may also override streaming behavior when it needs provider-specific control. Everything else -- including the public interface methods, message building, timeout handling, tool management, telemetry, and analytics -- is inherited from `BaseProvider`.
 
 ![Provider Abstraction Layer](/assets/img/posts/provider-abstraction/provider-abstraction-layer.gif)
 
@@ -156,6 +164,8 @@ export enum AIProviderName {
 }
 ```
 
+*(The provider roster has grown substantially since this post was written -- see the [Provider Comparison Matrix](/posts/provider-comparison-matrix/) for the current full list. The registration pattern below is unchanged: every new provider, then and now, is added the same way.)*
+
 This enum is not just a label -- it drives three critical systems:
 
 ### 1. Provider Registration
@@ -168,13 +178,13 @@ User input strings like `"google-ai"`, `"Google AI"`, `"GOOGLE_AI"`, or `"google
 
 ### 3. Environment Variable Resolution
 
-Each enum value maps to a set of expected environment variables. The resolution chain is: explicit parameter > env var > registry default. For example, model resolution for OpenAI checks `options.model` first, then `OPENAI_MODEL` env var, then falls back to `gpt-4o`.
+Each enum value maps to provider configuration and a registry default. For OpenAI, an explicit model wins; otherwise factory-created providers use the registry's legacy `gpt-4o-mini` default. The provider class also reads `OPENAI_MODEL` when it is constructed without a model and otherwise uses its own legacy `gpt-4o` default. Those legacy defaults document the current implementation rather than a current model recommendation; new explicit configurations should use a current in-catalog model such as `gpt-5.4-mini` for the balanced tier.
 
 The `AUTO` value is special -- it triggers `createBestAIProvider()`, which scans environment variables for available API keys and selects the best configured provider automatically.
 
 ## Adding a New Provider in 4 Steps
 
-This is the ultimate test of an abstraction: how easy is it to extend? Adding a new provider to NeuroLink requires exactly four steps, none of which modify existing code.
+This is the ultimate test of an abstraction: how easy is it to extend? Adding a built-in provider requires four focused steps. The provider class is new, while the enum or catalog and registration list receive additive entries; the factory's routing logic does not change.
 
 ### Step 1: Create the Provider Class
 
@@ -192,7 +202,7 @@ export class MyProvider extends BaseProvider {
     return "my-default-model";
   }
 
-  protected getAISDKModel(): LanguageModelV1 {
+  protected getAISDKModel(): LanguageModel {
     // Create and return the Vercel AI SDK model instance
     return createMySDK({ apiKey: process.env.MY_API_KEY });
   }
@@ -204,7 +214,7 @@ export class MyProvider extends BaseProvider {
     return result;
   }
 
-  protected handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     // Classify provider-specific errors
     if (error.message?.includes("invalid_api_key")) {
       return new AuthenticationError("Check MY_API_KEY");
@@ -214,31 +224,33 @@ export class MyProvider extends BaseProvider {
 }
 ```
 
-### Step 2: Implement the Abstract Methods
+### Step 2: Implement the BaseProvider Hooks
 
-You need to implement five methods:
+A `BaseProvider` subclass implements four required protected methods, with optional streaming overrides:
 
 - `getProviderName()` -- returns the enum value
 - `getDefaultModel()` -- returns the default model identifier
 - `getAISDKModel()` -- creates and returns the AI SDK model instance (can be async for providers like OpenAI-Compatible that do auto-discovery)
-- `executeStream()` -- implements the provider-specific streaming logic
-- `handleProviderError()` -- classifies errors into NeuroLink's error hierarchy
+- `formatProviderError()` -- classifies errors into NeuroLink's error hierarchy
+- `executeStream()` -- implements the provider-specific streaming logic (optional to override directly; `BaseProvider` provides a default that delegates to an optional `doStream()` hook)
 
 Everything else -- message building, tool management, telemetry, timeout handling -- is inherited from `BaseProvider`.
 
 ### Step 3: Register in the Provider Registry
 
 ```typescript
-// In ProviderRegistry.registerAllProviders()
-ProviderRegistry.register(
+// In ProviderRegistry's registration list
+ProviderFactory.registerProvider(
   AIProviderName.MY_PROVIDER,
   (modelName) => new MyProvider(modelName),
+  "my-default-model",
+  ["my-alias"],
 );
 ```
 
-### Step 4: Add the Enum Value (Optional)
+### Step 4: Add the Enum or Catalog Entry
 
-For type safety, add the new provider to the `AIProviderName` enum:
+For a built-in provider, add the new provider to the `AIProviderName` enum and its descriptor/catalog metadata:
 
 ```typescript
 export enum AIProviderName {
@@ -247,13 +259,13 @@ export enum AIProviderName {
 }
 ```
 
-This step is optional -- the dynamic provider system can register providers without enum values. But adding the enum gives you compile-time type checking across the entire codebase.
+Direct callers can register string keys through `ProviderFactory.registerProvider()`, but built-in providers use the enum and descriptor catalog for consistent typing, aliases, credentials, and discovery.
 
-### Why No Existing Code Changes
+### Why the Routing Logic Does Not Change
 
-The key architectural decision is that the factory uses **registration, not conditionals**. There is no switch statement or if-else chain that routes provider names to classes. Instead, providers register themselves in a map, and the factory looks them up by key. Adding a new entry to the map does not modify the factory logic -- it is an additive change.
+The key architectural decision is that the factory uses **registration, not conditionals**. There is no switch statement or if-else chain that routes provider names to classes. Instead, the registry adds each provider to a map through `ProviderFactory.registerProvider()`, and the factory looks it up by key. Adding a built-in provider changes the enum/catalog and registration list, but not the factory algorithm.
 
-This is the Open/Closed Principle in practice: the system is open for extension (new providers) and closed for modification (no changes to existing code).
+This is the Open/Closed Principle in practice: the routing mechanism stays closed to modification while its registrations remain open to extension.
 
 ## Architecture Diagram
 

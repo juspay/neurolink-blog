@@ -85,7 +85,7 @@ NeuroLink has embraced this philosophy from day one. Our provider-agnostic desig
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 
-// Single interface works across all 13 providers
+// Single interface works across all 14 native providers (plus 19 JSON-catalog providers and a generic OpenAI-compatible adapter)
 const neurolink = new NeuroLink();
 
 // Same code works regardless of which provider handles the request
@@ -113,7 +113,7 @@ async function generateWithFallback(prompt: string) {
     return await neurolink.generate({
       input: { text: prompt },
       provider: 'bedrock',
-      model: 'anthropic.claude-sonnet-4-5-v2-20250929',
+      model: 'anthropic.claude-sonnet-4-5-20250929-v1:0',
       maxTokens: 1000
     });
   } catch (error) {
@@ -153,9 +153,6 @@ async function streamWithRichEvents() {
   for await (const chunk of result.stream) {
     if ('content' in chunk) {
       process.stdout.write(chunk.content);
-    } else if ('audioChunk' in chunk) {
-      // Handle TTS audio chunks when enabled
-      handleAudioChunk(chunk.audioChunk);
     }
   }
 

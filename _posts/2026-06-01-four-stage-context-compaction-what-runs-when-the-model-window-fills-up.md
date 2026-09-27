@@ -9,7 +9,7 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Four-stage context compaction: what runs when the model window fills up — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  Inside NeuroLink's ContextCompactor: how pruning, deduplication, summarization, and sliding-window truncation combine to keep long conversations under the model's context budget.
 toc: true
 mermaid: true
 pin: false
@@ -28,7 +28,7 @@ If the usage ratio exceeds our configured `DEFAULT_COMPACTION_THRESHOLD` of 0.8,
 Of course, some errors are unavoidable. Different models and providers report context overflow in unique ways. Our `isContextOverflowError` function maintains a registry of provider-specific error patterns, from message text to API error codes. It uses helpers like `getContextOverflowProvider` to identify the source and `parseProviderOverflowDetails` to normalize the error structure. If we receive an error post-flight, this detector gives us a structured way to confirm the root cause and trigger compaction before retrying the call. A recognized overflow, parsed via `extractErrorMessage`, results in a typed `ContextBudgetExceededError`, which our retry logic is built to handle.
 
 ```typescript
-// src/lib/context/budgetChecker.ts
+// src/lib/context/budgetChecker.ts (simplified)
 export function checkContextBudget(
   messages: ChatMessage[],
   model: Model,
@@ -55,7 +55,7 @@ When `checkContextBudget` returns `shouldCompact: true`, NeuroLink invokes the `
 The `compact` method is the entry point that runs each stage in order, checking the token count after every step. As soon as the context usage drops below the `DEFAULT_COMPACTION_THRESHOLD`, the process stops and returns the compacted message history. This short-circuiting behavior is crucial for efficiency.
 
 ```typescript
-// src/lib/context/ContextCompactor.ts
+// src/lib/context/contextCompactor.ts (simplified)
 export class ContextCompactor {
   constructor(private messages: ChatMessage[], private model: Model) {}
 
@@ -105,7 +105,7 @@ This staged approach ensures we preserve as much fidelity as possible, only reso
 
 The first and safest step is `pruneToolOutputs`. In long conversations involving many tool calls, the outputs from those tools can consume a massive number of tokens. A single API response from a tool can be thousands of tokens long, often in a verbose JSON format.
 
-This stage walks the message history backwards and replaces the `content` of older `tool_result` messages with a placeholder message like `[Output pruned to save context]`. It leaves the most recent tool calls untouched, protecting a configurable number of tokens (`pruneProtectTokens`) from being cleared. This ensures the model has the immediate context it needs for its next turn.
+This stage walks the message history backwards and replaces the `content` of older `tool_result` messages with a placeholder message, `[Tool result cleared]`. It leaves the most recent tool calls untouched, protecting a configurable number of tokens (`pruneProtectTokens`) from being cleared. This ensures the model has the immediate context it needs for its next turn.
 
 We also use `generateToolOutputPreview` to create head-and-tail previews of large tool outputs *before* they are even inserted into the history. This function caps content at a size like the `DEFAULT_MAX_PREVIEW_BYTES` limit, preventing oversized tool results from bloating the context in the first place.
 
@@ -121,7 +121,7 @@ We also use `generateToolOutputPreview` to create head-and-tail previews of larg
 {
   "role": "tool",
   "tool_call_id": "call_abc123",
-  "content": "[Output pruned to save context. Original size: 4000 tokens.]"
+  "content": "[Tool result cleared]"
 }
 ```
 
@@ -129,39 +129,43 @@ This often frees up enough space on its own, especially for agents that act as t
 
 ## Stage 2: Deduplicating File Reads
 
-Developers often read the same file multiple times in a conversation. The `deduplicateFileReads` stage identifies when a user has attached the same file path more than once. When it finds duplicates, it removes all but the most recent `tool_result` corresponding to that file read. It identifies the relevant tool calls by matching the tool name and file path argument.
+Developers often read the same file multiple times in a conversation. The `deduplicateFileReads` stage identifies when the same file path has been read more than once. When it finds duplicates, it replaces all but the most recent read with a short notice pointing at the latest one. It identifies re-reads by matching a file path referenced in the message content, for example after a `read`, `cat`, or similar mention.
 
 This optimization only commits its changes if it can achieve at least a 30% reduction in character count from the targeted messages. This prevents trivial changes and ensures the stage has a meaningful impact. If it only saves a handful of tokens, it's better to proceed to the next stage which might yield more significant savings.
 
 ```typescript
-// src/lib/context/stages/fileReadDeduplicator.ts
+// src/lib/context/stages/fileReadDeduplicator.ts (simplified)
+const DEDUP_THRESHOLD = 0.3; // Need 30% savings to declare success
 
-// The logic identifies messages representing file reads
-// from the same path and keeps only the last one.
+// The logic identifies messages that reference the same file path
+// and keeps only the last one.
 export function deduplicateFileReads(
   messages: ChatMessage[],
-  minSavingsThreshold = 0.3
 ): ChatMessage[] {
   const readsByPath = new Map<string, number[]>();
-  // Group read message indices by file path
+  // Group read message indices by file path found in message content
   messages.forEach((msg, index) => {
-    if (msg.role === 'tool' && msg.tool_name === 'readFile') {
-      const path = msg.tool_input.path;
+    const path = extractFilePathFromContent(msg.content);
+    if (path) {
       if (!readsByPath.has(path)) readsByPath.set(path, []);
       readsByPath.get(path)!.push(index);
     }
   });
 
-  const indicesToRemove = new Set<number>();
-  // Mark all but the last read for each path for removal
+  const indicesToReplace = new Set<number>();
+  // Mark all but the last read for each path for replacement
   for (const indices of readsByPath.values()) {
     if (indices.length > 1) {
-      indices.slice(0, -1).forEach(i => indicesToRemove.add(i));
+      indices.slice(0, -1).forEach(i => indicesToReplace.add(i));
     }
   }
 
-  // ... check savings against minSavingsThreshold before filtering ...
-  return messages.filter((_, index) => !indicesToRemove.has(index));
+  // ... check savings against DEDUP_THRESHOLD before committing ...
+  return messages.map((msg, index) =>
+    indicesToReplace.has(index)
+      ? { ...msg, content: `[File ${extractFilePathFromContent(msg.content)} - refer to latest read below]` }
+      : msg
+  );
 }
 ```
 
@@ -172,23 +176,23 @@ If pruning and deduplication are not enough, we move to active summarization. Th
 The process is careful:
 
 1. It splits the message history into a "keep" portion (the most recent messages) and a "summarize" portion (the oldest messages).
-2. It uses `buildSummarizationPrompt` to construct a detailed prompt, instructing the model to create a summary structured into ten key sections (`SUMMARY_SECTIONS`), covering topics like key decisions, user preferences, and unresolved questions. This guides the model to extract the most salient information.
+2. It uses `buildSummarizationPrompt` to construct a detailed prompt, instructing the model to create a summary structured into ten key sections (`SUMMARY_SECTIONS`), covering topics like primary intent, technical concepts, and pending tasks. This guides the model to extract the most salient information.
 3. It calls the LLM via the `SummarizationEngine` to generate the summary. This engine may use a smaller, faster model specifically optimized for summarization tasks.
 4. Finally, it replaces the "summarize" portion of the history with a single `system` message containing the new structured summary, often wrapped in `<condensed-summary>` tags.
 
 ```typescript
-// src/lib/context/prompts/summarizationConstants.ts
-export const SUMMARY_SECTIONS = [
-  "Key decisions made",
-  "Main topics discussed",
-  "User's primary goal",
-  "Key files or data mentioned",
-  "Action items for the assistant",
-  "Action items for the user",
-  "Unresolved questions",
-  "User preferences or constraints",
-  "Technical discoveries",
-  "Summary of the last few turns",
+// src/lib/context/prompts/summarizationPrompt.ts
+const SUMMARY_SECTIONS = [
+  "Primary Request and Intent",
+  "Key Technical Concepts",
+  "Files and Code Sections",
+  "Problem Solving",
+  "Pending Tasks",
+  "Task Evolution",
+  "Current Work",
+  "Next Step",
+  "Required Files",
+  "Constraints and Established Rules",
 ];
 ```
 
@@ -196,9 +200,9 @@ This is a more advanced form of context management, which you can read about in 
 
 ## Stage 4: Sliding Window Truncation
 
-The final and most aggressive stage is `truncateWithSlidingWindow`. This is our implementation of the classic sliding window pattern. It simply deletes messages from the beginning of the conversation history until the token count is under the limit. It uses a helper, `findSplitIndexByTokens`, to efficiently calculate how many messages to remove.
+The final and most aggressive stage is `truncateWithSlidingWindow`. This is our implementation of the classic sliding window pattern. It calculates how many of the oldest messages to remove based on how far the conversation is over budget — the larger the overage, the larger the fraction it clears — while always preserving the first user-assistant pair, then deletes messages from the beginning of the conversation history until the token count is under the limit.
 
-It's a last resort because it results in total information loss for the removed messages. The logic is careful to preserve the `system` prompt and to avoid creating an invalid message sequence (e.g., an `assistant` message followed by another `assistant` message). The function `validateRoleAlternation` helps ensure the final history is well-formed by removing any orphaned roles.
+It's a last resort because it results in total information loss for the removed messages. The logic is careful to preserve the first user-assistant pair and to avoid creating an invalid message sequence (e.g., an `assistant` message followed by another `assistant` message). The function `validateRoleAlternation` checks the resulting history for broken role alternation and logs a warning if it finds one.
 
 After truncation, we run a `repairToolPairs` function to fix any broken `tool_call` and `tool_result` pairs that may have been separated by the truncation. This prevents sending a `tool_result` whose corresponding `tool_call` has been deleted, which would cause an API error.
 
@@ -239,26 +243,32 @@ These functions add metadata to each message object, which the `ContextCompactor
 {
   "role": "user",
   "content": "Can you check the status of ticket PROJ-123?",
-  "meta": {
-    "compaction": "condense"
-  }
+  "condenseParent": "<condensation-group-uuid>"
 }
 ```
 
+(The truncation case is analogous, using a sibling `truncationParent` field instead.)
+
 ## Handling Files and Budgets
 
-File attachments present a unique challenge. A user can upload megabytes of source code, which would instantly overflow any model's context. The `FileSummarizationService` manages this. Its `checkAndSummarize` method is the primary entry point.
+File attachments present a unique challenge. A user can upload megabytes of source code, which would instantly overflow any model's context. The `FileSummarizationService` manages this. Its `summarizeFiles` method is the primary entry point.
 
-We enforce a separate budget for file content using `enforceAggregateFileBudget`, which ensures that file tokens do not exceed a configured percentage of the total context (`FILE_READ_BUDGET_PERCENT`, set to 0.6). The `calculateFileTokenBudget` function determines the available tokens for file content. It does this by taking the model's total window, subtracting a `NON_FILE_RESERVE` for prompts and conversation history, and then taking a fraction of the remainder.
+We enforce a separate budget for file content using `enforceAggregateFileBudget`, which ensures that file tokens do not exceed a configured percentage of the total context (`FILE_READ_BUDGET_PERCENT`, set to 0.6). The `calculateFileTokenBudget` function determines the available tokens for file content. It does this by taking the model's total context window, subtracting the tokens already used and the tokens reserved for output, and then taking a fraction of the remainder.
 
-If a file is too large, the `shouldSummarizeFiles` helper returns true, and `planFileSummarization` orchestrates a process to summarize it before its contents are ever injected into the main chat history. This process uses a specific `buildFileSummarizationPrompt`. Once all files are processed (and potentially summarized), their content is formatted and inserted into the prompt by `buildFileContextSection`. This entire subsystem is a critical part of the overall message flow that turns raw user input into a provider-ready request.
+If a file is too large, the `shouldSummarizeFiles` helper returns true, and `planFileSummarization` orchestrates a process to summarize it before its contents are ever injected into the main chat history. This process uses a specific `buildFileSummarizationPrompt`. Once all files are processed (and potentially summarized), their content is inserted into the prompt alongside the conversation. This entire subsystem is a critical part of the overall message flow that turns raw user input into a provider-ready request.
 
 ```typescript
-// src/lib/context/files/budget.ts
-function calculateFileTokenBudget(modelMaxTokens: number, historyTokens: number): number {
-  const nonFileReserve = historyTokens + NON_FILE_RESERVE;
-  const availableForFiles = modelMaxTokens - nonFileReserve;
-  return Math.floor(availableForFiles * FILE_READ_BUDGET_PERCENT);
+// src/lib/context/fileTokenBudget.ts
+export function calculateFileTokenBudget(
+  contextWindow: number,
+  currentTokens: number,
+  maxOutputTokens: number,
+): number {
+  const remainingTokens = contextWindow - currentTokens - maxOutputTokens;
+  if (remainingTokens <= 0) {
+    return 0;
+  }
+  return Math.floor(remainingTokens * FILE_READ_BUDGET_PERCENT);
 }
 ```
 
@@ -266,7 +276,7 @@ function calculateFileTokenBudget(modelMaxTokens: number, historyTokens: number)
 
 In the absolute worst-case scenario, where even after four stages of compaction the context is still too large (perhaps due to a single, massive message), `emergencyContentTruncation` is called. This function performs a brute-force truncation on the `content` field of the largest messages until the budget is met.
 
-It operates at the character level, not the message level, using a binary search to quickly find a truncation point that gets the token count under the limit. It is a safety net to prevent a fatal error, but its use signals an extreme edge case. The `truncateSmallConversation` function handles the specific scenario where the entire history is only a few messages, but they are all too large to fit. We also use `estimatePostProcessingTokens` to leave a small buffer for any tokens that might be added during final prompt construction.
+It operates at the character level, not the message level: it sorts messages by content length, computes how much every oversized message must shrink in proportion to how far over budget the conversation is, and truncates each one down to that share (snapping to a sentence boundary where possible). It is a safety net to prevent a fatal error, but its use signals an extreme edge case. The `truncateSmallConversation` function handles the specific scenario where the entire history is only a few messages, but they are all too large to fit. We also use `estimatePostProcessingTokens` to convert a file's raw byte size into a realistic token estimate based on its type — a 50MB video yields only a few hundred tokens of metadata, while a 50MB text file yields millions, so using raw byte size for every type would wrongly exclude media files from the budget check.
 
 ```typescript
 // Conceptual logic for emergency truncation
@@ -291,8 +301,6 @@ function emergencyContentTruncation(messages: ChatMessage[], budget: number): Ch
 ```
 
 This multi-stage, progressively aggressive compaction strategy gives NeuroLink resilience against context window overflow, enabling robust, long-running conversations with AI agents that use tools, read files, and interact over extended periods.
-
----
 
 ---
 

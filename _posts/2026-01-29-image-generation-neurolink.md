@@ -27,7 +27,7 @@ image:
 
 In this guide, you will generate images using NeuroLink's integration with Gemini Imagen and other image generation providers. You will configure image generation parameters, implement prompt engineering for visual content, handle different output formats, and build a batch image generation pipeline.
 
-NeuroLink provides a unified image generation API that lets you generate images from text prompts with the same SDK and patterns you use for text generation. Currently backed by Google Gemini's Imagen models, the API handles prompt-to-image generation, output format handling (base64 and URLs), and integration with your existing TypeScript codebase. The result is a single `generate()` call that produces publication-ready images.
+NeuroLink provides a unified image generation API that lets you generate images from text prompts with the same SDK and patterns you use for text generation. Currently backed by Google Gemini's Imagen models, the API handles prompt-to-image generation, base64-encoded output handling, and integration with your existing TypeScript codebase. The result is a single `generate()` call that produces publication-ready images.
 
 In this tutorial, you will learn how to generate images with various configurations, engineer effective prompts, build a production image pipeline that combines LLM-powered prompt optimization with image generation, and handle errors and safety filters gracefully.
 
@@ -40,7 +40,7 @@ flowchart LR
     subgraph Input["Input"]
         PROMPT["Text Prompt"]
         CONFIG["Generation Config<br/>size, style, count"]
-        REF["Reference Image<br/>(optional)"]
+        REF["Reference Image<br/>optional"]
     end
 
     subgraph NeuroLink["NeuroLink SDK"]
@@ -72,7 +72,7 @@ flowchart LR
     style IMG2 fill:#22c55e,stroke:#16a34a,color:#fff
 ```
 
-You provide a text prompt, optional configuration, and an optional reference image. NeuroLink routes the request to the Gemini Imagen model via the Vertex AI provider, processes the response, and returns the generated images as base64-encoded data or URLs along with metadata.
+You provide a text prompt, optional configuration, and an optional reference image. NeuroLink routes the request to the Gemini Imagen model via the Vertex AI provider, processes the response, and returns the generated images as base64-encoded data along with metadata.
 
 ## Basic Image Generation
 
@@ -96,12 +96,9 @@ if (result.imageOutput?.base64) {
   await fs.writeFile('generated-workspace.png', Buffer.from(result.imageOutput.base64, 'base64'));
   console.log('Image saved');
 }
-if (result.imageOutput?.url) {
-  console.log('Image URL:', result.imageOutput.url);
-}
 ```
 
-The response includes `imageOutput` with either a `base64` field (for direct binary access) or a `url` field (for CDN-hosted results), depending on the provider configuration.
+The response includes `imageOutput.base64` for the generated image data and may include `imageOutput.mimeType` to identify the image format.
 
 > **Note:** Image generation uses the `vertex` provider with an image-capable model like `gemini-2.5-flash-image`. The same `generate()` method handles both text and image generation -- the model determines the output type.
 {: .prompt-info }
@@ -232,7 +229,7 @@ Style: ${post.style}
 The prompt should be vivid, specific, and optimized for AI image generation.
 Return ONLY the image prompt, nothing else.` },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     temperature: 0.7,
   });
 

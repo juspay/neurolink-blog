@@ -9,7 +9,8 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Twenty-four providers, one BaseProvider: the adapter catalog — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  How NeuroLink's `BaseProvider` abstract class unifies OpenAI, Anthropic, SageMaker,
+  and the rest of the provider catalog behind one contract for chat, embeddings, and image generation.
 toc: true
 mermaid: true
 pin: false
@@ -18,7 +19,7 @@ image:
   alt: 'Twenty-four providers, one BaseProvider: the adapter catalog'
 ---
 
-We designed NeuroLink's `BaseProvider` because our first multi-cloud AI deployment at Juspay was a mess of bespoke integration code. One function to call OpenAI, another for Anthropic, and a third, completely different beast for an early SageMaker endpoint. Each had its own error handling, its own retry logic, and its own way of formatting requests. When a new model came out, we had to write another snowflake implementation. The maintenance burden was enormous, and the risk of provider-specific bugs taking down a whole workflow was constant. Our test matrix was exploding. We needed a single, stable contract for any model provider to plug into.
+NeuroLink's `BaseProvider` exists to solve a problem that shows up in any multi-cloud AI deployment: without a shared contract, you end up with bespoke integration code per provider — one function to call OpenAI, another for Anthropic, and a third, completely different beast for a SageMaker endpoint. Each has its own error handling, its own retry logic, and its own way of formatting requests, and every new model means another snowflake implementation. The maintenance burden compounds quickly, and the risk of a provider-specific bug taking down a whole workflow grows with every adapter. NeuroLink, built at Juspay, needed a single, stable contract that any model provider could plug into.
 
 This post walks through that contract — the `BaseProvider` abstract class — and the catalog of two-dozen provider adapters we have built on top of it. It is the story of how we took a chaotic landscape of external APIs and unified them behind a single, predictable interface. This pattern is central to how we can add a new provider like Groq or DeepSeek in an afternoon, not a week, and how we ensure that features like our [MCP circuit breaker](/posts/mcp-circuit-breaker-pattern/) work universally, regardless of the underlying model.
 
@@ -29,7 +30,7 @@ The core abstraction is simple: every provider is a class that extends `BaseProv
 The contract surface is intentionally small. For a basic chat completion provider, you only need to implement four methods:
 
 - `getProviderName()`: Returns a unique string identifier for the provider (e.g., `'anthropic'`, `'openai'`).
-- `getDefaultModel()`: Specifies the default model ID to use if the user does not provide one (e.g., `'claude-3-opus-20240229'`).
+- `getDefaultModel()`: Specifies the default model ID to use if the user does not provide one (e.g., `'claude-opus-5'`).
 - `getAISDKModel()`: Returns a `LanguageModel` instance from the AI SDK, which handles the low-level API communication.
 - `formatProviderError()`: Translates a raw error from the provider's SDK into a standardized `Error` format that NeuroLink's other systems can understand.
 
@@ -69,33 +70,34 @@ This design is the foundation for features like [dynamic model selection at runt
 
 ## Chat Completion: The Core Workload
 
-Most of our providers are for chat completion. The list includes all the major players: `OpenAIProvider`, `AnthropicProvider`, `GoogleAIStudioProvider`, `GroqProvider`, `MistralProvider`, `PerplexityProvider`, and many more.
+Most of our providers are for chat completion. Dedicated adapters cover the major players — `OpenAIProvider`, `AnthropicProvider`, `GoogleAIStudioProvider` — while a config-driven `ConfiguredOpenAICompatProvider` covers the growing catalog of OpenAI-compatible services: Groq, Mistral, Perplexity, and many more.
 
 For providers that offer an OpenAI-compatible API, the implementation is even simpler. They extend `OpenAIChatCompletionsProvider`, which provides a default implementation for most methods. Adding a new one, like the `NvidiaNimProvider`, can be as simple as defining the provider name and a default model.
 
 ```typescript
-// src/lib/providers/nvidiaNim.ts
+// src/lib/providers/nvidiaNim/client.ts
 
 // The entire implementation inherits from a shared OpenAI-compatible base class.
 export class NvidiaNimProvider extends OpenAIChatCompletionsProvider {
   constructor(
     // ... constructor logic
   ) {
-    super(config, logger, 'NVIDIA');
+    super('nvidia-nim', modelName, sdk, { baseURL, apiKey });
   }
 
   protected getProviderName(): AIProviderName {
-    return 'nvidia';
+    return 'nvidia-nim';
   }
 
   protected getDefaultModel(): string {
-    return 'meta/llama3-70b-instruct';
+    return 'openai/gpt-oss-20b';
   }
 
   // Optional: Tweak the request body before sending
   protected adjustBuildBodyOptions(
-    options: BuildOllamaBodyOptions,
-  ): BuildOllamaBodyOptions {
+    modelId: string,
+    options: OpenAICompatBuildBodyArgs['options'],
+  ): OpenAICompatBuildBodyArgs['options'] {
     // ... provider-specific adjustments
     return options;
   }
@@ -175,7 +177,7 @@ Some of our most powerful adapters are meta-providers: `LiteLLMProvider`, `OpenR
 
 `OllamaProvider`, for instance, allows NeuroLink to connect to a local Ollama server, giving developers access to a huge library of open-source models running on their own machines. `LiteLLMProvider` does the same for the `litellm` proxy, unifying access to models across Azure, Bedrock, Vertex AI, and more.
 
-These providers follow the same `BaseProvider` contract, demonstrating its flexibility. To NeuroLink's router, a request to a local Llama 3 instance via `OllamaProvider` looks identical to a request to OpenAI's GPT-4.
+These providers follow the same `BaseProvider` contract, demonstrating its flexibility. To NeuroLink's router, a request to a local Llama 3 instance via `OllamaProvider` looks identical to a request to OpenAI's GPT-5.4.
 
 ## Inside the SageMaker Adapter
 
@@ -214,7 +216,7 @@ This collection of tools makes interacting with SageMaker as predictable as any 
 
 While most modern APIs have converged on similar patterns, some, like Google's native Gemini API, have unique quirks. Our Google provider adapter uses a suite of helper functions to normalize Gemini's behavior before it even reaches the core `BaseProvider` logic.
 
-The functions in `googleNativeGemini3.ts` act as a protective barrier, sanitizing inputs and normalizing outputs.
+The functions in `googleNativeGemini3/utils.ts` act as a protective barrier, sanitizing inputs and normalizing outputs.
 
 - `sanitizeForGoogleFunctionName`: Tool function names in Gemini have strict validation rules. This function cleans up proposed names to ensure they are compliant.
 - `sanitizeSchemaForGemini`: Gemini has its own opinions about JSON schema definitions for tools. This function traverses a tool schema and adjusts it to match what the API expects.

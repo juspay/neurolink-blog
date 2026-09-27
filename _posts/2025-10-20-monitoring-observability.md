@@ -151,7 +151,7 @@ const result = await tracker.trackRequest(() =>
   neurolink.generate({
     input: { text: 'Explain monitoring best practices' },
     provider: 'vertex',
-    model: 'gemini-2.0-flash'
+    model: 'gemini-2.5-flash'
   })
 );
 
@@ -175,7 +175,7 @@ async function measureTTFT() {
   const result = await neurolink.stream({
     input: { text: 'Write a comprehensive guide on monitoring' },
     provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022'
+    model: 'claude-sonnet-5'
   });
 
   for await (const chunk of result.stream) {
@@ -205,7 +205,7 @@ console.log('Streaming Metrics:', metrics);
 
 **Input and Output Token Counts**
 
-Track token consumption across your LLM applications to monitor usage and costs. NeuroLink's built-in analytics middleware automatically captures token usage metrics (input, output, and total tokens) from all `generate()` and `stream()` calls.
+Track token consumption across your LLM applications to monitor usage and costs. NeuroLink's built-in analytics captures token usage metrics (input, output, and total tokens) on `generate()` and `stream()` calls when you pass `enableAnalytics: true`.
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -214,29 +214,25 @@ interface TokenMetrics {
   input: number;
   output: number;
   total: number;
-  estimatedCost: number;
+  estimatedCost?: number;
 }
 
 class TokenUsageMonitor {
   private metrics: TokenMetrics[] = [];
-  // Cost per 1K tokens (example rates)
-  private readonly costs = {
-    'claude-3-5-sonnet-20241022': { input: 0.003, output: 0.015 },
-    'gemini-2.0-flash': { input: 0.00015, output: 0.0006 }
-  };
 
   async trackGeneration(neurolink: NeuroLink, prompt: string, model: string) {
     const result = await neurolink.generate({
       input: { text: prompt },
       provider: 'anthropic',
-      model
+      model,
+      enableAnalytics: true
     });
 
     const metrics: TokenMetrics = {
-      input: result.analytics?.tokenUsage?.input || 0,
-      output: result.analytics?.tokenUsage?.output || 0,
-      total: result.analytics?.tokenUsage?.total || 0,
-      estimatedCost: this.calculateCost(result.analytics?.tokenUsage, model)
+      input: result.analytics?.tokenUsage.input ?? 0,
+      output: result.analytics?.tokenUsage.output ?? 0,
+      total: result.analytics?.tokenUsage.total ?? 0,
+      estimatedCost: result.analytics?.cost
     };
 
     this.metrics.push(metrics);
@@ -244,15 +240,8 @@ class TokenUsageMonitor {
     return result;
   }
 
-  private calculateCost(tokenUsage: any, model: string): number {
-    const rates = this.costs[model] || { input: 0, output: 0 };
-    const inputCost = (tokenUsage?.input || 0) / 1000 * rates.input;
-    const outputCost = (tokenUsage?.output || 0) / 1000 * rates.output;
-    return inputCost + outputCost;
-  }
-
   getTotalCost(): number {
-    return this.metrics.reduce((sum, m) => sum + m.estimatedCost, 0);
+    return this.metrics.reduce((sum, metric) => sum + (metric.estimatedCost ?? 0), 0);
   }
 }
 
@@ -260,8 +249,8 @@ class TokenUsageMonitor {
 const monitor = new TokenUsageMonitor();
 const neurolink = new NeuroLink();
 
-await monitor.trackGeneration(neurolink, 'Explain observability', 'claude-3-5-sonnet-20241022');
-console.log('Total Cost:', `$${monitor.getTotalCost().toFixed(4)}`);
+await monitor.trackGeneration(neurolink, 'Explain observability', 'claude-sonnet-5');
+console.log('Total Priced Cost:', `$${monitor.getTotalCost().toFixed(4)}`);
 ```
 
 ### Error and reliability metrics
@@ -343,7 +332,7 @@ await tracker.executeWithTracking(() =>
   neurolink.generate({
     input: { text: 'Test query' },
     provider: 'vertex',
-    model: 'gemini-2.0-flash'
+    model: 'gemini-2.5-flash'
   })
 );
 
@@ -409,7 +398,7 @@ const requestId = randomUUID();
 logger.log('info', 'llm_request_started', {
   requestId,
   provider: 'anthropic',
-  model: 'claude-3-5-sonnet-20241022',
+  model: 'claude-sonnet-5',
   promptLength: 45
 });
 
@@ -417,7 +406,8 @@ try {
   const result = await neurolink.generate({
     input: { text: 'Explain structured logging benefits' },
     provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022'
+    model: 'claude-sonnet-5',
+    enableAnalytics: true
   });
 
   logger.log('info', 'llm_request_completed', {
@@ -425,7 +415,7 @@ try {
     input: result.analytics?.tokenUsage?.input,
     output: result.analytics?.tokenUsage?.output,
     latencyMs: 1234,
-    model: 'claude-3-5-sonnet-20241022'
+    model: 'claude-sonnet-5'
   });
 } catch (error: any) {
   logger.log('error', 'llm_request_failed', {
@@ -483,7 +473,7 @@ async function handleUserRequest(userId: string, sessionId: string) {
     const result = await neurolink.generate({
       input: { text: 'Explain observability in distributed systems' },
       provider: 'vertex',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
     });
 
     content = result.content;
@@ -513,7 +503,7 @@ async function gracefulShutdown() {
 
 ### NeuroLink analytics data
 
-NeuroLink automatically includes analytics data in the response object's `analytics` property. This includes token usage, response times, and model performance metrics:
+Pass `enableAnalytics: true` and NeuroLink includes an optional `analytics` property with provider, model, token usage, request duration, timestamp, and estimated cost when pricing is available. Native agent loops can also add step count, tool-call count, stop reason, elapsed time, and the provider's raw finish reason:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -524,7 +514,8 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'What are best practices for monitoring?' },
   provider: 'bedrock',
-  model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+  model: 'anthropic.claude-sonnet-4-6',
+  enableAnalytics: true,
 });
 
 // Analytics are available directly on the response object:
@@ -535,10 +526,10 @@ console.log('Token Usage:', {
 });
 
 // The analytics property includes:
-// - tokenUsage: { input, output, total }
-// - Request/response timing
-// - Provider and model information
-// - Error tracking with context
+// - provider, model, timestamp, and requestDuration
+// - tokenUsage: { input, output, total, optional cache/reasoning fields }
+// - optional cost and caller-supplied context
+// - optional agent-loop lifecycle fields such as stepsUsed and stopReason
 ```
 
 ### Implementing custom OpenTelemetry tracing
@@ -573,7 +564,7 @@ async function tracedLLMGeneration(prompt: string) {
       // Set span attributes
       span.setAttributes({
         'llm.provider': 'anthropic',
-        'llm.model': 'claude-3-5-sonnet-20241022',
+        'llm.model': 'claude-sonnet-5',
         'llm.prompt_length': prompt.length,
         'llm.temperature': 0.7
       });
@@ -581,7 +572,8 @@ async function tracedLLMGeneration(prompt: string) {
       const result = await neurolink.generate({
         input: { text: prompt },
         provider: 'anthropic',
-        model: 'claude-3-5-sonnet-20241022'
+        model: 'claude-sonnet-5',
+        enableAnalytics: true
       });
 
       // Add result metrics to span
@@ -765,7 +757,7 @@ You set up production monitoring for LLM applications: metrics collection with P
 NeuroLink simplifies observability with built-in features:
 
 - **Langfuse Integration**: Automatic trace collection via OpenTelemetry with `initializeOpenTelemetry()` and `setLangfuseContext()`
-- **Analytics Middleware**: Automatic tracking of token usage, response times, and model performance
+- **Analytics Middleware**: Tracking for provider/model metadata, token usage, request duration, and estimated cost when pricing is available
 - **Environment Configuration**: Simple setup with `buildObservabilityConfigFromEnv()` for production deployments
 - **Health Monitoring**: Built-in health checks via `getLangfuseHealthStatus()`
 

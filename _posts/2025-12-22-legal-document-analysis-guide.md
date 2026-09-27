@@ -422,8 +422,8 @@ const client = new NeuroLink();
 
 const VISION_MODELS = [
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-  { provider: 'openai', model: 'gpt-4o' },
-  { provider: 'google', model: 'gemini-1.5-pro' },
+  { provider: 'openai', model: 'gpt-5.4' },
+  { provider: 'google', model: 'gemini-2.5-pro' },
 ];
 
 async function analyzeWithFallback(

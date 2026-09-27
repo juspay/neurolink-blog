@@ -8,7 +8,9 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Ten ESLint rules that hold NeuroLink's type system together — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  Ten custom ESLint rules that keep NeuroLink's types in one place, ban
+  interface declaration merging, and force typed provider errors and
+  regex-free log sanitization.
 toc: true
 mermaid: true
 pin: false
@@ -17,7 +19,7 @@ image:
   alt: 'Ten ESLint rules that hold NeuroLink''s type system together'
 ---
 
-We built NeuroLink's type system on a simple, brutal principle: any type definition ambiguity that *could* cause a production incident *will* cause a production incident. This wasn't theoretical. An early incident involving a subtle type mismatch between our internal representation and a new provider's payload from Anthropic led to a cascade of `undefined` errors that took down a critical user-facing service. The post-mortem was clear: our TypeScript conventions were too loose. To enforce discipline at scale across dozens of engineers and multiple AI providers like OpenAI and Vertex AI, we encoded our hard-won lessons into a set of ten custom ESLint rules. They aren't just style suggestions; they are the steel frame of our application's stability.
+We built NeuroLink's type system on a simple, brutal principle: any type definition ambiguity that *could* cause a production incident *will* cause a production incident. It's not a hypothetical risk — a subtle type mismatch between an internal representation and a provider's payload shape is exactly the kind of thing that surfaces as a cascade of `undefined` errors at runtime, and by the time it does, the cost of tracing it back to a loose type is much higher than the cost of preventing it. To enforce discipline at scale across dozens of engineers and multiple AI providers like OpenAI and Vertex AI, we encoded our hard-won lessons into a set of ten custom ESLint rules. They aren't just style suggestions; they are the steel frame of our application's stability.
 
 The core philosophy is simple: all shared types for the entire NeuroLink application must live in one, and only one, directory: `src/lib/types/`. No exceptions. This isn't just about tidiness. It's about creating a single, unambiguous source of truth that the rest of the application can consume. When you're dealing with dozens of rapidly evolving AI models, as we discuss in [Dynamic Model Selection: Routing AI Requests at Runtime](/posts/dynamic-model-selection-runtime/), a fragmented type system is a recipe for disaster.
 
@@ -67,7 +69,7 @@ Finally, `neurolink/no-type-export-outside-types` completes the lockdown. It ens
 
 Once all types are in one place, a new problem emerges: name collisions. In a small project, `Request` or `Response` are fine type names. In NeuroLink, which integrates with dozens of APIs from OpenAI, Anthropic, Gemini, and more, a generic name is a time bomb. Whose `Request` is it? Is it an MCP request, a provider request, or an internal API request?
 
-We saw this happen. Two different teams working on different provider integrations both defined a `Message` type. They were structurally similar but semantically different. When they were eventually used together, chaos ensued.
+It's an easy trap to fall into: two engineers working on different provider integrations each define their own `Message` type, structurally similar but semantically different — one shaped around a chat completion, the other around an MCP payload. Used together, the mismatch is exactly the kind of bug that only shows up at runtime.
 
 Our solution is twofold. First, `neurolink/unique-type-names` scans all files in `src/lib/types/` and throws an error if the same type name is declared in more than one file.
 
@@ -152,7 +154,7 @@ graph TD
         F1["provider/anthropic.ts"] --> Barrel
         F2["mcp/request.ts"] --> Barrel
         F3["other type files"] --> Barrel
-        Barrel{"index.ts (barrel)"}
+        Barrel{"barrel: index.ts"}
     end
 
     subgraph app["Application Code"]
@@ -242,16 +244,12 @@ The rule `neurolink/no-inline-secret-regex` bans this practice entirely. It dete
 The error message directs the developer to the right solution:
 
 ```text
-Inline secret-redaction regex `...` is forbidden — use `sanitizeForLog` from src/lib/utils/logSanitize.js so all callers stay consistent and any pattern updates happen in one place.
+Inline secret-redaction regex `...` is forbidden — use `sanitizeForLog` from src/lib/utils/logSanitize.js so all callers stay consistent and any pattern improvements propagate. See review finding H04.
 ```
 
 This forces all sanitation to go through a single, audited utility function. It's a simple rule, but it provides a massive security and maintenance win.
 
-These ten rules, born from production incidents and hard-won experience, form the backbone of NeuroLink's TypeScript architecture. They are strict, sometimes inconvenient, but they enable us to build a complex, multi-provider AI platform with confidence, knowing that an entire class of errors has been systematically eliminated.
-
----
-
----
+These ten rules, shaped by the failure modes above and hard-won experience, form the backbone of NeuroLink's TypeScript architecture. They are strict, sometimes inconvenient, but they enable us to build a complex, multi-provider AI platform with confidence, knowing that an entire class of errors has been systematically eliminated.
 
 ---
 

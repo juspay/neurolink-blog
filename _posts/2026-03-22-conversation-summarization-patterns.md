@@ -87,7 +87,7 @@ class ConversationSummarizer {
   constructor(options: { maxMessages?: number; summaryModel?: string } = {}) {
     this.neurolink = new NeuroLink();
     this.maxMessages = options.maxMessages || 10;
-    this.summaryModel = options.summaryModel || 'claude-3-5-haiku-20241022';
+    this.summaryModel = options.summaryModel || 'claude-haiku-4-5-20251001';
   }
 
   addMessage(role: 'user' | 'assistant', content: string, important = false) {
@@ -341,7 +341,7 @@ class ContextWindowManager {
 information:\n\n${conversationText}`,
       },
       provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       maxTokens: 500,
     });
 
@@ -382,18 +382,19 @@ This graduated approach keeps LLM summarization calls to a minimum while ensurin
 
 ## Token Budget Strategies
 
-Before you can summarize intelligently, you need to know how much room you have. NeuroLink's `BudgetChecker` runs before every generation call and returns a detailed breakdown of where your tokens are going.
+Before you can summarize intelligently, you need to know how much room you have. NeuroLink runs an internal budget check (`checkContextBudget`) before every generation call and returns a detailed breakdown of where your tokens are going.
 
 ### How the Budget Checker Works
 
 The budget checker estimates total input tokens from five categories: system prompt, tool definitions, conversation history, the current user prompt, and file attachments. It compares the total against the model's available input space and sets a `shouldCompact` flag when usage exceeds the configured threshold (default: 80%).
 
-```typescript
-import { checkContextBudget } from '@juspay/neurolink';
+`checkContextBudget` itself isn't part of the public package exports — it's shown below to illustrate the shape of the check. From your own code, get the same numbers through `neurolink.getContextStats()`, covered later in this post.
 
+```typescript
+// Internal shape — illustrative, not a public import.
 const budgetResult = checkContextBudget({
   provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-4-6',
   maxTokens: 4096,
   systemPrompt: 'You are a helpful assistant.',
   conversationMessages: sessionHistory,
@@ -440,13 +441,11 @@ Each model family has different context windows. NeuroLink maintains these autom
 
 ```typescript
 const CONTEXT_LIMITS: Record<string, number> = {
-  'gpt-4o': 128_000,
-  'gpt-4o-mini': 128_000,
-  'gpt-4.1': 1_047_576,
+  'gpt-5.4-mini': 400_000,
+  'gpt-5.4': 1_050_000,
   'o3': 200_000,
-  'claude-opus-4-20250514': 200_000,
-  'claude-sonnet-4-20250514': 200_000,
-  'claude-3-5-sonnet-20241022': 200_000,
+  'claude-opus-5': 200_000,
+  'claude-sonnet-5': 1_000_000,
   'gemini-2.5-flash': 1_048_576,
   'gemini-2.5-pro': 1_048_576,
 };
@@ -482,8 +481,8 @@ The cheapest stage. Tool call results (shell outputs, API responses, file conten
 const DEFAULT_CONFIG = {
   enablePrune: true,
   pruneProtectTokens: 40_000,    // Protect the most recent 40K tokens
-  pruneMinimumSavings: 20_000,   // Only prune if it saves at least 20K tokens
-  pruneProtectedTools: ['skill'], // Never prune outputs from these tools
+  pruneMinimumSavings: 500,      // Only prune if it saves at least 500 tokens
+  pruneProtectedTools: ['skill', 'use_skill', 'read_skill_resource'], // Never prune outputs from these tools
 };
 ```
 
@@ -536,7 +535,7 @@ const truncResult = truncateWithSlidingWindow(currentMessages, {
   targetTokens: targetTokens,
   provider: provider,
   adaptiveBuffer: 0.15,
-  maxIterations: 3,
+  maxIterations: 6,
 });
 ```
 
@@ -636,7 +635,7 @@ async function checkAndCompact(sessionId: string) {
   const stats = await neurolink.getContextStats(
     sessionId,
     'anthropic',
-    'claude-sonnet-4-20250514',
+    'claude-sonnet-4-6',
   );
 
   if (!stats) return;
@@ -650,8 +649,7 @@ async function checkAndCompact(sessionId: string) {
   if (stats.shouldCompact) {
     const result = await neurolink.compactSession(sessionId);
     if (result?.compacted) {
-      const saved = result.originalTokenCount - result.compactedTokenCount;
-      console.log(`Freed ${saved} tokens via ${result.stagesApplied.join(', ')}`);
+      console.log(`Freed ${result.tokensSaved} tokens via ${result.stagesUsed.join(', ')}`);
     }
   }
 }
@@ -670,7 +668,7 @@ async function chat(userMessage: string) {
   const response = await neurolink.generate({
     input: { text: userMessage },
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     context: { sessionId },
   });
 

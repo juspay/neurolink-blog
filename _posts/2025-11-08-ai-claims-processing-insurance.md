@@ -38,7 +38,7 @@ The architecture uses four specialized agents, each running on a different model
 ```mermaid
 flowchart TB
     Claim[Claim Submission] --> Intake[Intake Agent<br/>Gemini Flash]
-    Intake --> DocExtract[Document Extraction<br/>GPT-4o Vision]
+    Intake --> DocExtract[Document Extraction<br/>GPT-5.4 Vision]
     DocExtract --> RiskAssess[Risk Assessment<br/>Claude Opus]
     RiskAssess --> FraudCheck[Fraud Detection<br/>Gemini Pro]
 
@@ -62,7 +62,7 @@ flowchart TB
 The pipeline flow is deliberate in its model selection:
 
 - **Intake Agent** uses Gemini Flash -- classification is a quick decision that benefits from speed and low cost. Is this an auto claim, home claim, health claim, or liability claim? Flash handles this in milliseconds.
-- **Document Extraction** uses GPT-4o -- multimodal vision capability is essential for reading uploaded photos of damage, medical bills, repair estimates, and police reports.
+- **Document Extraction** uses GPT-5.4 -- multimodal vision capability is essential for reading uploaded photos of damage, medical bills, repair estimates, and police reports.
 - **Risk Assessment** uses Claude Opus -- complex reasoning is needed to evaluate claim validity, assess damage severity, cross-reference policy coverage, and determine the appropriate payout range.
 - **Fraud Detection** uses Gemini Pro -- balanced performance for pattern matching against known fraud indicators, inconsistency detection in claim narratives, and comparison with historical claims data.
 
@@ -85,13 +85,13 @@ const intakeAgent = await AIProviderFactory.createProvider(
 // Document extraction - multimodal
 const docAgent = await AIProviderFactory.createProvider(
   "openai",
-  "gpt-4o" // Vision-capable
+  "gpt-5.4" // Vision-capable
 );
 
 // Risk assessment - quality reasoning
 const riskAgent = await AIProviderFactory.createProvider(
   "bedrock",
-  modelConfig.getModelForTier("bedrock", "quality") // claude-3-opus
+  modelConfig.getModelForTier("bedrock", "quality") // anthropic.claude-opus-4-6-v1
 );
 
 // Fraud detection with fallback
@@ -153,7 +153,7 @@ const claimsHITL = new HITLManager({
 
 The HITL configuration implements a tiered approval system:
 
-**Low-risk claims under $5,000** with no fraud indicators are prioritized for expedited adjuster review. The AI pre-fills the approval form and highlights key findings, reducing review time from 30 minutes to under 5 minutes.
+**Low-risk claims under $5,000** with no fraud indicators are prioritized for expedited adjuster review. The AI pre-fills the approval form and highlights key findings, which is designed to cut a typical manual review down to a few minutes.
 
 **Medium-risk claims above $5,000** require adjuster review. The `high-value-claim` custom rule intercepts any approval over $5,000 and routes it to the adjuster dashboard. The adjuster sees the AI's recommendation along with all supporting data and can approve, deny, or modify the payout amount.
 
@@ -213,7 +213,10 @@ const claimsMiddleware = new MiddlewareFactory({
     guardrails: {
       enabled: true,
       config: {
-        badWords: ["social security", "ssn", "credit card number"],
+        badWords: {
+          enabled: true,
+          list: ["social security", "ssn", "credit card number"],
+        },
         precallEvaluation: {
           enabled: true,
         },
@@ -241,19 +244,16 @@ The analytics middleware tracks cost per claim for ROI analysis. By tagging each
 Claims processing accuracy directly impacts both policyholders and the carrier's bottom line. Overestimated claims cost money. Underestimated claims lead to appeals and lawsuits. Auto-evaluation provides a quality gate that catches inaccurate assessments before they reach the adjuster.
 
 ```typescript
-import { generateEvaluation } from '@juspay/neurolink';
-
-const qaCheck = await generateEvaluation({
-  userQuery: `Assess claim #${claimId}: ${claimDescription}`,
-  aiResponse: riskAssessmentOutput,
-  primaryDomain: "insurance",
-  toolUsage: [
-    { toolName: "document-extraction", result: docExtractionResult },
-    { toolName: "fraud-check", result: fraudCheckResult },
-  ],
+const riskAssessment = await riskAgent.generate({
+  input: { text: `Assess claim #${claimId}: ${claimDescription}` },
+  enableEvaluation: true,
+  evaluationDomain: "insurance",
+  toolUsageContext: "document-extraction and fraud-check agents already ran on this claim",
 });
 
-if (qaCheck.accuracy < 7 || qaCheck.completeness < 7) {
+const qaCheck = riskAssessment.evaluation;
+
+if (!qaCheck || qaCheck.accuracy < 7 || qaCheck.completeness < 7) {
   // Re-run with quality-tier model
   const qualityAgent = await AIProviderFactory.createProvider(
     "bedrock",
@@ -263,7 +263,7 @@ if (qaCheck.accuracy < 7 || qaCheck.completeness < 7) {
 }
 ```
 
-The `primaryDomain: "insurance"` parameter triggers domain-specific evaluation criteria. Instead of generic accuracy and completeness scores, the evaluation considers insurance-specific factors:
+Setting `enableEvaluation: true` with `evaluationDomain: "insurance"` on the `generate()` call attaches an `EvaluationData` object to `riskAssessment.evaluation`, scored against domain-specific criteria instead of generic accuracy and completeness alone:
 
 - **Domain alignment**: Does the assessment use correct insurance terminology and concepts?
 - **Terminology accuracy**: Are coverage types, deductibles, and policy limits referenced correctly?
@@ -276,7 +276,43 @@ The quality gate pattern is straightforward: if evaluation scores fall below a t
 Claims processing volumes are spiky. A major weather event can increase claim submissions 10-100x overnight. The pipeline needs resilience patterns that handle both normal load and catastrophic surges.
 
 ```typescript
-import { withRetry, CircuitBreaker, RateLimiter } from '@juspay/neurolink';
+import { withRetry } from '@juspay/neurolink';
+
+// NeuroLink does not export CircuitBreaker/RateLimiter classes -- these are
+// small utilities you own alongside the pipeline.
+class CircuitBreaker {
+  private failures = 0;
+  private openedAt = 0;
+  constructor(private threshold: number, private cooldownMs: number) {}
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.failures >= this.threshold && Date.now() - this.openedAt < this.cooldownMs) {
+      throw new Error("Circuit breaker open");
+    }
+    try {
+      const result = await fn();
+      this.failures = 0;
+      return result;
+    } catch (error) {
+      this.failures++;
+      this.openedAt = Date.now();
+      throw error;
+    }
+  }
+}
+
+class RateLimiter {
+  private timestamps: number[] = [];
+  constructor(private max: number, private windowMs: number) {}
+  async acquire(): Promise<void> {
+    const now = Date.now();
+    this.timestamps = this.timestamps.filter((t) => now - t < this.windowMs);
+    if (this.timestamps.length >= this.max) {
+      await new Promise((r) => setTimeout(r, this.windowMs - (now - this.timestamps[0])));
+      return this.acquire();
+    }
+    this.timestamps.push(now);
+  }
+}
 
 // Circuit breaker per provider
 const bedrockBreaker = new CircuitBreaker(5, 60000);
@@ -289,7 +325,7 @@ async function processClaimWithResilience(claim) {
   return bedrockBreaker.execute(() =>
     withRetry(
       () => riskAgent.generate({ input: { text: claim.description } }),
-      { maxAttempts: 3, initialDelay: 2000, maxDelay: 15000 }
+      { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 15000 }
     )
   );
 }
@@ -309,13 +345,14 @@ Cost tracking via `ModelConfigurationManager.getCostInfo()` enables per-claim co
 
 ```typescript
 // Track cost per claim
-const costInfo = modelConfig.getCostInfo("gpt-4o");
-const estimatedCost = (inputTokens * costInfo.inputCostPer1k / 1000) +
-                      (outputTokens * costInfo.outputCostPer1k / 1000);
+const costInfo = modelConfig.getCostInfo("openai", "gpt-5.4");
+const estimatedCost = costInfo
+  ? inputTokens * costInfo.input + outputTokens * costInfo.output
+  : 0;
 
 claimCostTracker.record(claimId, {
   stage: "document-extraction",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tokens: { input: inputTokens, output: outputTokens },
   cost: estimatedCost,
 });
@@ -345,7 +382,7 @@ For carriers with data residency requirements, use the region parameter in the p
 ```typescript
 const riskAgent = await AIProviderFactory.createProvider(
   "bedrock",
-  "claude-3-opus",
+  "anthropic.claude-opus-4-6-v1",
   true,
   undefined,
   "us-east-1" // Data stays in US East region

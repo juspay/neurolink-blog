@@ -26,9 +26,9 @@ image:
 > **Note:** This guide covers structured output features available in the current NeuroLink SDK. See our changelog for version-specific details.
 {: .prompt-info }
 
-You will enforce structured JSON output from any LLM using NeuroLink's Zod schema validation. By the end of this tutorial, you will have schema-constrained generation that returns validated, typed JSON every time -- no regex parsing, no markdown unwrapping, no hoping the model follows instructions.
+You will request structured JSON output using NeuroLink's Zod schema support. By the end of this tutorial, you will have provider-aware generation that exposes parsed data through `result.structuredData`, plus application-level validation for a typed result -- no regex parsing or markdown unwrapping.
 
-Ask an LLM for JSON without schema enforcement and you might get valid JSON, markdown-wrapped JSON, JSON with trailing commas, or a conversational explanation. You will eliminate this inconsistency entirely.
+Ask an LLM for JSON without a schema and you might get valid JSON, markdown-wrapped JSON, JSON with trailing commas, or a conversational explanation. A schema lets NeuroLink use native constraints where the provider supports them and JSON coercion as a fallback on other paths.
 
 Next, you will define Zod schemas for LLM output, integrate schema validation with NeuroLink's `generate()` call, and build error handling patterns for edge cases.
 
@@ -36,7 +36,7 @@ Next, you will define Zod schemas for LLM output, integrate schema validation wi
 flowchart LR
     A[User Prompt] --> B[NeuroLink SDK]
     B --> C{Zod Schema}
-    C --> D[LLM with Schema Constraint]
+    C --> D[Native Constraint or Coercion]
     D --> E[JSON Output]
     E --> F{Parse & Validate}
     F -->|Valid| G[Typed Data Object]
@@ -122,15 +122,10 @@ Understanding key Zod methods helps you define precise constraints:
 
 ## NeuroLink Schema Enforcement
 
-NeuroLink integrates Zod schemas directly into the API, ensuring the model's output always conforms to your specification. This is not post-processing validation; the model is constrained during generation to only produce valid output.
+NeuroLink accepts a Zod schema directly in both `generate()` and `stream()`. It uses provider-native structured output when available and falls back to schema-guided JSON coercion when native schema enforcement cannot be combined with the selected provider or tools.
 
-> **Tip:** The `schema` option works with the `generate()` method only. For streaming, use `generate()` with schema to get validated output.
+> **Tip:** Passing `schema` is sufficient to request structured output. `output.format: 'json'` is optional when a schema is present; use it when you want JSON output without supplying a schema.
 {: .prompt-tip }
-
-<!-- markdownlint-disable-next-line MD028 -->
-
-> **Important:** For schema enforcement to work, you must set `output.format` to either `'json'` or `'structured'`. Without this option, the schema will not be enforced.
-{: .prompt-warning }
 
 ### Basic Usage
 
@@ -153,21 +148,22 @@ const result = await neurolink.generate({
   input: {
     text: 'Extract contact: "John Smith, john@acme.com, works at Acme Inc"'
   },
-  schema: ContactSchema,
-  output: { format: 'json' }
+  schema: ContactSchema
 });
 
-// result.content is always a string, so JSON.parse() is required
-const contact = JSON.parse(result.content);
+// Prefer the parsed object NeuroLink returns for schema requests.
+const contact = ContactSchema.parse(result.structuredData);
 // { name: "John Smith", email: "john@acme.com", company: "Acme Inc" }
 ```
 
-NeuroLink automatically converts your Zod schema to the appropriate format for each provider.
+NeuroLink converts your Zod schema to the appropriate format for each provider and exposes a recovered, schema-compatible value as `result.structuredData` when the model produces one. On that successful path, `result.content` is its JSON string representation. A pure-prose or unrecoverable response can leave `structuredData` undefined, which is why the example validates it with the same schema.
 
-### Important: Google Provider Limitation
+### Gemini Tools and Schemas
 
-> **Critical:** Google Gemini providers (Vertex AI and Google AI Studio) cannot use tools and JSON schema output simultaneously. When using schemas with Google providers, you **must** set `disableTools: true`.
-{: .prompt-warning }
+Gemini models cannot combine native function calling with native JSON-schema response enforcement. NeuroLink handles this conflict automatically: for a Gemini model it drops the tools for that request and keeps native JSON-schema enforcement, so you still get a schema-constrained response. Set `disableTools: true` only when you explicitly want a tool-free request.
+
+> **Note:** This limitation applies to Gemini models on Google AI Studio and Vertex AI. Vertex-hosted Claude models use a different transport and can combine tools with schemas.
+{: .prompt-info }
 
 ```typescript
 import { z } from 'zod';
@@ -181,29 +177,27 @@ const AnalysisSchema = z.object({
   topics: z.array(z.string())
 });
 
-// Correct usage for Google providers
+// Gemini schema request: NeuroLink selects the compatible path automatically.
 const result = await neurolink.generate({
   input: { text: 'Analyze: "The product exceeded expectations!"' },
   schema: AnalysisSchema,
-  output: { format: 'json' },
-  provider: 'vertex', // or 'google-ai'
-  disableTools: true  // REQUIRED for Google providers with schemas
+  provider: 'google-ai'
 });
 
-// OpenAI and Anthropic work without disableTools
-const openaiResult = await neurolink.generate({
+// Optional: force a tool-free call.
+const toolFreeResult = await neurolink.generate({
   input: { text: 'Analyze: "The product exceeded expectations!"' },
   schema: AnalysisSchema,
-  output: { format: 'json' },
-  provider: 'openai',  // No restriction - works with or without tools
+  provider: 'google-ai',
+  disableTools: true
 });
 ```
 
-This is a documented Google API limitation, not a NeuroLink bug. All frameworks (LangChain, Vercel AI SDK, etc.) require this approach.
+On successful structured generation, both calls return JSON in `content` and a parsed value in `structuredData`; the second call additionally makes no tools available to that request. Validate `structuredData` before using it because an unrecoverable model response can leave the field undefined.
 
 ### Nested Objects and Arrays
 
-Real-world data often involves nested structures. NeuroLink handles complex schemas seamlessly:
+Real-world data often involves nested structures. You can pass nested Zod objects and arrays directly:
 
 ```typescript
 import { z } from 'zod';
@@ -250,12 +244,10 @@ const result = await neurolink.generate({
       Subtotal: $125, Tax: $12.50, Total: $137.50`
   },
   schema: InvoiceSchema,
-  output: { format: 'json' },
   provider: 'openai',
 });
 
-// result.content is always a string, so JSON.parse() is required
-const invoice = JSON.parse(result.content);
+const invoice = InvoiceSchema.parse(result.structuredData);
 ```
 
 ## Type-Safe Extraction Patterns
@@ -280,15 +272,12 @@ async function extract<T extends ZodSchema>(
   const result = await neurolink.generate({
     input: { text: prompt },
     schema,
-    output: { format: 'json' },
     provider: options?.provider,
     temperature: options?.temperature ?? 0,
     disableTools: options?.disableTools
   });
 
-  // result.content is always a string, so JSON.parse() is required
-  const data = JSON.parse(result.content);
-  return schema.parse(data); // Validate and get typed result
+  return schema.parse(result.structuredData); // Validate and get typed result
 }
 
 // Usage with automatic type inference
@@ -306,21 +295,18 @@ const event = await extract(
 // event is fully typed as { title: string; date: string; location: string; attendees: string[] }
 ```
 
-### Provider-Aware Extraction Helper
+### Provider-Selectable Extraction Helper
 
-> **Note**: The `smartExtract()` function shown below is a **custom helper pattern**, not a built-in NeuroLink API method. You can implement this helper in your own codebase.
+> **Note**: The `smartExtract()` function shown below is a custom helper pattern, not a built-in NeuroLink API method.
 {: .prompt-info }
 
-Create a reusable helper that automatically handles Google provider restrictions:
+Create a reusable helper that lets callers select a provider and model. NeuroLink handles provider-specific structured-output behavior internally:
 
 ```typescript
 import { z, ZodSchema } from 'zod';
 import { NeuroLink } from '@juspay/neurolink';
 
-// Custom helper - implement this in your application code
 const neurolink = new NeuroLink();
-
-const GOOGLE_PROVIDERS = ['vertex', 'google-ai'];
 
 async function smartExtract<T extends ZodSchema>(
   schema: T,
@@ -331,40 +317,29 @@ async function smartExtract<T extends ZodSchema>(
     temperature?: number;
   }
 ): Promise<z.infer<T>> {
-  const provider = options?.provider ?? 'openai';
-
-  // Automatically disable tools for Google providers when using schemas
-  const disableTools = GOOGLE_PROVIDERS.includes(provider);
-
   const result = await neurolink.generate({
     input: { text: prompt },
     schema,
-    output: { format: 'json' },
-    provider,
+    provider: options?.provider ?? 'openai',
     model: options?.model,
-    temperature: options?.temperature ?? 0,
-    disableTools
+    temperature: options?.temperature ?? 0
   });
 
-  const data = JSON.parse(result.content);
-  return schema.parse(data);
+  return schema.parse(result.structuredData);
 }
 
-// Works seamlessly with any provider
 const PersonSchema = z.object({
   name: z.string(),
   age: z.number(),
   occupation: z.string()
 });
 
-// Automatically disables tools for Vertex AI
-const vertexResult = await smartExtract(
+const geminiResult = await smartExtract(
   PersonSchema,
   'Extract: "John is a 30-year-old engineer"',
-  { provider: 'vertex' },
+  { provider: 'google-ai' },
 );
 
-// Works normally with OpenAI
 const openaiResult = await smartExtract(
   PersonSchema,
   'Extract: "John is a 30-year-old engineer"',
@@ -393,12 +368,10 @@ async function safeExtract<T>(
     const result = await neurolink.generate({
       input: { text: prompt },
       schema,
-      output: { format: 'json' },
-      provider,
-      disableTools: ['vertex', 'google-ai'].includes(provider)
+      provider
     });
 
-    const data = schema.parse(JSON.parse(result.content));
+    const data = schema.parse(result.structuredData);
     return { success: true, data };
   } catch (error) {
     if (error instanceof ZodError) {
@@ -451,40 +424,31 @@ async function extractWithRetry<T extends ZodSchema>(
 ): Promise<z.infer<T>> {
   const maxRetries = options?.maxRetries ?? 3;
   const provider = options?.provider ?? 'openai';
-  let lastError: Error | null = null;
+  let lastError: Error = new Error('Extraction failed');
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const result = await neurolink.generate({
         input: { text: prompt },
         schema,
-        output: { format: 'json' },
-        provider,
-        disableTools: ['vertex', 'google-ai'].includes(provider)
+        provider
       });
 
-      const data = JSON.parse(result.content);
-      return schema.parse(data);
-    } catch (error) {
-      lastError = error as Error;
-
-      // Don't retry validation errors - they won't self-resolve
+      return schema.parse(result.structuredData);
+    } catch (error: unknown) {
       if (error instanceof ZodError) {
-        throw error;
+        throw error; // A schema mismatch is not a transient transport failure.
       }
 
-      // Check for rate limiting
-      if (error instanceof Error && error.message.includes('rate limit')) {
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-        console.log(`Rate limited. Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt === maxRetries) {
+        break;
       }
 
-      // Retry other transient errors
-      if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      // In production, classify retryable provider/network errors by typed
+      // status or error code rather than message text.
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
@@ -529,7 +493,7 @@ const neurolink = new NeuroLink();
 const DateEventSchema = z.object({
   title: z.string(),
   startDate: z.string().describe('ISO 8601 format: YYYY-MM-DD'),
-  endDate: z.string().optional().describe('ISO 8601 format, null if same as start'),
+  endDate: z.string().optional().describe('ISO 8601 format; omit if same as start'),
   isRecurring: z.boolean()
 });
 
@@ -584,7 +548,7 @@ describe('ContactSchema', () => {
 
 ## What You Built
 
-You built schema-enforced JSON extraction with Zod schemas, provider-aware helpers that handle Google's `disableTools` requirement, retry logic with exponential backoff, and testing patterns for validation. Every LLM response now returns typed, validated data that your application can consume directly.
+You built structured JSON extraction with Zod schemas, provider-selectable helpers, retry logic with exponential backoff, and application-level validation. NeuroLink supplies JSON in `content` and a parsed value in `structuredData`; validating that value with the same Zod schema gives your application a typed result.
 
 Continue with these related tutorials:
 

@@ -119,7 +119,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Extract product info: The new UltraWidget Pro costs $49.99, falls under electronics, and features bluetooth, waterproofing, and 48hr battery.' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   schema: ProductSchema,
   output: { format: 'structured' }
 });
@@ -147,7 +147,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'What chunking strategies does NeuroLink support?' },
   provider: 'vertex',
-  model: 'gemini-3-flash',
+  model: 'gemini-2.5-flash',
   rag: {
     files: ['./docs/guide.md', './docs/api-reference.md'],
     strategy: 'markdown',
@@ -164,7 +164,7 @@ console.log(result.content);
 
 The `rag` option in `generate()` automatically loads your documents, chunks them using the specified strategy, creates embeddings, retrieves relevant chunks, and injects them into the prompt. No separate pipeline setup required.
 
-For more control, use the full `RAGPipeline` class with the `ChunkerRegistry`, which supports 9 chunking strategies: character, sentence, markdown, recursive, semantic, HTML, JSON, LaTeX, and token-based chunking. This lets you tune retrieval quality for different document types.
+For more control, use the full `RAGPipeline` class with the `ChunkerRegistry`, which supports 10 chunking strategies: character, sentence, markdown, recursive, semantic, semantic-markdown, HTML, JSON, LaTeX, and token-based chunking. This lets you tune retrieval quality for different document types.
 
 ---
 
@@ -211,7 +211,7 @@ console.log(`Available tools: ${tools.map(t => t.name).join(', ')}`);
 const result = await neurolink.generate({
   input: { text: 'List the files in the current directory and summarize the project structure' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4'
 });
 
 console.log(result.content);
@@ -220,7 +220,7 @@ console.log('Tools used:', result.toolsUsed);
 
 The AI model decides which tools to call based on the user's request, executes them, and incorporates the results into its response. You get an AI agent that can take actions, not just generate text.
 
-With 58+ MCP servers available, your agents can interact with file systems, GitHub, Slack, databases, and much more -- all through a standardized protocol.
+With support for any MCP server via `neurolink mcp add` (plus one-command configs for common ones like filesystem, GitHub, and Postgres), your agents can interact with file systems, source control, databases, and much more -- all through a standardized protocol.
 
 ---
 
@@ -347,21 +347,21 @@ const result = await neurolink.generate({
     ]
   },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4'
 });
 
 console.log(result.content);
 ```
 
-Image analysis works with any vision-capable model, including GPT-4o, Gemini, and Claude. Use cases range from product screenshot analysis and document OCR to content moderation and accessibility auditing.
+Image analysis works with any vision-capable model, including GPT-5.4, Gemini, and Claude. Use cases range from product screenshot analysis and document OCR to content moderation and accessibility auditing.
 
 You can pass multiple images in the `images` array to enable comparison analysis, multi-page document processing, or before-and-after evaluations.
 
 ---
 
-## 10. Extended Thinking for Complex Reasoning
+## 10. Adaptive Thinking for Complex Reasoning
 
-Some problems require deep reasoning -- mathematical proofs, complex code analysis, strategic planning. Extended thinking gives the model a dedicated "thinking budget" to work through the problem step by step before generating a response:
+Some problems require deeper reasoning -- mathematical proofs, complex code analysis, and strategic planning. Claude Sonnet 5 uses adaptive thinking by default, deciding how much reasoning the task needs without a fixed token budget:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -371,24 +371,17 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Prove that the square root of 2 is irrational.' },
   provider: 'anthropic',
-  model: 'claude-3-7-sonnet-20250219',
-  thinkingConfig: {
-    enabled: true,
-    budgetTokens: 10000
-  }
+  model: 'claude-sonnet-5'
 });
 
 console.log(result.content);
 ```
 
-The `thinkingConfig` options differ by provider:
+For Claude Sonnet 5, omit the older Anthropic `thinkingConfig` form that sets `budgetTokens`. Sonnet 5 uses adaptive thinking automatically and rejects fixed-budget thinking requests. Thinking controls differ across providers and model generations, so check the provider's current documentation before adding model-specific options.
 
-- **Anthropic:** `{ enabled: true, budgetTokens: 10000 }` -- allocates a token budget for internal reasoning
-- **Google Gemini 3:** `{ thinkingLevel: 'high' }` -- sets the thinking depth level (minimal, low, medium, high)
+Adaptive thinking is useful for tasks that benefit from deeper reasoning, including mathematical proofs, code debugging, architectural decision-making, and complex analysis.
 
-Extended thinking dramatically improves quality on tasks that benefit from step-by-step reasoning: mathematical proofs, code debugging, architectural decision-making, and complex analysis.
-
-> **Note:** Extended thinking increases token usage and response time. Use it selectively for tasks where accuracy is worth the additional cost.
+> **Note:** Deeper reasoning can increase token usage and response time. Use it selectively for tasks where the additional reasoning is valuable.
 {: .prompt-info }
 
 ---

@@ -25,11 +25,11 @@ image:
   alt: 'The Middleware System: Analytics, Guardrails, and Custom Pipelines'
 ---
 
-Every `generate()` call in production needed the same boilerplate: timing, token counting, PII filtering, content safety checks, and audit logging. We were copying this logic across every endpoint, and every copy drifted slightly from the others. The maintenance cost was quadratic.
+Every `generate()` call in production needs the same boilerplate: timing, token counting, PII filtering, content safety checks, and audit logging. Copy that logic into every endpoint by hand and every copy drifts slightly from the others -- the maintenance cost compounds with each new endpoint added.
 
-The middleware system was the fix. NeuroLink wraps the language model itself using the AI SDK's `wrapLanguageModel`, so analytics, guardrails, and evaluation run transparently on both `generate()` and `stream()` with zero application code changes. A priority-based chain ensures correct execution order. A registry handles registration and conditional application. And because the factory catches middleware errors gracefully, a broken logger never takes down your AI pipeline.
+The middleware system is the fix. NeuroLink wraps the language model itself using its own `wrapLanguageModel` implementation -- a local reimplementation of the AI SDK's middleware-wrapping pattern, so the core no longer depends on the `ai` package -- so analytics, guardrails, and evaluation run transparently on both `generate()` and `stream()` with zero application code changes. A priority-based chain ensures correct execution order, while a registry handles registration and conditional application. The factory falls back to the original model if setup fails while assembling or wrapping the chain; once generation starts, runtime hook errors propagate unless the middleware catches them internally.
 
-This deep dive covers the full architecture: the `MiddlewareFactory` and `MiddlewareRegistry`, every built-in middleware (analytics at priority 100, guardrails at 90, auto-evaluation at 80), the custom middleware interface, conditional application by provider or model, and the execution statistics that keep your pipeline observable.
+This deep dive covers the full architecture: the `MiddlewareFactory` and `MiddlewareRegistry`, all four built-in middleware (lifecycle at priority 110, analytics at 100, and guardrails and auto-evaluation at 90), the custom middleware interface, conditional application by provider or model, and the execution statistics that keep your pipeline observable.
 
 ## Architecture overview
 
@@ -37,30 +37,32 @@ NeuroLink's middleware system is built around two core components: the `Middlewa
 
 ```mermaid
 flowchart LR
-    A[User Request] --> B[MiddlewareFactory]
-    B --> C[MiddlewareRegistry]
-    C --> D{Build Chain}
-    D --> E[Analytics\npriority: 100]
-    D --> F[Guardrails\npriority: 90]
-    D --> G[AutoEvaluation\npriority: 80]
-    D --> H[Custom\npriority: n]
-    E --> I[wrapLanguageModel]
-    F --> I
-    G --> I
-    H --> I
-    I --> J[AI Provider]
-    J --> K[Response]
+    A["User Request"] --> B["MiddlewareFactory"]
+    B --> C["MiddlewareRegistry"]
+    C --> D{"Build Chain"}
+    D --> E["Lifecycle<br/>priority: 110<br/>disabled by default"]
+    D --> F["Analytics<br/>priority: 100"]
+    D --> G["Guardrails<br/>priority: 90"]
+    D --> H["AutoEvaluation<br/>priority: 90"]
+    D --> I["Custom<br/>priority: n"]
+    E --> J["wrapLanguageModel"]
+    F --> J
+    G --> J
+    H --> J
+    I --> J
+    J --> K["AI Provider"]
+    K --> L["Response"]
 ```
 
 Here is how the pieces fit together:
 
-- **MiddlewareFactory** (`factory.ts`): The orchestrator. It manages the registry, applies presets, merges configurations, and ultimately calls `wrapLanguageModel` with the assembled middleware chain. If anything goes wrong during middleware application, the factory returns the original model -- your requests never fail because of a middleware error.
+- **MiddlewareFactory** (`factory.ts`): The orchestrator. It manages the registry, applies presets, merges configurations, and ultimately calls `wrapLanguageModel` with the assembled middleware chain. If chain construction or model wrapping fails during `applyMiddleware()`, the factory returns the original model. That fallback does not catch errors thrown later by runtime hooks.
 
-- **MiddlewareRegistry** (`registry.ts`): The storage layer. It stores registered middleware, handles priority-based ordering, builds execution chains, and tracks execution statistics. The `buildChain()` method (lines 97-141 in the source) is where middleware are sorted by priority and filtered by conditions.
+- **MiddlewareRegistry** (`registry.ts`): The storage layer. It stores registered middleware, handles priority-based ordering, builds execution chains, and tracks execution statistics. The `buildChain()` method is where middleware are sorted by priority and filtered by conditions. Its runtime wrappers record hook failures and rethrow them.
 
-- **NeuroLinkMiddleware type**: Every middleware extends the `LanguageModelV1Middleware` interface with metadata -- an `id`, `name`, `description`, `priority`, and `defaultEnabled` flag. This metadata drives the registry's sorting, filtering, and reporting.
+- **NeuroLinkMiddleware type**: Every middleware extends the package's AI SDK v3-compatible `LanguageModelMiddleware` interface with metadata -- an `id`, `name`, `description`, `priority`, and `defaultEnabled` flag. This metadata drives the registry's sorting, filtering, and reporting.
 
-- **Priority system**: Higher priority numbers mean earlier execution in the chain. Analytics runs at priority 100 (first, to capture total time), guardrails at 90, and auto-evaluation at 80. Custom middleware slots in wherever you need it.
+- **Priority system**: Higher priority numbers mean earlier execution in the chain. Lifecycle runs at priority 110 when explicitly enabled, analytics runs at 100, and guardrails and auto-evaluation both run at 90. Custom middleware slots in wherever you need it.
 
 - **Conditional application**: Middleware can specify `MiddlewareConditions` to control when they run -- filter by provider, model, or a custom function. This means you can have different guardrails for different providers without if-statements in your application code.
 
@@ -68,11 +70,15 @@ Here is how the pieces fit together:
 
 ## Built-in middleware deep dive
 
-NeuroLink ships with three production-ready middleware out of the box. Each one addresses a critical production concern, and each is designed to work independently or in combination.
+NeuroLink registers four built-in middleware. Analytics is enabled by the default preset; guardrails and auto-evaluation are opt-in, and lifecycle is disabled by default.
+
+### Lifecycle middleware
+
+The lifecycle middleware runs at priority 110 when enabled. It invokes `onFinish`, `onError`, and `onChunk` callbacks around generation and streaming lifecycle events. It is disabled by default, so applications opt in when they need callback-driven lifecycle integration.
 
 ### Analytics middleware
 
-The analytics middleware tracks token usage, response times, and model performance for every LLM call. It runs at priority 100, meaning it is the first middleware in the chain -- this is deliberate, because it needs to measure the total wall-clock time including all other middleware.
+The analytics middleware tracks token usage, response times, and model performance for every LLM call. It runs at priority 100, ahead of guardrails and auto-evaluation at priority 90. The default-disabled lifecycle middleware is the one built-in with a higher priority, at 110.
 
 The middleware wraps both `wrapGenerate` and `wrapStream` hooks, extracting timing data and usage metrics from every response. The collected data is injected into `experimental_providerMetadata.neurolink.analytics`, making it available downstream without polluting the main response object.
 
@@ -90,7 +96,7 @@ const result = await neurolink.generate({
 // Analytics data available in provider metadata
 ```
 
-Because analytics runs first in the chain, the timing data it captures includes latency added by guardrails, evaluation, and any custom middleware. This gives you the true end-to-end picture, not just the raw provider latency.
+Because analytics runs before guardrails and auto-evaluation, the timing data it captures includes latency added by those lower-priority middleware and by any custom middleware ordered after analytics. This gives you a broader end-to-end picture than raw provider latency alone.
 
 > **Note:** The `"default"` preset enables analytics automatically. You do not need any additional configuration to start tracking token usage and latency.
 {: .prompt-info }
@@ -143,11 +149,11 @@ The guardrails middleware applies to both `wrapGenerate` and `wrapStream`. For s
 
 ### Auto-evaluation middleware
 
-The auto-evaluation middleware performs RAGAS-style quality assessment of every response. It scores outputs on relevance, accuracy, and completeness, providing a numerical quality gate for your AI pipeline.
+The auto-evaluation middleware performs one RAGAS-style quality assessment of each response. It scores outputs on relevance, accuracy, and completeness, and makes the result available through `onEvaluationComplete`.
 
-Configuration is straightforward: set a `threshold` score (responses below this are flagged or retried), a `maxRetries` count, and a `blocking` flag that determines whether low-scoring responses are returned with a warning or blocked entirely.
+Set `threshold` to determine the evaluation result's `isPassing` value. For non-streaming generation, `blocking` controls whether NeuroLink waits for evaluation and propagates evaluator errors; it does not block or retry a response merely because its score is below the threshold. Streaming evaluation remains non-blocking from the caller's perspective.
 
-This middleware is covered in depth in a dedicated post on model evaluation and scoring. For now, know that it runs at priority 80 and integrates seamlessly with the analytics and guardrails middleware above it.
+This middleware is covered in depth in a dedicated post on model evaluation and scoring. For now, know that it runs at priority 90 (registered after guardrails, so it still executes later in the chain) and integrates with the analytics and guardrails middleware above it.
 
 ![middleware-config](/assets/img/posts/middleware-system/middleware-config.gif)
 
@@ -166,7 +172,7 @@ Three built-in presets are registered during `MiddlewareFactory.initialize()`:
 You can also register custom presets for your specific needs:
 
 ```typescript
-import { MiddlewareFactory } from '@juspay/neurolink/middleware';
+import { MiddlewareFactory } from '@juspay/neurolink';
 
 const factory = new MiddlewareFactory();
 
@@ -185,7 +191,10 @@ factory.registerPreset({
     },
     autoEvaluation: {
       enabled: true,
-      config: { threshold: 7, maxRetries: 2 },
+      config: {
+        threshold: 7,
+        blocking: true,
+      },
     },
   },
 });
@@ -231,9 +240,13 @@ A custom middleware implements the `NeuroLinkMiddleware` interface, which consis
 Here is a complete example of a logging middleware:
 
 ```typescript
-import type { NeuroLinkMiddleware } from '@juspay/neurolink/middleware';
+import {
+  MiddlewareFactory,
+  type NeuroLinkMiddleware,
+} from "@juspay/neurolink";
 
 const loggingMiddleware: NeuroLinkMiddleware = {
+  specificationVersion: "v3",
   metadata: {
     id: "custom-logging",
     name: "Request Logger",
@@ -280,7 +293,7 @@ Not every middleware should run on every request. NeuroLink's conditional middle
 Four condition types are available:
 
 - **`providers[]`**: Only run for specific providers (e.g., only apply guardrails to OpenAI and Anthropic).
-- **`models[]`**: Only run for specific models (e.g., extra validation for GPT-4o but not GPT-4o-mini).
+- **`models[]`**: Only run for specific models (e.g., extra validation for the flagship tier but not the mini tier).
 - **`options{}`**: Match against request options.
 - **`custom(context) => boolean`**: A function that receives the full request context and returns whether the middleware should apply.
 
@@ -294,7 +307,7 @@ const result = await neurolink.generate({
         enabled: true,
         conditions: {
           providers: ["openai", "anthropic"],
-          models: ["gpt-4o", "claude-sonnet-4-20250514"],
+          models: ["gpt-5.4", "claude-sonnet-5"],
           custom: (ctx) => ctx.session?.userId !== "admin",
         },
       },
@@ -303,7 +316,7 @@ const result = await neurolink.generate({
 });
 ```
 
-In this example, guardrails only apply when the provider is OpenAI or Anthropic, the model is GPT-4o or Claude Sonnet 4, and the user is not an admin. Admin users bypass guardrails entirely -- a common pattern for internal tooling.
+In this example, guardrails only apply when the provider is OpenAI or Anthropic, the model is GPT-5.4 or Claude Sonnet 5, and the user is not an admin. Admin users bypass guardrails entirely -- a common pattern for internal tooling.
 
 Conditional middleware is particularly powerful in multi-tenant applications where different customers have different security requirements, or in development environments where you want to skip expensive middleware during testing.
 
@@ -321,7 +334,7 @@ The `MiddlewareRegistry.getAggregatedStats()` method returns metrics for each re
 - **`averageExecutionTime`**: Mean execution time in milliseconds.
 - **`lastExecutionTime`**: The most recent execution time.
 
-The registry maintains a ring buffer of the last 100 executions per middleware (implemented at line 311 of `registry.ts`), providing a rolling window of performance data without unbounded memory growth.
+The registry maintains a ring buffer of the last 100 executions per middleware (implemented around line 314 of `registry.ts`), providing a rolling window of performance data without unbounded memory growth.
 
 ### Chain-level summary
 
@@ -343,15 +356,15 @@ After building and operating middleware pipelines in production, here are the pa
 
 ### Priority ordering matters
 
-The most common mistake is getting priority ordering wrong. Analytics should run first (highest priority) to capture total time. Guardrails should run second to block unsafe content before it reaches custom middleware. Custom middleware runs last.
+The most common mistake is getting priority ordering wrong. Higher numbers run earlier: lifecycle is 110 when enabled, analytics is 100, and guardrails and auto-evaluation are 90. Place custom middleware according to the behavior it must surround rather than assuming it always runs last.
 
 If you put a caching middleware at a lower priority than guardrails, cached responses will bypass safety checks. If you put analytics at a lower priority than custom middleware, your timing data will not include custom middleware latency.
 
-### Error handling is graceful by design
+### Distinguish setup-time and runtime errors
 
-The `MiddlewareFactory` is designed to be resilient. If any middleware throws an error during `applyMiddleware()`, the factory catches it and returns the original, unwrapped model (line 183 of `factory.ts`). Your requests still succeed -- they just skip the failed middleware.
+`MiddlewareFactory.applyMiddleware()` catches errors while configuring the chain or wrapping the model and returns the original, unwrapped model. This keeps setup-time middleware failures from preventing use of the underlying model.
 
-This is a deliberate design choice. In production, a broken logging middleware should never take down your AI pipeline. However, you should monitor `failedExecutions` in your stats to catch issues early.
+Once generation starts, the registry records failures from `transformParams`, `wrapGenerate`, and `wrapStream`, then rethrows them. A custom logger or other hook that must not fail the request should catch and handle its own runtime errors. Monitor `failedExecutions` in your stats to catch those issues early.
 
 ### Performance considerations
 
@@ -381,7 +394,7 @@ Three entry points:
 2. `"all"` preset for user-facing applications needing content guardrails
 3. Custom middleware for domain-specific processing -- compliance logging, PII detection, response caching, validation
 
-Priority ordering, graceful error handling, and `getChainStats()` make the pipeline observable and debuggable. The middleware pipeline is what separates a prototype from a production system.
+Priority ordering, explicit runtime error handling, and `getChainStats()` make the pipeline observable and debuggable. The middleware pipeline is what separates a prototype from a production system.
 
 ## What's next
 

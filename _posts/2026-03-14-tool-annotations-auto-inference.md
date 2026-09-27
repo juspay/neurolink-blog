@@ -123,7 +123,7 @@ This means `deleteUser`, `delete_user`, `delete-user`, and "Delete a user accoun
 
 ## Annotation types: The complete taxonomy
 
-NeuroLink infers and supports twelve annotation fields. Four come from the MCP specification. Eight are NeuroLink extensions that power advanced routing and observability.
+NeuroLink infers and supports thirteen annotation fields: four MCP-specification annotations, `title` for tool metadata, and eight NeuroLink extensions that power advanced routing and observability.
 
 ### MCP specification annotations
 
@@ -155,7 +155,7 @@ The `complexity` field is the only extension that gets auto-inferred. Keywords l
 
 ## How routing uses annotations
 
-The tool router consults annotations when selecting which MCP server should handle a tool call. Annotation-based routing adds a safety-aware layer on top of the six standard routing strategies (round-robin, weighted, least-connections, category, capability, and affinity).
+The tool router consults annotations when selecting which MCP server should handle a tool call. Annotation-based routing adds a safety-aware layer on top of the six standard routing strategies (round-robin, least-loaded, capability-based, priority, random, and affinity).
 
 ```mermaid
 flowchart LR
@@ -188,20 +188,21 @@ Here is how you query the router with annotation awareness:
 ```typescript
 import { ToolRouter, createAnnotatedTool } from "@juspay/neurolink";
 
-const router = new ToolRouter();
-
-// Register servers with different weights and categories
-router.registerServer({
-  id: "primary-db",
-  weight: 80,
-  categories: ["database", "caching"],
+const router = new ToolRouter({
+  strategy: "least-loaded",
+  // Weights live on the router config, not on registerServer()
+  serverWeights: [
+    { serverId: "primary-db", weight: 80 },
+    { serverId: "replica-db", weight: 20 },
+  ],
+  categoryMapping: {
+    caching: ["primary-db"],
+  },
 });
 
-router.registerServer({
-  id: "replica-db",
-  weight: 20,
-  categories: ["database"],
-});
+// registerServer(serverId, capabilities?) makes a server eligible for routing
+router.registerServer("primary-db", ["database", "caching"]);
+router.registerServer("replica-db", ["database"]);
 
 // A destructive tool routes only to the primary server
 const deleteResult = router.routeByAnnotation({
@@ -220,23 +221,19 @@ const queryResult = router.routeByAnnotation({
 
 ## How caching uses annotations
 
-The tool cache layer uses annotations to make three decisions: whether to cache a result, how long to keep it, and when to invalidate it.
+`ToolCache` itself is annotation-agnostic -- it is a generic get/set store with a configurable TTL, max size, and eviction strategy (`lru`, `fifo`, or `lfu`). It does not read a tool's annotations on its own; the calling code decides whether to touch the cache, and annotations are exactly the signal you use to make that decision.
 
-Read-only tools with `readOnlyHint: true` are always eligible for caching. Their results depend only on the input parameters and do not change server state. The cache key is a hash of the tool name plus the serialized input parameters.
-
-Idempotent tools with `idempotentHint: true` are cached with a shorter TTL. While the tool produces the same result for the same input, the underlying data may change between calls. A `updateUserPreferences` call is idempotent (calling it twice with the same preferences produces the same state), but the result of `getUserPreferences` may change after the update.
-
-Destructive tools are never cached. A `deleteUser` result should never be served from cache -- the caller needs to know the current state, not a cached confirmation from a previous deletion.
+The pattern is straightforward: check `readOnlyHint` and `destructiveHint` before you read or write the cache. Read-only tools are safe to cache unconditionally, since their results depend only on the input parameters and do not change server state. Idempotent tools can be cached too, but with a shorter TTL of your choosing, since the underlying data may change between calls even though the tool itself is safe to repeat. Destructive tools should never be cached -- a `deleteUser` call should never be served from cache, the caller needs the current state, not a cached confirmation from a previous deletion.
 
 ```typescript
 import { ToolCache, createAnnotatedTool } from "@juspay/neurolink";
 
 const cache = new ToolCache({
+  ttl: 300000, // 5 minutes
   maxSize: 1000,
   strategy: "lru",
 });
 
-// Read-only tool: cached with full TTL (default 5 minutes)
 const listTool = createAnnotatedTool({
   name: "listUsers",
   description: "List all users in the system",
@@ -245,21 +242,27 @@ const listTool = createAnnotatedTool({
   },
 });
 // Inferred: { readOnlyHint: true, complexity: "simple" }
-// Cache behavior: results cached for 5 minutes
 
-// Destructive tool: never cached
-const deleteTool = createAnnotatedTool({
-  name: "deleteUser",
-  description: "Delete a user account permanently",
-  execute: async ({ userId }) => {
-    return await db.query("DELETE FROM users WHERE id = $1", [userId]);
-  },
-});
-// Inferred: { destructiveHint: true, requiresConfirmation: true }
-// Cache behavior: results never cached
+// Annotations gate the cache at the call site -- ToolCache has no
+// built-in notion of readOnlyHint, idempotentHint, or destructiveHint.
+async function executeWithCache(tool, params) {
+  if (tool.annotations?.destructiveHint) {
+    return tool.execute(params);
+  }
+
+  const key = `${tool.name}:${JSON.stringify(params)}`;
+  const cached = cache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = await tool.execute(params);
+  cache.set(key, result);
+  return result;
+}
 ```
 
-The cache layer also uses the `estimatedDuration` annotation to decide whether caching is worthwhile. A tool that takes 5 milliseconds to execute gets less benefit from caching than one that takes 5 seconds. When `estimatedDuration` exceeds a configurable threshold (default: 500ms), the cache layer prioritizes keeping that tool's results in the LRU eviction queue.
+`estimatedDuration` is not consulted by `ToolCache` for eviction or TTL decisions -- it is exposed on the annotation object for you to read in your own wrapper (for example, to skip caching calls that are already fast enough that a cache round trip isn't worth it).
 
 ## How error recovery uses annotations
 
@@ -291,7 +294,7 @@ const paymentTool = createAnnotatedTool({
 
 The `isSafeToRetry` function returns `true` only when `idempotentHint` or `readOnlyHint` is set. A tool that matches neither -- like `processPayment` -- is never auto-retried. If the payment gateway returns a 500 error, the retry middleware surfaces the error to the caller rather than risking a duplicate charge.
 
-For tools marked as safe to retry, the middleware uses exponential backoff with jitter. The `estimatedDuration` annotation, when present, sets the initial backoff interval. A tool that normally takes 3 seconds gets a longer initial backoff than one that normally takes 50 milliseconds.
+For tools marked as safe to retry, the built-in retry middleware (`createRetryMiddleware`) backs off linearly: each attempt waits a multiple of a configured base delay. The delay comes from the middleware's own configuration, not from `estimatedDuration` -- the annotation is there for your dashboards and cost-aware logic, not for tuning retry timing automatically.
 
 The safety level classification provides a higher-level API for error recovery decisions:
 
@@ -357,30 +360,38 @@ MCP server authors can also set server-level default annotations. When you exten
 ```typescript
 import { MCPServerBase } from "@juspay/neurolink";
 
-const server = new MCPServerBase({
-  name: "analytics-server",
-  description: "Read-only analytics and reporting tools",
-  version: "1.0.0",
-  category: "analytics",
-  defaultAnnotations: {
-    readOnlyHint: true,
-    securityLevel: "internal",
-    auditRequired: true,
-  },
-});
+// MCPServerBase is abstract -- extend it rather than instantiating it directly
+class AnalyticsServer extends MCPServerBase {
+  constructor() {
+    super({
+      id: "analytics-server",
+      name: "Analytics Server",
+      description: "Read-only analytics and reporting tools",
+      version: "1.0.0",
+      category: "custom",
+      defaultAnnotations: {
+        readOnlyHint: true,
+        securityLevel: "internal",
+        auditRequired: true,
+      },
+    });
 
-// Every tool on this server inherits the default annotations
-server.registerTool({
-  name: "queryMetrics",
-  description: "Query application metrics",
-  execute: async ({ query }) => {
-    return await metricsDB.query(query);
-  },
-});
-// Effective annotations: { readOnlyHint: true, securityLevel: "internal", auditRequired: true, complexity: "simple" }
+    // Every tool registered here inherits the default annotations
+    this.registerTool({
+      name: "queryMetrics",
+      description: "Query application metrics",
+      execute: async ({ query }) => {
+        return await metricsDB.query(query);
+      },
+    });
+  }
+}
+
+const server = new AnalyticsServer();
+// Effective annotations: { readOnlyHint: true, securityLevel: "internal", auditRequired: true }
 ```
 
-The precedence order is: inferred annotations (lowest) -> server defaults -> tool-level manual annotations (highest).
+The precedence order is: server defaults (lowest) -> inferred annotations -> tool-level manual annotations (highest).
 
 ```mermaid
 flowchart TB
@@ -508,7 +519,7 @@ describe("createAnnotatedTool", () => {
 The `EnhancedToolDiscovery` class connects auto-inference to multi-server environments. When you discover tools from an MCP server, annotations are inferred automatically and attached to every tool in the discovery result.
 
 ```typescript
-import { EnhancedToolDiscovery, filterToolsByAnnotations } from "@juspay/neurolink";
+import { EnhancedToolDiscovery } from "@juspay/neurolink";
 
 const discovery = new EnhancedToolDiscovery();
 
@@ -534,12 +545,13 @@ const dangerousTools = discovery.getToolsBySafetyLevel("dangerous");
 const confirmationRequired = discovery.getToolsRequiringConfirmation();
 
 // Filter with custom predicates
-const auditableDestructive = filterToolsByAnnotations(
-  discovery.getAllTools(),
-  (annotations) =>
-    annotations.destructiveHint === true &&
-    annotations.auditRequired === true,
-);
+const auditableDestructive = discovery
+  .getAllTools()
+  .filter(
+    (tool) =>
+      tool.annotations?.destructiveHint === true &&
+      tool.annotations?.auditRequired === true,
+  );
 
 // Listen for annotation events
 discovery.on("toolDiscovered", ({ serverId, toolName, annotations }) => {
@@ -557,9 +569,11 @@ The discovery class also exposes a `getStatistics` method that provides aggregat
 const stats = discovery.getStatistics();
 // {
 //   totalTools: 47,
-//   byServer: { "github-server": 12, "db-server": 8, ... },
-//   byCategory: { "version-control": 12, "database": 8, ... },
-//   bySafety: { safe: 22, moderate: 18, dangerous: 7 }
+//   toolsByServer: { "github-server": 12, "db-server": 8, ... },
+//   toolsByCategory: { "version-control": 12, "database": 8, ... },
+//   toolsBySafetyLevel: { safe: 22, moderate: 18, dangerous: 7 },
+//   toolsWithAnnotations: 47,
+//   deprecatedTools: 0
 // }
 ```
 

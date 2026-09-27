@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Building Webhook Handlers with NeuroLink AI Processing
+title: 'Building Webhook Handlers with NeuroLink AI Processing'
 date: '2025-11-10 10:00:00 +0530'
 categories:
   - Tutorial
@@ -237,7 +237,7 @@ Message: "${messageContent}"
 Respond in JSON format with keys: sentiment, intent, entities, suggestedResponse`
       },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
       temperature: 0.3,
       systemPrompt: 'You are a customer service analysis assistant. Analyze messages and provide structured insights.',
     });
@@ -806,7 +806,7 @@ app.post('/webhooks/secure',
 
 ## Common Integration Patterns
 
-Your webhook handlers can integrate with popular platforms and services, using NeuroLink for AI processing. Here are battle-tested patterns for common integrations where you receive webhooks from external services and use NeuroLink to generate intelligent responses.
+Your webhook handlers can integrate with popular platforms and services, using NeuroLink for AI processing. Here are common patterns for integrations where you receive webhooks from external services and use NeuroLink to generate intelligent responses.
 
 ### Slack Integration
 
@@ -858,7 +858,7 @@ class SlackWebhookHandler implements EventHandler {
 Be helpful, friendly, and concise. If the question relates to code or technical topics, provide specific guidance.`
       },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
       temperature: 0.7,
       maxTokens: 500,
       systemPrompt: 'You are a helpful AI assistant integrated into Slack. Respond in a friendly, professional tone appropriate for workplace communication.',
@@ -981,7 +981,7 @@ Diff:
 ${String(diff).slice(0, 10000)} // Truncate for token limits
 `
       },
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
       temperature: 0.3,
       maxTokens: 1500,
       systemPrompt: 'You are an expert code reviewer. Provide constructive, actionable feedback focusing on bugs, security, and best practices.',

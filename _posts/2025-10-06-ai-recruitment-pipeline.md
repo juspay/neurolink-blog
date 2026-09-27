@@ -26,7 +26,7 @@ image:
 ---
 
 
-You will build a complete AI recruitment pipeline that handles resume parsing, skill matching, bias prevention, candidate ranking, recruiter approval, and interview scheduling. By the end of this tutorial, you will have a multi-stage pipeline using GPT-4o for resume parsing, Gemini Pro for skill matching, Claude Sonnet for candidate ranking, guardrails middleware for bias prevention, HITL for recruiter approval, and Gemini Flash for automated interview scheduling.
+You will build a complete AI recruitment pipeline that handles resume parsing, skill matching, bias prevention, candidate ranking, recruiter approval, and interview scheduling. By the end of this tutorial, you will have a multi-stage pipeline using GPT-5.4 for resume parsing, Gemini Pro for skill matching, Claude Sonnet for candidate ranking, guardrails middleware for bias prevention, HITL for recruiter approval, and Gemini Flash for automated interview scheduling.
 
 Every automated hiring decision must be auditable and free of bias against protected characteristics under EEOC, ADA, and Title VII regulations. Every final hiring decision must involve a human.
 
@@ -38,7 +38,7 @@ The recruitment pipeline is a multi-stage process where each stage uses a differ
 
 ```mermaid
 flowchart LR
-    Resume[Resume Upload] --> Parser[Resume Parser<br/>GPT-4o Vision]
+    Resume[Resume Upload] --> Parser[Resume Parser<br/>GPT-5.4 Vision]
     Parser --> Matcher[Skill Matcher<br/>Gemini Pro]
     Matcher --> BiasCheck[Bias Guardrails<br/>Middleware]
     BiasCheck --> Ranker[Candidate Ranker<br/>Claude Sonnet]
@@ -54,7 +54,7 @@ flowchart LR
 
 Each stage in the pipeline is handled by a specialized model:
 
-- **Resume Parser (GPT-4o):** Multimodal vision capabilities for parsing PDF and image-based resumes into structured JSON data.
+- **Resume Parser (GPT-5.4):** Multimodal vision capabilities for parsing PDF and image-based resumes into structured JSON data.
 - **Skill Matcher (Gemini Pro):** Balanced model for matching extracted skills against job requirements with nuanced understanding.
 - **Bias Check (Guardrails Middleware):** Content filtering that removes protected characteristics from both inputs and outputs before they influence evaluations.
 - **Candidate Ranker (Claude Sonnet):** Nuanced comparative evaluation across multiple candidates with reasoning explanations.
@@ -62,12 +62,12 @@ Each stage in the pipeline is handled by a specialized model:
 
 ## Resume parsing with Structured Output
 
-The first stage extracts structured data from resumes in any format -- PDF, Word, or image. GPT-4o's multimodal capabilities handle all these formats through a single interface.
+The first stage extracts structured data from resumes in any format -- PDF, Word, or image. GPT-5.4's multimodal capabilities handle all these formats through a single interface.
 
 ```typescript
 import { AIProviderFactory } from '@juspay/neurolink';
 
-const parser = await AIProviderFactory.createProvider("openai", "gpt-4o");
+const parser = await AIProviderFactory.createProvider("openai", "gpt-5.4");
 
 const systemPrompt = `You are a resume parser. Extract structured data from resumes.
 ${STRUCTURED_OUTPUT_INSTRUCTIONS}`;
@@ -95,7 +95,7 @@ const result = await parser.generate({
 
 The `STRUCTURED_OUTPUT_INSTRUCTIONS` from NeuroLink's conversation memory configuration is critical here. It instructs the model to output pure JSON without markdown wrapping, conversational preamble, or decorative formatting. This ensures that the parsed output can be directly fed into your Applicant Tracking System (ATS) without additional text processing.
 
-For PDF resumes, GPT-4o's vision capabilities process the document as an image, handling complex layouts, tables, and multi-column formats that text-only parsers struggle with. This eliminates the need for a separate PDF parsing library in your pipeline.
+For PDF resumes, GPT-5.4's vision capabilities process the document as an image, handling complex layouts, tables, and multi-column formats that text-only parsers struggle with. This eliminates the need for a separate PDF parsing library in your pipeline.
 
 > **Tip:** Always validate parsed resume data against a schema before storing it. LLMs can hallucinate fields or produce malformed JSON despite structured output instructions. A Zod schema validation step adds milliseconds but prevents data quality issues downstream.
 {: .prompt-tip }
@@ -260,7 +260,7 @@ The `generateEvaluation()` function scores the AI's skill matching output on mul
 
 Recruitment pipelines process hundreds or thousands of candidates per role. Cost optimization at each stage adds up significantly:
 
-- **Resume parsing (GPT-4o):** Approximately $0.005 per resume for multimodal processing. This is the most expensive per-candidate step but provides the highest-quality extraction.
+- **Resume parsing (GPT-5.4):** Approximately $0.005 per resume for multimodal processing. This is the most expensive per-candidate step but provides the highest-quality extraction.
 - **Skill matching (Gemini Pro):** Approximately $0.0003 per candidate. The balanced tier provides good matching quality at a fraction of the parsing cost.
 - **Ranking (Claude Sonnet):** Approximately $0.003 per batch of 10 candidates. Ranking is done in batches for comparative evaluation, amortizing the cost across multiple candidates.
 - **Scheduling (Gemini Flash):** Approximately $0.0001 per scheduling request. The fast tier is more than sufficient for scheduling logic.
@@ -269,7 +269,7 @@ Use `getCostInfo()` from `ModelConfigurationManager` for real-time cost tracking
 
 ## What you built
 
-You built a complete AI recruitment pipeline: resume parsing with GPT-4o Vision, skill matching with Gemini Pro, bias prevention with guardrails middleware, candidate ranking with Claude Sonnet, recruiter approval with HITL, and interview scheduling with Gemini Flash and calendar tools. Every evaluation is auditable, bias-checked, and human-approved.
+You built a complete AI recruitment pipeline: resume parsing with GPT-5.4 Vision, skill matching with Gemini Pro, bias prevention with guardrails middleware, candidate ranking with Claude Sonnet, recruiter approval with HITL, and interview scheduling with Gemini Flash and calendar tools. Every evaluation is auditable, bias-checked, and human-approved.
 
 Continue with these related tutorials:
 

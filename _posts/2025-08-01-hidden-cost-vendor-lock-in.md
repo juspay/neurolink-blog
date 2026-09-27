@@ -48,16 +48,23 @@ NeuroLink provides this out of the box:
 ```typescript
 import { createAIProviderWithFallback } from '@juspay/neurolink';
 
-// Primary on Anthropic, automatic failover to OpenAI
+// Get a ready-to-use primary and fallback provider instance
 const { primary, fallback } = await createAIProviderWithFallback(
   'anthropic',  // Primary provider
-  'openai',     // Automatic failover
+  'openai',     // Fallback provider
 );
+
+try {
+  const result = await primary.generate({ input: { text: 'Hello!' } });
+} catch (error) {
+  // Switch to the fallback provider on primary failure
+  const result = await fallback.generate({ input: { text: 'Hello!' } });
+}
 ```
 
-The `createAIProviderWithFallback()` function creates a provider pair where the primary handles all requests until it fails, then traffic automatically routes to the fallback. This is backed by a circuit breaker pattern that prevents cascading failures: after a configurable number of failures (default: 5), NeuroLink stops trying the unhealthy provider for a cooldown period (default: 60 seconds) before probing it again.
+The `createAIProviderWithFallback()` function hands you ready-to-use primary and fallback provider instances; your application decides when to switch, typically by catching a primary failure and retrying against the fallback, as shown above.
 
-The circuit breaker operates in three states -- closed (healthy), open (failing, using fallback), and half-open (probing to see if the primary has recovered) -- with a configurable monitor window of 10 minutes. This is not a naive retry loop; it is a production-grade resilience pattern borrowed from distributed systems engineering.
+For automatic switching inside a single `generate()` call instead of managing two instances yourself, pass a `providerFallback(error)` callback in your config. NeuroLink retries the current provider a couple of times with backoff first, and only then calls your callback, which returns the next `{ provider, model }` to try (or `null` to let the error bubble up). This is not a naive retry loop; it gives you a hook to implement whatever fallback policy your production environment needs.
 
 > **Tip:** Configure your fallback provider to use a different cloud entirely. If your primary is on AWS (Bedrock), your fallback should be on GCP (Vertex) or a direct API provider (OpenAI, Anthropic). This protects against cloud-level incidents, not just provider-level ones.
 {: .prompt-tip }
@@ -89,11 +96,11 @@ const cheapResult = await neurolink.generate({
 const qualityResult = await neurolink.generate({
   input: { text: "Draft a legal contract review" },
   provider: "anthropic",      // Premium quality for critical tasks
-  model: "claude-3-5-sonnet-20241022",
+  model: "claude-sonnet-5",
 });
 ```
 
-The `createBestAIProvider()` utility auto-selects from available providers based on your environment configuration, while `ProviderHealthChecker` validates configuration and connectivity before routing traffic. Combined, these tools let you shift volume to the best price/performance ratio at any time -- without code changes.
+The `createBestAIProvider()` utility auto-selects from available providers based on your environment configuration, backed by NeuroLink's internal provider health checks that validate configuration and connectivity before routing traffic. Combined, these tools let you shift volume to the best price/performance ratio at any time -- without code changes.
 
 ## Cost 3: The Innovation Lag
 
@@ -103,7 +110,7 @@ New models launch every 2-3 months across providers. When OpenAI released o-seri
 
 The innovation pace is accelerating, not slowing. Missing a model generation compounds -- the team that adopts a superior model first ships better features faster, creating a competitive advantage that widens over time.
 
-NeuroLink supports 13 providers out of the box, covering the full spectrum of AI model innovation:
+NeuroLink supports 33 LLM providers out of the box, covering the full spectrum of AI model innovation. Among them:
 
 - **OpenAI, Anthropic, Google AI Studio, Google Vertex, Mistral** -- direct access to all major model providers
 - **AWS Bedrock, Azure OpenAI** -- enterprise cloud deployments
@@ -121,7 +128,7 @@ When your AI code is tightly coupled to a specific provider's SDK, you are not j
 
 Provider-specific code creates provider-specific expertise requirements. New developers need to learn not just your application logic but the quirks of your chosen provider's API, error handling patterns, and SDK conventions. When your lead AI engineer leaves, the knowledge gap is wider because they were the only one who truly understood the provider's undocumented behaviors.
 
-NeuroLink's consistent interface means any developer can work with any provider using the same `generate()` and `stream()` methods. The learning curve is one API, not thirteen. A developer who has worked with NeuroLink on OpenAI can immediately contribute to Anthropic or Google AI workloads without any additional training.
+NeuroLink's consistent interface means any developer can work with any provider using the same `generate()` and `stream()` methods. The learning curve is one API, not dozens. A developer who has worked with NeuroLink on OpenAI can immediately contribute to Anthropic or Google AI workloads without any additional training.
 
 This is not just about hiring -- it is about team velocity. When every developer on your team can work on any AI-powered feature regardless of which provider it uses, you eliminate bottlenecks and increase throughput.
 
@@ -140,7 +147,7 @@ NeuroLink enables region-specific routing through provider-specific configuratio
 - **Google Vertex:** Regional deployment with Anthropic model support via dual provider architecture
 - **Ollama:** Fully on-premises, no data leaves your network
 
-The `ProviderHealthChecker` validates region-specific configurations including AWS region support for Bedrock and Vertex AI regional availability for Anthropic models. This means you can build a routing strategy that automatically directs EU user data to EU-hosted providers while routing other traffic to the most cost-effective option.
+NeuroLink's internal provider health checks validate region-specific configurations, including AWS region support for Bedrock and Vertex AI regional availability for Anthropic models. This means you can build a routing strategy that automatically directs EU user data to EU-hosted providers while routing other traffic to the most cost-effective option.
 
 > **Warning:** Compliance requirements vary by industry and jurisdiction. Always consult with your legal and compliance teams when designing region-specific AI routing strategies. NeuroLink provides the technical capability, but the regulatory analysis is your responsibility.
 {: .prompt-warning }
@@ -149,24 +156,23 @@ The `ProviderHealthChecker` validates region-specific configurations including A
 
 **Single-provider applications have no baseline for comparison when model behavior changes.**
 
-Provider models change behavior between versions without notice. GPT-4o may respond differently from one API version to the next. Claude's output characteristics shift between model releases. When you are locked to a single provider, you have no baseline for comparison -- you cannot tell whether a quality regression is in your application or the model.
+Provider models change behavior between versions without notice. GPT-5.4 may respond differently from one API version to the next. Claude's output characteristics shift between model releases. When you are locked to a single provider, you have no baseline for comparison -- you cannot tell whether a quality regression is in your application or the model.
 
-Multi-provider architecture enables A/B testing and quality validation across models. When one model's output degrades, you have immediate comparison points. NeuroLink's evaluation system supports multi-model quality scoring through the evaluation middleware:
+Multi-provider architecture enables A/B testing and quality validation across models. When one model's output degrades, you have immediate comparison points. NeuroLink's workflow engine supports multi-model quality scoring through its built-in ensemble workflows:
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import { NeuroLink, CONSENSUS_3_WORKFLOW } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Run the same prompt through multiple models, compare quality
+// Run the same prompt through a 3-model ensemble, judge picks the best response
 const result = await neurolink.generate({
   input: { text: 'Classify this document' },
-  // Workflow config for multi-model consensus
-  workflowConfig: { strategy: 'consensus', models: 3 },
+  workflowConfig: CONSENSUS_3_WORKFLOW,
 });
 ```
 
-The consensus strategy runs the same prompt through multiple models and compares outputs. This is invaluable for quality-critical applications like medical document processing, legal analysis, or financial classification where model regression could have serious consequences.
+The `CONSENSUS_3_WORKFLOW` ensemble runs the same prompt through three models in parallel and a judge selects the best response based on accuracy, clarity, and completeness. This is invaluable for quality-critical applications like medical document processing, legal analysis, or financial classification where model regression could have serious consequences.
 
 Beyond quality monitoring, multi-model testing helps you make informed provider decisions. Instead of guessing which model is best for your use case, you can benchmark them empirically with your actual data and your actual prompts.
 
@@ -176,7 +182,7 @@ These six costs are real, but they are also solvable. Here is a practical, step-
 
 ### Step 1: Abstract the Provider Layer
 
-Use a unified SDK instead of provider-specific SDKs. NeuroLink provides a single interface (`generate()` and `stream()`) across all 13 providers. This is the foundation everything else builds on -- without provider abstraction, every other step is exponentially harder.
+Use a unified SDK instead of provider-specific SDKs. NeuroLink provides a single interface (`generate()` and `stream()`) across all 33 supported LLM providers. This is the foundation everything else builds on -- without provider abstraction, every other step is exponentially harder.
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -186,7 +192,7 @@ const neurolink = new NeuroLink();
 // Same interface, any provider
 const result = await neurolink.generate({
   input: { text: "Process this request" },
-  provider: "openai",  // Switch to any of 13 providers
+  provider: "openai",  // Switch to any supported provider
 });
 ```
 
@@ -200,7 +206,7 @@ Separate your prompts from provider-specific formatting. Use Zod schemas for str
 
 ### Step 4: Implement Automatic Failover
 
-`createAIProviderWithFallback()` provides zero-downtime provider switching. Combined with circuit breakers that prevent cascading failures, this ensures your service stays up even when individual providers go down.
+`createAIProviderWithFallback()` gives you ready-to-use primary and fallback provider instances to switch between on error. Combined with a `providerFallback` callback on `generate()` for automatic same-call switching, this keeps your service up even when individual providers go down.
 
 ```typescript
 import { createAIProviderWithFallback } from '@juspay/neurolink';

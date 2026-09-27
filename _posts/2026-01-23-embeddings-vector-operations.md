@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Embeddings and Vector Operations with NeuroLink
+title: 'Embeddings and Vector Operations with NeuroLink'
 date: '2026-01-23 10:00:00 +0530'
 categories:
   - Tutorial
@@ -29,9 +29,9 @@ In this guide, you will implement embeddings and vector operations with NeuroLin
 
 At their core, embeddings turn text into numerical vectors that capture semantic meaning. Two pieces of text that mean similar things produce vectors that are close together in high-dimensional space, even if they share no words in common. This property makes embeddings the fundamental building block for semantic search, Retrieval-Augmented Generation (RAG) pipelines, document clustering, and recommendation systems.
 
-NeuroLink provides a unified embedding API across providers, including OpenAI's `text-embedding-3-small`, Google AI's `text-embedding-004`, and Vertex AI models. Each provider implements `getDefaultEmbeddingModel()` to expose its best embedding model, so you can switch providers without changing your application logic.
+NeuroLink provides embedding support across providers, including OpenAI's `text-embedding-3-small`, Google AI's `gemini-embedding-001`, and Vertex AI's `text-embedding-004`. In the inline RAG workflow, you can select an `embeddingProvider` and `embeddingModel` while keeping document and query vectors in the same embedding space.
 
-In this tutorial, you will learn how embeddings work, how to generate them through NeuroLink's RAG pipeline, and how to build semantic search systems that retrieve the right information every time.
+In this tutorial, you will learn how embeddings work, how to generate them through NeuroLink's RAG pipeline, and how to build semantic search systems that retrieve relevant information for a query.
 
 ## How Embeddings Work
 
@@ -79,7 +79,7 @@ const result = await neurolink.generate({
   input: { text: "What is machine learning?" },
   provider: "google-ai",
   rag: {
-    sources: ["./docs/ml-guide.pdf"],
+    files: ["./docs/ml-guide.md"],
     chunkSize: 500,
     chunkOverlap: 50,
   },
@@ -90,16 +90,14 @@ const result = await neurolink.generate({
 
 Different providers offer different embedding models, each with its own characteristics:
 
-| Provider | Model | Dimensions | Selection |
-|---|---|---|---|
-| **OpenAI** | text-embedding-3-small (default) | 1536 | Via `getDefaultEmbeddingModel()` |
-| **OpenAI** | text-embedding-3-large | 3072 | Explicit selection |
-| **OpenAI** | text-embedding-ada-002 | 1536 | Legacy support |
-| **Google AI** | text-embedding-004 | 768 | Via `getDefaultEmbeddingModel()` |
-| **Vertex AI** | text-embedding-004 | 768 | Via `getDefaultEmbeddingModel()` |
-| **Vertex AI** | textembedding-gecko | 768 | Enterprise deployments |
+| Provider | Model | Selection |
+|---|---|---|
+| **OpenAI** | text-embedding-3-small | Set `embeddingProvider: "openai"` and `embeddingModel: "text-embedding-3-small"` |
+| **OpenAI** | text-embedding-3-large | Set both fields with `embeddingModel: "text-embedding-3-large"` |
+| **Google AI** | gemini-embedding-001 | Set `embeddingProvider: "google-ai"` and `embeddingModel: "gemini-embedding-001"` |
+| **Vertex AI** | text-embedding-004 | Set both fields with `embeddingModel: "text-embedding-004"` |
 
-Embedding models are selected via `getDefaultEmbeddingModel()` in each provider implementation. The RAG configuration within `GenerateOptions` accepts `sources`, `chunkSize`, `chunkOverlap`, `topK`, and `scoreThreshold` parameters to control the retrieval behavior.
+The inline RAG configuration within `GenerateOptions` accepts `files`, `strategy`, `chunkSize`, `chunkOverlap`, `topK`, `toolName`, `toolDescription`, `embeddingProvider`, and `embeddingModel`. With current v12 behavior, configure `embeddingProvider` and `embeddingModel` together: omitting the model substitutes the generation model `gemini-2.5-flash`, which is not a safe embedding default for another provider. If provider creation or index-time embedding fails, NeuroLink rebuilds the entire index with its deterministic fallback and uses that fallback for later queries. A provider failure that first occurs at query time hashes only that query, however, so applications that require strict embedding-space consistency should reject or retry that query rather than relying on the fallback.
 
 > **Note:** Always use the same embedding model for both document embeddings and query embeddings. Mixing models (for example, embedding documents with OpenAI but querying with Google) produces meaningless similarity scores because the vector spaces are incompatible.
 {: .prompt-info }
@@ -134,15 +132,13 @@ flowchart TD
 
 ### Pipeline Components
 
-The RAG pipeline is organized into four major subsystems:
+NeuroLink provides two related RAG paths:
 
-**Chunking** -- The semantic chunker splits documents into chunks that preserve semantic boundaries. Rather than splitting blindly at a fixed character count, it identifies natural breakpoints like paragraph endings, section headers, and topic shifts. This produces chunks where each one contains a coherent unit of information.
+**Inline RAG for `generate()` and `stream()`** -- The `rag` option loads local files, chooses or auto-detects one of NeuroLink's chunking strategies, indexes the chunks in an in-memory vector store, and injects a search tool the model can call. It is the shortest path from files to a grounded response.
 
-**Retrieval** -- The vector query tool and hybrid search module handle finding the most relevant chunks for a given query. Vector search finds semantically similar content, while keyword matching (BM25) catches exact term matches that embedding models might miss.
+**Advanced `RAGPipeline`** -- The standalone pipeline supports optional hybrid search, reranking, graph retrieval, metadata extraction, and resilience controls. These features are configured on the pipeline; they are not switched on merely by passing the inline `rag` object shown above.
 
-**Reranking** -- After initial retrieval, a factory-based reranker module re-scores the results using a more expensive but more accurate model. This two-stage approach (fast retrieval followed by precise reranking) balances speed and accuracy.
-
-**Resilience** -- The circuit breaker and retry handler protect the pipeline from provider outages. If an embedding API goes down, the circuit breaker prevents repeated failed calls, and the retry handler manages exponential backoff for transient failures.
+For persistent deployments, NeuroLink also includes Pinecone, pgvector, and Chroma vector-store adapters in addition to the in-memory store. Choose one of those adapters when the index must survive process restarts or scale beyond one application instance.
 
 ### Advanced RAG Configuration
 
@@ -152,15 +148,16 @@ For more control over retrieval, you can specify detailed RAG parameters:
 const result = await neurolink.generate({
   input: {
     text: "What are the key findings from the research paper?",
-    pdfFiles: ["./research-paper.pdf"],
   },
   provider: "vertex",
   rag: {
-    sources: ["./research-paper.pdf", "./supplementary-data.csv"],
+    files: ["./research-notes.md", "./supplementary-data.csv"],
+    strategy: "recursive",
     chunkSize: 1000,
     chunkOverlap: 200,
     topK: 5,
-    scoreThreshold: 0.7,
+    embeddingProvider: "vertex",
+    embeddingModel: "text-embedding-004",
   },
 });
 ```
@@ -168,7 +165,7 @@ const result = await neurolink.generate({
 - **chunkSize**: The target size for each document chunk in characters. Larger chunks preserve more context but may dilute relevance for specific queries.
 - **chunkOverlap**: The number of characters that overlap between adjacent chunks. This prevents important information from being split across chunk boundaries.
 - **topK**: The maximum number of chunks to retrieve. More chunks provide more context but increase token usage and cost.
-- **scoreThreshold**: The minimum similarity score (0 to 1) for a chunk to be included. This filters out low-relevance results that would add noise to the context.
+- **embeddingProvider / embeddingModel**: The provider and model used for both document and query embeddings. Configure them together when you need a specific embedding space.
 
 ## Vector Similarity Operations
 
@@ -187,11 +184,11 @@ Under the hood, NeuroLink's vector query tool performs similarity search against
 // 6. Feeds chunks as context to the LLM
 ```
 
-The score threshold filtering is particularly important for production systems. Without it, the pipeline would always return `topK` results even if none of them are actually relevant. Setting `scoreThreshold: 0.7` ensures that only genuinely similar content reaches the LLM, preventing hallucinations caused by irrelevant context.
+The inline `rag` option returns up to `topK` results and does not expose a `scoreThreshold` field. If your application requires threshold filtering, query the standalone `RAGPipeline` with `{ generate: false }` (or query a vector-store adapter directly), filter the returned scored sources in application code, and only then assemble context. Calibrate the cutoff against representative relevant and irrelevant queries; neither query path has a built-in threshold option.
 
 ### When Similarity Scores Mislead
 
-Be aware that similarity scores are not absolute measures of relevance. A score of 0.85 from OpenAI's `text-embedding-3-small` does not mean the same thing as 0.85 from Google's `text-embedding-004`. The score distributions differ between models, so you need to calibrate your threshold for each model you use.
+Be aware that similarity scores are not absolute measures of relevance. A score of 0.85 from OpenAI's `text-embedding-3-small` does not mean the same thing as 0.85 from Google's `gemini-embedding-001`. The score distributions differ between models, so you need to calibrate your threshold for each model you use.
 
 A practical approach is to embed a set of known-relevant and known-irrelevant queries against your document set, then choose a threshold that correctly separates the two groups.
 
@@ -199,16 +196,16 @@ A practical approach is to embed a set of known-relevant and known-irrelevant qu
 
 The choice of embedding model affects vector dimensions, accuracy, cost, and latency. Here is a comparison to guide your decision:
 
-| Provider | Model | Dimensions | Best For |
-|---|---|---|---|
-| **OpenAI** | text-embedding-3-small | 1536 | Cost-effective general use |
-| **OpenAI** | text-embedding-3-large | 3072 | Maximum accuracy for critical applications |
-| **Google** | text-embedding-004 | 768 | Google ecosystem integration |
-| **Vertex** | textembedding-gecko | 768 | Enterprise deployments with Vertex AI |
+| Provider | Model | Best For |
+|---|---|---|
+| **OpenAI** | text-embedding-3-small | Cost-effective general use |
+| **OpenAI** | text-embedding-3-large | Higher-capacity OpenAI embeddings |
+| **Google AI** | gemini-embedding-001 | Google AI Studio integration |
+| **Vertex AI** | text-embedding-004 | Vertex AI deployments |
 
 **Key trade-offs:**
 
-- **Dimensions**: Higher dimensions capture more semantic nuance but require more storage and compute for similarity calculations. OpenAI's 3072-dimensional model captures finer distinctions than a 768-dimensional model, but at roughly 4x the storage cost.
+- **Vector size**: Larger vectors require more storage and similarity-computation work. Check the selected provider model's current output dimensions before sizing a persistent index.
 - **Provider consistency**: Beyond using the same model for documents and queries, keep your entire pipeline on one provider. Switching embedding providers mid-project means re-embedding your entire document corpus.
 - **Cost**: Embedding generation cost scales with input size. For large document sets, the cost difference between models can be significant.
 

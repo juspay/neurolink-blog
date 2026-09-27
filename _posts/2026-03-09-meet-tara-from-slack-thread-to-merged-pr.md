@@ -27,13 +27,13 @@ We're excited to introduce TARA — Threaded AI Resource Agent. Two engineers bu
 
 ## The 13-Minute Bug Fix
 
-Last week, Sarthak from Marketing dropped a screenshot into a Slack thread — a typo in the UI. Sachin tagged @TARA. Thirteen minutes later: bug identified at the exact file and line (`src/routes/(app)/ai/v2/+page.svelte`, line 849, two issues — missing space in "amatter", missing period), JIRA ticket BZ-47215 created, fix implemented, pull request #3847 created. Released to production the same day. No IDE opened. No ticket reassigned.
+In one thread, Sarthak from Marketing dropped a screenshot into a Slack thread — a typo in the UI. Sachin tagged @TARA. Thirteen minutes later: bug identified at the exact file and line (`src/routes/(app)/ai/v2/+page.svelte`, line 849, two issues — missing space in "amatter", missing period), JIRA ticket BZ-47215 created, fix implemented, pull request #3847 created. Released to production the same day. No IDE opened. No ticket reassigned.
 
 ![Sarthak reports a typo bug in Slack](/assets/img/posts/meet-tara-from-slack-thread-to-merged-pr/bug-fix-sarthak-report.png)
 
 ![Tara identifies the exact file, line, and two issues — then creates JIRA ticket and fix plan](/assets/img/posts/meet-tara-from-slack-thread-to-merged-pr/bug-fix-tara-response.png)
 
-That is not a demo. That happened at 8:55 on a Tuesday morning.
+That is not a demo. That happened at 8:55 on a Thursday morning.
 
 | Metric | Result |
 |--------|--------|
@@ -70,7 +70,7 @@ flowchart LR
 
 ## The Stories
 
-Those are the capabilities. Here is what they look like at 8:55 on a Tuesday morning.
+Those are the capabilities. Here is what they look like at 8:55 on a Thursday morning.
 
 ### The Async Planning Loop
 
@@ -155,10 +155,9 @@ Here is how a per-thread NeuroLink instance is configured:
 import { NeuroLink } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
-  defaultProvider: "vertex",
-  memory: {
-    type: "redis",
-    prefix: `thread:${sessionId}:`,
+  conversationMemory: {
+    enabled: true,
+    redisConfig: { keyPrefix: `thread:${sessionId}:` },
   },
   observability: {
     langfuse: { enabled: true },
@@ -169,13 +168,14 @@ const neurolink = new NeuroLink({
 And this is the streaming loop that powers every conversational response:
 
 ```typescript
-for await (const token of neurolink.stream({
-  prompt: userMessage,
-  files: attachedFiles,
+const { stream } = await neurolink.stream({
+  input: { text: userMessage, files: attachedFiles },
   tools: { ...mcpTools },
   memory: { enabled: true },
-})) {
-  accumulated += token;
+});
+
+for await (const chunk of stream) {
+  accumulated += chunk.content;
   await slackClient.chat.update({
     channel,
     ts: responseTs,

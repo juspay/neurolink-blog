@@ -124,9 +124,9 @@ Attach a policy that grants the minimum necessary permissions for Bedrock operat
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-opus-20240229-v1:0",
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
         "arn:aws:bedrock:*::foundation-model/meta.llama3-70b-instruct-v1:0",
         "arn:aws:bedrock:*::foundation-model/amazon.titan-text-express-v1"
       ]
@@ -198,11 +198,11 @@ import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Using Claude 3.5 Sonnet on Bedrock
+// Using Claude Sonnet 4.6 on Bedrock
 const response = await neurolink.generate({
   input: { text: "Explain quantum computing in simple terms." },
   provider: "bedrock",
-  model: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+  model: "anthropic.claude-sonnet-4-6",
   systemPrompt: "You are a helpful assistant.",
   maxTokens: 1024,
   temperature: 0.7
@@ -220,19 +220,19 @@ import { NeuroLink, BedrockModels } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Claude 4.5 Sonnet - Latest model
+// Claude 4.6 Sonnet - Latest model
 const latestResponse = await neurolink.generate({
   input: { text: "Analyze this complex business scenario..." },
   provider: "bedrock",
-  model: BedrockModels.CLAUDE_4_5_SONNET, // "anthropic.claude-sonnet-4-5-20250929-v1:0"
+  model: BedrockModels.CLAUDE_4_6_SONNET, // "anthropic.claude-sonnet-4-6"
   maxTokens: 4096
 });
 
-// Claude 3.5 Haiku - Fast and cost-effective
+// Claude 4.5 Haiku - Fast and cost-effective
 const quickResponse = await neurolink.generate({
   input: { text: "Quick summary of cloud computing benefits" },
   provider: "bedrock",
-  model: BedrockModels.CLAUDE_3_5_HAIKU, // "anthropic.claude-3-5-haiku-20241022-v1:0"
+  model: BedrockModels.CLAUDE_4_5_HAIKU, // "anthropic.claude-haiku-4-5-20251001-v1:0"
   maxTokens: 512
 });
 ```
@@ -248,7 +248,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: "Your prompt here" },
   provider: 'bedrock',
-  model: 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
+  model: 'global.anthropic.claude-sonnet-4-6',
   region: 'us-east-1'
 });
 ```
@@ -266,7 +266,7 @@ Enable streaming for real-time response handling:
 const result = await neurolink.stream({
   input: { text: "Explain the benefits of cloud computing in detail..." },
   provider: "bedrock",
-  model: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+  model: "anthropic.claude-sonnet-4-6",
   maxTokens: 4096
 });
 
@@ -364,7 +364,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: "Quick question about weather." },
   provider: "bedrock",
-  model: BedrockModels.CLAUDE_3_5_HAIKU,
+  model: BedrockModels.CLAUDE_4_5_HAIKU,
   region: "eu-west-1" // Route to nearest region
 });
 ```

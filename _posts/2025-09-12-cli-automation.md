@@ -130,7 +130,7 @@ neurolink gen "Write a Python function to sort a list"
 neurolink generate "Analyze this code" --provider openai
 
 # Use specific model and temperature
-neurolink gen "Write a creative story" -m gpt-4 -t 0.8
+neurolink gen "Write a creative story" -m gpt-5.4 -t 0.8
 
 # Control output length
 neurolink generate "Summarize machine learning" --maxTokens 500
@@ -154,7 +154,7 @@ neurolink stream "Explain machine learning" -p anthropic
 neurolink stream "Write documentation" --output docs.txt
 
 # Stream code walkthrough
-neurolink stream "Walk through this code step by step" -m claude-3-5-sonnet
+neurolink stream "Walk through this code step by step" -m claude-sonnet-5
 ```
 
 ## Common CLI Options
@@ -172,8 +172,6 @@ These options work with `generate` and `stream` commands:
 | `--format` | `-f` | Output format (text, json, table) | text |
 | `--quiet` | `-q` | Suppress progress messages | false |
 | `--debug` | | Enable debug output | false |
-
-> **Important Note**: The CSV and multimodal features described in the following section (CSV file analysis, video processing, PDF handling, etc.) should be verified against the current NeuroLink SDK documentation before use in production. Feature availability, supported file formats, and implementation details may vary by provider and SDK version. Always refer to the official [NeuroLink documentation](https://juspay.in/neurolink) for the most up-to-date information on supported input types and their specific requirements.
 
 ## Multimodal CLI Usage
 
@@ -356,7 +354,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Explain quantum computing in simple terms' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   temperature: 0.7,
   maxTokens: 500
 });
@@ -395,8 +393,6 @@ console.log(`Provider: ${result.provider}`);
 
 ### Multimodal Analysis Script
 
-> **Important Note**: The CSV and multimodal examples below demonstrate conceptual patterns. Before implementing these features in production, please verify the exact API interfaces, parameter names, and supported options against the current [NeuroLink SDK documentation](https://juspay.in/neurolink) and [test examples](https://github.com/juspay/neurolink/tree/main/tests). Feature availability and implementation details may vary by provider and SDK version.
-
 ```typescript
 #!/usr/bin/env npx tsx
 
@@ -415,16 +411,24 @@ async function analyzeImage(imagePath: string, prompt: string) {
       images: [imageBuffer]
     },
     provider: 'vertex',
-    model: 'gemini-2.0-flash-001',
+    model: 'gemini-2.5-flash',
   });
 
   return result.content;
 }
 
-// For CSV processing examples, refer to:
-// - Official NeuroLink multimodal documentation
-// - Test suite: https://github.com/juspay/neurolink/tree/main/tests
-// The exact API for CSV files may differ from generic examples shown here
+// Analyze CSV data
+async function analyzeCsv(csvPath: string, prompt: string) {
+  const result = await neurolink.generate({
+    input: {
+      text: prompt,
+      csvFiles: [csvPath]
+    },
+    provider: 'openai',
+  });
+
+  return result.content;
+}
 
 // Example usage
 const imageAnalysis = await analyzeImage(
@@ -432,9 +436,10 @@ const imageAnalysis = await analyzeImage(
   'Describe what you see in this image and identify any UI issues'
 );
 console.log('Image Analysis:', imageAnalysis);
-```
 
-> **Note:** For complete CSV processing examples with verified APIs, refer to the [NeuroLink test examples](https://github.com/juspay/neurolink/tree/main/tests).
+const csvAnalysis = await analyzeCsv('./sales.csv', 'Summarize the key trends in this data');
+console.log('CSV Analysis:', csvAnalysis);
+```
 
 ## CI/CD Integration
 
@@ -704,7 +709,7 @@ for (const question of questions) {
   const result = await neurolink.generate({
     input: { text: question },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
   });
   responses.push(result.content);
   console.log(`Q: ${question}`);
@@ -734,7 +739,7 @@ const AnalysisSchema = z.object({
 const result = await neurolink.generate({
   input: { text: 'Analyze this code: function add(a,b) { return a+b }' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   schema: AnalysisSchema,
   disableTools: false
 });
@@ -745,10 +750,12 @@ console.log('Score:', analysis.score);
 console.log('Issues:', analysis.issues);
 ```
 
-### With MCP Tools
+### With Custom Tools
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
+import { z } from 'zod';
+import { readFileSync } from 'fs';
 
 const neurolink = new NeuroLink();
 
@@ -756,13 +763,10 @@ const neurolink = new NeuroLink();
 const tools = {
   readFile: {
     description: 'Read contents of a file',
-    parameters: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'File path to read' }
-      },
-      required: ['path']
-    }
+    inputSchema: z.object({
+      path: z.string().describe('File path to read')
+    }),
+    execute: async ({ path }: { path: string }) => readFileSync(path, 'utf-8')
   }
 };
 

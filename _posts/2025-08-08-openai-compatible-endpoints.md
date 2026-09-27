@@ -30,7 +30,7 @@ You will configure the OpenAI-Compatible provider with two environment variables
 
 ## How It Works
 
-The implementation is elegantly simple. The `OpenAICompatibleProvider` uses `createOpenAI` from `@ai-sdk/openai` with a custom `baseURL` and `apiKey`. Instead of pointing at `api.openai.com`, it points at whatever endpoint URL you provide.
+The implementation is elegantly simple. `OpenAICompatibleProvider` talks directly over HTTP to your endpoint's `/v1/chat/completions` (and `/v1/models`) using the `baseURL` and `apiKey` you configure -- no `@ai-sdk/openai` client in the request path. Instead of pointing at `api.openai.com`, it points at whatever endpoint URL you provide.
 
 Two environment variables are required:
 
@@ -85,7 +85,7 @@ When you do not set `OPENAI_COMPATIBLE_MODEL`, NeuroLink discovers available mod
 
 1. Check `OPENAI_COMPATIBLE_MODEL` environment variable
 2. If empty, call `getAvailableModels()` to fetch from `/v1/models`
-3. Use the first discovered model, or fall back to `gpt-3.5-turbo`
+3. Use the first endpoint-reported model; if discovery fails or returns no models, use the first entry in the implementation's legacy hardcoded compatibility list (`gpt-4o`). The provider also retains `gpt-3.5-turbo` as a last-resort fallback name.
 
 The `/v1/models` call has a 5-second timeout to prevent slow or unresponsive endpoints from blocking your application. The response is parsed as a standard `ModelsResponse` type: `{ data: Array<{ id: string; object: string; ... }> }`.
 
@@ -110,13 +110,9 @@ console.log(firstModel);
 
 ### Fallback Models
 
-If the `/v1/models` endpoint is not available (some servers do not implement it), NeuroLink falls back to a common model list:
+If the `/v1/models` endpoint is unavailable, the current implementation returns a hardcoded compatibility list. That list still contains legacy identifiers: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo`, `claude-3-5-sonnet`, `claude-3-haiku`, and `gemini-pro`. These are implementation fallbacks, not current model recommendations, and an attempt succeeds only if the endpoint actually exposes one of those exact IDs.
 
-- `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo`
-- `claude-3-5-sonnet`, `claude-3-haiku`
-- `gemini-pro`
-
-These fallbacks ensure that NeuroLink can always attempt a request, even if model discovery fails. The actual success depends on whether the endpoint hosts one of these models.
+For new explicit configurations, choose a model that your endpoint reports. If it mirrors current provider IDs, tier-matched examples include `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `claude-sonnet-5`, `claude-haiku-4-5-20251001`, and `gemini-2.5-pro`. Because OpenAI-compatible servers often expose custom or renamed IDs, the endpoint's `/v1/models` response remains authoritative.
 
 > **Note:** In production, always set `OPENAI_COMPATIBLE_MODEL` explicitly. Auto-discovery adds latency on the first request and introduces a dependency on the `/v1/models` endpoint being available.
 {: .prompt-info }
@@ -132,8 +128,7 @@ The OpenAI-Compatible provider supports full streaming with tool calling, follow
 
 ```typescript
 import { z } from "zod";
-import { tool } from "ai";
-import { NeuroLink } from '@juspay/neurolink';
+import { tool, NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
@@ -261,7 +256,7 @@ const result = await neurolink.stream({
 
 ## Error Handling
 
-The `handleProviderError()` method provides endpoint-specific error classification:
+The provider's `formatProviderError()` override provides endpoint-specific error classification:
 
 | Error Pattern | Classification | Cause |
 |---|---|---|
@@ -306,7 +301,7 @@ Here is how the OpenAI-Compatible provider connects NeuroLink to any compatible 
 flowchart TB
     A[Your App] --> B[NeuroLink SDK]
     B --> C[OpenAICompatibleProvider]
-    C --> D["createOpenAI(@ai-sdk/openai)<br/>baseURL: your-endpoint"]
+    C --> D["Direct HTTP client<br/>baseURL: your-endpoint"]
 
     C -->|Auto-Discovery| E[GET /v1/models]
     E -->|First Model| D

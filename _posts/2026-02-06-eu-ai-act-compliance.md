@@ -15,9 +15,8 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Build EU AI Act compliant AI applications with TypeScript. Technical guide
-  covering risk assessment, audit logging, human oversight, and transparency
-  requirements with NeuroLink SDK.
+  Map EU AI Act engineering obligations to NeuroLink patterns for logging,
+  human oversight, transparency, guardrails, and operational resilience.
 toc: true
 mermaid: true
 pin: false
@@ -28,7 +27,7 @@ image:
 
 The EU AI Act is the most consequential AI regulation in the world, and it will reshape how every organization deploys AI in European markets. Anyone who treats compliance as an afterthought will face costly retrofits and potential fines. Those that build regulation-ready architectures now -- with risk classification, documentation, and human oversight baked in -- will have a structural advantage as enforcement begins.
 
-For developers, the Act translates into specific technical requirements: audit logging of inputs and outputs, human oversight mechanisms for high-risk decisions, transparency about AI-generated content, guardrails against harmful outputs, and robustness through fallback and evaluation systems. The penalties for non-compliance are severe: up to 35 million euros or 7% of global annual turnover.
+For developers, the Act translates into specific technical requirements: audit logging of inputs and outputs, human oversight mechanisms for high-risk decisions, transparency about AI-generated content, guardrails against harmful outputs, and robustness through fallback and evaluation systems. Maximum penalties vary by infringement. Violating a prohibited practice can carry a ceiling of EUR 35 million or 7% of the preceding financial year's worldwide turnover for an undertaking, while other breaches have lower ceilings. The regulation includes separate treatment for SMEs and requires penalties to be assessed case by case.
 
 This guide maps the Act's requirements to concrete technical implementations using NeuroLink SDK. We cover audit logging with OpenTelemetry, human-in-the-loop controls, transparency metadata, guardrails middleware, fallback for robustness, and data governance patterns. This is a technical implementation guide, not legal advice -- consult your compliance team for regulatory interpretation.
 
@@ -78,33 +77,26 @@ flowchart TD
 
 Article 12 requires that high-risk AI systems produce logs that enable tracing of the system's operation. This means logging inputs, outputs, the provider and model used, timestamps, and decision rationale.
 
-NeuroLink integrates with OpenTelemetry for comprehensive distributed tracing:
+NeuroLink can initialize OpenTelemetry through constructor configuration. Keep the telemetry endpoint and service identity in configuration rather than hard-coding them:
 
 ```typescript
-import {
-  NeuroLink,
-  initializeOpenTelemetry,
-  getLangfuseHealthStatus,
-} from "@juspay/neurolink";
+import { NeuroLink } from "@juspay/neurolink";
 
-// Initialize OpenTelemetry for comprehensive audit logging
-await initializeOpenTelemetry({
-  serviceName: "my-ai-service",
-  endpoint: process.env.OTEL_ENDPOINT || "http://localhost:4317",
+const neurolink = new NeuroLink({
+  observability: {
+    openTelemetry: {
+      enabled: true,
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      serviceName: "my-ai-service",
+      serviceVersion: process.env.APP_VERSION,
+    },
+  },
 });
 
-// Check Langfuse health for observability
-const langfuseStatus = await getLangfuseHealthStatus();
-console.log("Langfuse connected:", langfuseStatus);
-
-const neurolink = new NeuroLink();
-
-// Every generate/stream call is automatically traced
 const result = await neurolink.generate({
   input: { text: userQuery },
   provider: "openai",
-  model: "gpt-4o",
-  // Context for audit trail
+  model: "gpt-5.4",
   context: {
     userId: "user-123",
     sessionId: "session-456",
@@ -113,75 +105,62 @@ const result = await neurolink.generate({
   },
 });
 
-// Analytics include full audit data
 console.log("Provider:", result.provider);
 console.log("Model:", result.model);
-console.log("Token usage:", result.analytics?.tokenUsage);
-console.log("Response time:", result.analytics?.responseTime);
+console.log("Token usage:", result.usage);
+console.log("Response time:", result.responseTime);
 ```
 
-Once OpenTelemetry is initialized, every `generate()` and `stream()` call is automatically traced with spans that include the provider, model, input text, output content, token usage, and latency. These traces are exported to your configured endpoint (Jaeger, Grafana Tempo, Langfuse, or any OpenTelemetry-compatible backend).
-
-The `context` object is particularly important for compliance. Including the `userId`, `purpose`, and `riskLevel` in every request creates a queryable audit trail that compliance teams can search by user, by purpose, or by risk category.
-
-> **Note:** Langfuse integration provides a purpose-built LLM observability platform on top of OpenTelemetry. The `getLangfuseHealthStatus()` check ensures your observability pipeline is operational before serving requests -- critical for systems where logging failures would create compliance gaps.
-{: .prompt-info }
+Telemetry is only one part of an audit design. Define which inputs, outputs, decisions, tool calls, approvals, errors, and model identifiers your use case must retain; apply access controls and redaction; monitor exporter failures; and test that records can be reconstructed. Do not assume enabling tracing automatically satisfies Article 12 or that recording full prompts is always compatible with data-minimization obligations.
 
 ## Step 2: Human-in-the-Loop Oversight
 
 Article 14 requires that high-risk AI systems include mechanisms for human oversight. Humans must be able to understand the system's capabilities and limitations, monitor its operation, and override or stop its decisions.
 
-NeuroLink's HITL system implements this through tool-level approval workflows:
+NeuroLink's HITL system can pause selected tool calls and emit a confirmation request. The application must route that request to an authorized reviewer and return the reviewer's decision:
 
 ```typescript
+import { tool } from "ai";
+import { z } from "zod";
+
 const neurolink = new NeuroLink({
   hitl: {
     enabled: true,
-    // Keywords in tool names that trigger HITL confirmation
-    dangerousActions: [
-      "createTicket",
-      "sendEmail",
-      "updateDatabase",
-      "executePayment",
-    ],
-    // Advanced custom rules for complex approval scenarios
-    customRules: [
-      {
-        name: 'high-risk-action',
-        requiresConfirmation: true,
-        condition: (toolName: string, _args: unknown) =>
-          ['sendEmail', 'updateDatabase', 'executePayment'].includes(toolName),
-        customMessage: 'This action requires human approval before execution',
-      },
-    ],
+    dangerousActions: ["processRefund", "executePayment"],
+    autoApproveOnTimeout: false,
+    auditLogging: true,
   },
 });
-```
 
-The HITL manager emits events when tools require approval, allowing you to integrate with any approval workflow -- Slack notifications, email approvals, dashboard reviews, or custom internal tools:
+neurolink.getEventEmitter().on(
+  "hitl:confirmation-request",
+  async (event) => {
+    const decision = await approvalQueue.request({
+      confirmationId: event.payload.confirmationId,
+      toolName: event.payload.toolName,
+      arguments: event.payload.arguments,
+    });
 
-```typescript
-// Listen for approval requests via the HITLManager
-const hitlManager = neurolink.getHITLManager();
+    neurolink.getEventEmitter().emit("hitl:confirmation-response", {
+      type: "hitl:confirmation-response",
+      payload: {
+        confirmationId: event.payload.confirmationId,
+        approved: decision.approved,
+        reason: decision.reason,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          responseTime: decision.responseTime,
+          userId: decision.reviewerId,
+        },
+      },
+    });
+  },
+);
 
-hitlManager.on("hitl:confirmation-request", async (event) => {
-  const { confirmationId, toolName, arguments: args, timeoutMs } = event.payload;
-  console.log(`Tool "${toolName}" requires approval`);
-  console.log("Parameters:", args);
-
-  // In production: send to approval queue (Slack, email, dashboard)
-  // For now, auto-approve for demonstration
-  hitlManager.processUserResponse(confirmationId, {
-    approved: true,
-    reason: 'Approved via automated compliance check',
-  });
-});
-
-// Generate with HITL-protected tools
 const result = await neurolink.generate({
   input: { text: "Process refund for order #12345" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tools: {
     processRefund: tool({
       description: "Process a customer refund",
@@ -190,16 +169,13 @@ const result = await neurolink.generate({
         amount: z.number(),
         reason: z.string(),
       }),
-      execute: async (params) => {
-        // This will trigger HITL approval before execution
-        return await processRefund(params);
-      },
+      execute: processRefund,
     }),
   },
 });
 ```
 
-For compliance, every approval and rejection is logged with the approver's identity, timestamp, and reason. This creates an auditable record of human oversight that satisfies Article 14's requirements.
+HITL provides a technical pause-and-response mechanism. Compliance still depends on who can approve, what information they receive, whether they can override or stop the system, how automation bias is addressed, and how the application persists the resulting record.
 
 ## Step 3: Transparency and Model Provenance
 
@@ -210,7 +186,7 @@ Article 13 requires that AI systems be designed to be sufficiently transparent. 
 const result = await neurolink.generate({
   input: { text: userQuery },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 
 // Build transparency metadata for the response
@@ -232,129 +208,137 @@ res.json({
 
 Key transparency practices:
 
-- **Always disclose AI**: Include a disclaimer in every user-facing response. This is a legal requirement for chatbots and content generation systems under the Act.
-- **Track model provenance**: Record which provider and model generated each response. If a model is later found to have issues, you can identify all affected responses.
-- **Expose metadata**: Give users access to the generation metadata (model, timestamp) so they can make informed decisions about the content.
+- **Disclose direct AI interaction when required**: Article 50 requires notification unless it is already obvious to a reasonably well-informed, observant, and circumspect person.
+- **Mark synthetic content where applicable**: Machine-readable marking and specific disclosure duties apply to generated content, deepfakes, and public-interest text, subject to the regulation's conditions and exceptions.
+- **Track model provenance internally**: Record the provider, model, application version, and relevant policy version so affected outputs can be identified later.
+- **Design user-facing metadata deliberately**: Expose the information users need without leaking credentials, internal controls, or personal data.
 
 ## Step 4: Guardrails Middleware
 
-Article 9 requires risk management measures to prevent harmful outputs. NeuroLink's guardrails middleware provides configurable content filtering:
+Article 9 requires a continuous risk-management system for high-risk AI systems. NeuroLink middleware can support some technical controls, but a keyword filter is not a complete risk-management process:
 
 ```typescript
-import { NeuroLink, MiddlewareFactory } from "@juspay/neurolink";
-
-const neurolink = new NeuroLink();
-
-// Configure middleware for compliance
-const middleware = MiddlewareFactory.create({
-  presets: ["guardrails", "analytics"],
-  guardrails: {
-    maxOutputTokens: 4096,
-    blockedTopics: ["medical-advice", "legal-advice", "financial-advice"],
-    requireDisclaimer: true,
-  },
-  analytics: {
-    trackAllRequests: true,
-    includePrompts: true, // Required for audit trail
-    includeResponses: true,
+const result = await neurolink.generate({
+  input: { text: userQuery },
+  provider: "openai",
+  model: "gpt-5.4",
+  maxTokens: 4096,
+  middleware: {
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          badWords: {
+            enabled: true,
+            list: ["application-specific-blocked-term"],
+            replacementText: "[REDACTED]",
+          },
+          precallEvaluation: {
+            enabled: true,
+            blockUnsafeRequests: true,
+          },
+        },
+      },
+      analytics: { enabled: true },
+    },
   },
 });
 ```
 
-The guardrails middleware enforces output constraints:
-
-- **Blocked topics**: Prevents the AI from providing advice in domains where it could cause harm (medical, legal, financial). The system either refuses the request or adds appropriate disclaimers.
-- **Output limits**: Caps response length to prevent runaway generation.
-- **Required disclaimers**: Automatically appends compliance disclaimers to responses.
-- **Content filtering**: Screens outputs for inappropriate content before delivery to users.
-
-The analytics middleware runs alongside guardrails, logging every request and response with full prompt and completion text. The `includePrompts: true` and `includeResponses: true` settings are essential for Article 12 compliance -- without them, your audit trail is incomplete.
-
-> **Note:** Balance compliance with usability. Overly aggressive content filtering degrades user experience. Work with your compliance team to define blocked topics that are genuinely high-risk for your application, rather than blocking everything that could theoretically be sensitive.
-{: .prompt-info }
+Use these controls as one layer alongside authorization, input validation, application-specific policy checks, testing, incident response, and human oversight. Add any required disclosure in the application response rather than assuming middleware inserts a legally sufficient notice. Decide whether prompts and outputs may be retained only after privacy, security, and data-governance review.
 
 ## Step 5: Robustness with Fallback and Evaluation
 
-Article 15 requires AI systems to achieve appropriate levels of accuracy and robustness. In practice, this means handling provider failures gracefully and verifying output quality:
+Article 15 requires appropriate accuracy, robustness, and cybersecurity throughout a high-risk system's lifecycle. Provider fallback can improve availability, while evaluation can detect some output-quality problems:
 
 ```typescript
-import {
-  createAIProviderWithFallback,
-  CONSENSUS_3_WORKFLOW,
-} from "@juspay/neurolink";
+let fallbackUsed = false;
 
-// Fallback for robustness
-const { primary, fallback } = await createAIProviderWithFallback(
-  "openai",    // Primary
-  "anthropic"  // Fallback if primary fails
-);
-
-// For critical decisions, use consensus (multiple models agree)
-const criticalResult = await neurolink.generate({
-  input: { text: "Assess credit risk for application #789" },
-  workflowConfig: CONSENSUS_3_WORKFLOW,
+const resilientNeuroLink = new NeuroLink({
+  providerFallback: async () => {
+    if (fallbackUsed) return null;
+    fallbackUsed = true;
+    return { provider: "anthropic", model: "claude-sonnet-5" };
+  },
 });
 
-console.log("Consensus score:", criticalResult.workflow?.metrics?.totalTime);
-console.log("Models used:", criticalResult.workflow?.selectedModel);
+const robustResult = await resilientNeuroLink.generate({
+  input: { text: "Summarize the evidence for application #789" },
+  provider: "openai",
+  model: "gpt-5.4",
+});
+
+const quality = await resilientNeuroLink.evaluate(
+  {
+    query: "Summarize the evidence for application #789",
+    response: robustResult.content,
+    context: evidenceDocuments,
+  },
+  {
+    scorers: ["faithfulness", "answer-relevancy", "hallucination"],
+    passThreshold: 0.8,
+  },
+);
+
+if (!quality.passed) {
+  await sendForHumanReview(robustResult, quality.scores);
+}
 ```
 
-For high-risk applications, the consensus workflow sends the same prompt to three different models and only returns a result when at least two agree. This multi-model verification provides a level of robustness that satisfies Article 15's accuracy requirements.
+The callback receives one error and returns the next provider/model pair or `null`; it is different from `modelChain`, which preserves the current provider and advances models only for model-access-denied errors unless an explicit fallback callback is also supplied.
 
-Provider fallback ensures that a single provider outage does not render your AI system unavailable. If OpenAI is down, the system automatically routes to Anthropic. This availability guarantee is important for systems classified as high-risk, where downtime could have real-world consequences.
+Fallback and LLM-based scoring do not demonstrate legal compliance or the accuracy of a consequential decision. Define measurable task-specific accuracy, test foreseeable failure conditions, protect against adversarial inputs, and retain a safe way to stop or override the system.
 
 ## Step 6: Data Governance and Retention
 
 The Act requires appropriate data governance, including data retention policies and privacy protections:
 
 ```typescript
-// Structure for compliance data retention
+// Example application-owned audit record
 interface ComplianceRecord {
   requestId: string;
   timestamp: string;
   userId: string;
-  inputHash: string; // Hash for privacy, retain full input in secure store
+  inputHash: string;
   outputHash: string;
-  provider: string;
-  model: string;
-  tokenUsage: { prompt: number; completion: number };
+  provider?: string;
+  model?: string;
+  tokenUsage?: { input: number; output: number; total: number };
   riskCategory: "minimal" | "limited" | "high";
-  hitlApproved: boolean;
   toolsUsed: string[];
-  responseTimeMs: number;
+  responseTimeMs?: number;
 }
 
-// Log every interaction
 async function logComplianceRecord(
-  result: GenerateResult,
-  context: { userId: string; riskCategory: string }
+  result: import("@juspay/neurolink/types").GenerateApiResult,
+  context: {
+    userId: string;
+    riskCategory: ComplianceRecord["riskCategory"];
+    inputHash: string;
+  },
 ) {
   const record: ComplianceRecord = {
     requestId: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     userId: context.userId,
-    inputHash: hash(result.input),
+    inputHash: context.inputHash,
     outputHash: hash(result.content),
     provider: result.provider,
     model: result.model,
-    tokenUsage: result.analytics?.tokenUsage,
-    riskCategory: context.riskCategory as ComplianceRecord["riskCategory"],
-    hitlApproved: result.hitlApproved || false,
-    toolsUsed: result.toolsUsed || [],
-    responseTimeMs: result.analytics?.responseTime || 0,
+    tokenUsage: result.usage,
+    riskCategory: context.riskCategory,
+    toolsUsed: result.toolsUsed ?? [],
+    responseTimeMs:
+      result.responseTime ?? result.analytics?.requestDuration,
   };
 
   await complianceStore.insert(record);
 }
 ```
 
-The data governance pattern stores hashes of inputs and outputs for compliance records (enabling lookup without storing raw personal data in the audit log) while retaining full text in a separate, access-controlled secure store. This satisfies both the Act's logging requirements and GDPR's data minimization principle.
+This pattern keeps an application-owned record separate from raw content. Hashing can support integrity and lookup, but it does not by itself anonymize personal data or satisfy the AI Act or GDPR.
 
-Retention periods should be defined per risk category:
-
-- **High-risk**: Retain records for 10 years after the AI system has been placed on the market or put into service (Article 19(1)).
-- **Limited risk**: Retain for 3-5 years depending on jurisdiction.
-- **Minimal risk**: Standard business retention policies apply.
+Article 19 requires providers of high-risk systems to retain automatically generated logs under their control for an appropriate period of at least six months, unless other EU or national law specifies otherwise. The separate ten-year period in Article 18 concerns a defined provider documentation package, not every interaction log. Set retention with legal counsel based on operator role, system category, applicable sector rules, purpose limitation, and data-protection obligations.
 
 ## Compliance Checklist
 
@@ -384,25 +368,25 @@ gantt
     section Phases
     Prohibited AI banned           :done, 2025-02, 2025-02
     General-purpose AI rules       :active, 2025-08, 2025-08
-    High-risk AI full compliance   :2026-08, 2026-08
-    Full enforcement               :2027-08, 2027-08
+    General application            :2026-08, 2026-08
+    Product safety high-risk rules :2027-08, 2027-08
 ```
 
 - **February 2025**: Prohibited AI practices banned (already in effect).
 - **August 2025**: General-purpose AI model rules apply. This affects most LLM-based applications.
-- **August 2026**: High-risk AI systems must be fully compliant. This is the critical deadline for credit scoring, hiring tools, medical devices, and similar applications.
-- **August 2027**: Full enforcement across all risk categories.
+- **August 2026**: The regulation generally applies, with exceptions specified in Article 113.
+- **August 2027**: Article 6(1) and corresponding obligations apply to certain high-risk systems that are safety components of, or themselves are, products covered by listed EU harmonization legislation.
 
 > **Note:** Even if your system is classified as "limited risk" with only transparency obligations, implementing audit logging and human oversight now prepares you for potential reclassification. Risk categories may shift as regulators issue guidance and precedents emerge.
 {: .prompt-info }
 
 ## Beyond the EU AI Act
 
-The EU AI Act is the first comprehensive AI regulation, but it will not be the last. Canada's AIDA, Brazil's AI framework, and various US state-level regulations are in development. The compliance patterns in this guide -- audit logging, human oversight, transparency, guardrails, and robustness -- are universal. Building them into your application now means you are prepared for any regulatory framework that follows.
+Other jurisdictions and sectors impose different AI, privacy, consumer-protection, safety, and recordkeeping duties. The engineering patterns in this guide -- traceability, human oversight, transparency, risk controls, and resilience -- are useful foundations, but they must be mapped to the specific law, operator role, system classification, and deployment context.
 
 ## What's Next
 
-The direction is clear, even if the timeline is not. Organizations that invest in these capabilities now -- building the infrastructure, developing the talent, establishing the practices -- will compound their advantage over those that wait. The question is not whether this shift will happen, but whether your team will be leading it or catching up. The tools are available. The patterns are proven. The only remaining variable is execution.
+Start by classifying the system and your operator role with qualified counsel. Then translate the applicable duties into testable controls: traceability, documented model and policy versions, effective human oversight, measurable accuracy, incident handling, cybersecurity, and retention. NeuroLink can implement parts of that architecture, but compliance remains a property of the complete sociotechnical system and its operation.
 
 ---
 

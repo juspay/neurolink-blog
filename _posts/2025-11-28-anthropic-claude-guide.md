@@ -13,8 +13,8 @@ tags:
   - haiku
 author: neurolink
 description: >-
-  Master Anthropic Claude with NeuroLink. Opus, Sonnet, Haiku - features,
-  prompting, and patterns.
+  Integrate Claude Opus, Sonnet, and Haiku through NeuroLink with tier-based
+  routing, structured output, agent loops, streaming, retries, and usage metrics.
 toc: true
 mermaid: true
 pin: false
@@ -23,7 +23,7 @@ image:
   alt: 'Mastering Claude with NeuroLink: Complete Anthropic Guide'
 ---
 
-You will integrate Anthropic's Claude models into your NeuroLink-powered applications, from choosing between Opus, Sonnet, and Haiku for each task to building advanced patterns with structured output and agentic workflows. By the end of this tutorial, you will have a working Claude integration with model-tier routing, streaming, tool calling, and cost optimization.
+You will integrate Anthropic's Claude models into your NeuroLink-powered applications, from choosing between Opus, Sonnet, and Haiku for each task to building patterns with structured output and agent loops. By the end of this tutorial, you will have a working Claude integration with model-tier routing, streaming, retries, fallbacks, and usage metrics.
 
 Claude offers distinct capabilities through three model tiers. Now you will learn when to use each tier and how to configure them through NeuroLink's unified interface.
 
@@ -120,7 +120,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: 'Classify this customer feedback as positive, negative, or neutral: "The product works but shipping was slow."' },
   provider: "anthropic",
-      model: "claude-haiku-4-5-20251001",
+  model: "claude-haiku-4-5-20251001",
   maxTokens: 256
 });
 ```
@@ -218,7 +218,7 @@ const response = await neurolink.generate({
   schema: ErrorAnalysis
 });
 
-console.log(response.content); // Type-safe JSON output
+console.log(response.structuredData); // Parsed object matching the schema
 ```
 
 ### Chain-of-Thought Prompting
@@ -290,7 +290,7 @@ const neurolink = new NeuroLink();
 // Define the action schema for Claude's decisions
 const AgentAction = z.object({
   action: z.enum(['search_database', 'send_notification', 'respond', 'escalate']),
-  parameters: z.record(z.any()).optional(),
+  parameters: z.record(z.unknown()).optional(),
   reasoning: z.string()
 });
 
@@ -316,11 +316,8 @@ Decide the best action and explain your reasoning.`
     schema: AgentAction
   });
 
-  // When using schema, response.content may already be a parsed object
-  // JSON.parse is only needed if the response is a string
-  return typeof response.content === 'string' 
-    ? JSON.parse(response.content) 
-    : response.content;
+  // NeuroLink returns parsed schema output through structuredData.
+  return AgentAction.parse(response.structuredData);
 }
 
 // Execute the action and continue the loop
@@ -454,13 +451,11 @@ async function analyzeCodebase(files: FileContent[]) {
 
   // Estimate tokens (rough: ~4 chars per token)
   const estimatedTokens = context.length / 4;
-  // Standard context: 200K tokens for most Claude models
-  // Extended context: Claude Sonnet 4.5 supports up to 1M tokens
-  // with the "anthropic-beta: context-1m-2025-08-07" header
-  const maxContextTokens = 200000;
+  // NeuroLink's model catalog records a 200K-token context for Claude Opus.
+  const maxContextTokens = 200_000;
 
   if (estimatedTokens > maxContextTokens - 8000) {
-    console.warn('Context may be too large, consider truncating or using extended context');
+    console.warn('Context may be too large; truncate or split the input');
   }
 
   return await neurolink.generate({
@@ -494,9 +489,9 @@ async function generateWithRetry(prompt: string, maxRetries = 3): Promise<string
       });
       return response.content;
 
-    } catch (error: any) {
-      lastError = error;
-      console.log(`Attempt ${attempt} failed: ${error.message}`);
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.log(`Attempt ${attempt} failed: ${lastError.message}`);
 
       // Exponential backoff
       if (attempt < maxRetries) {
@@ -514,7 +509,7 @@ async function generateWithFallback(prompt: string): Promise<string> {
   const models = [
     { provider: "anthropic" as const, model: "claude-sonnet-4-5-20250929" },
     { provider: "anthropic" as const, model: "claude-haiku-4-5-20251001" },
-    { provider: "openai" as const, model: "gpt-4o" }
+    { provider: "openai" as const, model: "gpt-5.4" }
   ];
 
   for (const { provider, model } of models) {
@@ -552,7 +547,7 @@ const result = await neurolink.stream({
   maxTokens: 1000
 });
 
-// Handle streamed response - result.stream is a ReadableStream
+// Handle streamed response - result.stream is an AsyncIterable of chunks
 for await (const chunk of result.stream) {
   if ('content' in chunk) {
     process.stdout.write(chunk.content);
@@ -596,7 +591,7 @@ async function batchClassify(items: string[]) {
     neurolink.generate({
       input: { text: `Classify this feedback as positive, negative, or neutral: "${item}"` },
       provider: "anthropic",
-  model: "claude-haiku-4-5-20251001",
+      model: "claude-haiku-4-5-20251001",
       maxTokens: 50
     })
   ));
@@ -734,7 +729,7 @@ console.log(getMetricsSummary());
 
 ## What You Built
 
-You configured Claude models through NeuroLink with the right tier for each task -- Opus for complex reasoning, Sonnet for general tasks, Haiku for high-volume operations. You built agentic workflows that leverage Claude's reasoning for multi-step tasks, implemented tool use for powerful automation, optimized prompts with Claude-specific patterns like constitutional framing and explicit structure requests, and set up production patterns including streaming, caching, retries, and fallbacks.
+You configured Claude models through NeuroLink with the right tier for each task -- Opus for complex reasoning, Sonnet for general tasks, Haiku for high-volume operations. You built agentic workflows that leverage Claude's reasoning for multi-step tasks with structured action schemas, optimized prompts with Claude-specific patterns like constitutional framing and explicit structure requests, and set up production patterns including streaming, retries, and fallbacks.
 
 For more advanced patterns, explore our guides on [prompt engineering](/posts/prompt-engineering-neurolink/), [streaming best practices](/posts/streaming-best-practices/), and [cost optimization strategies](/posts/cost-optimization-strategies/).
 

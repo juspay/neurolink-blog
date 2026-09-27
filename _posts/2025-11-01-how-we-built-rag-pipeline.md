@@ -17,9 +17,9 @@ tags:
   - engineering
 author: neurolink
 description: >-
-  A Stripe-style deep dive into building NeuroLink's RAG pipeline. Why we built
-  10 chunking strategies, how hybrid search combines vector and BM25, and the
-  benchmarks that guided every decision.
+  Explore NeuroLink's RAG architecture: 10 registered chunking strategies,
+  hybrid vector and BM25 retrieval, Graph RAG, LLM-based reranking, and the
+  trade-offs to evaluate for your own corpus.
 toc: true
 mermaid: true
 pin: false
@@ -28,68 +28,70 @@ image:
   alt: 'How We Built the RAG Pipeline: 10 Chunking Strategies and Why'
 ---
 
-Our first RAG implementation used fixed-size character splitting. It worked perfectly on blog posts. Then someone fed it a LaTeX paper with 47 nested equations, and the retrieved chunks were gibberish -- half an equation here, a dangling `\end{theorem}` there.
+Fixed-size character splitting can work for uniform prose but fail on structured formats. A split can cut a LaTeX equation, Markdown heading, function definition, or JSON object in half, leaving fragments with too little context for reliable retrieval.
 
-NeuroLink's RAG pipeline now supports 10 chunking strategies, hybrid search (vector + BM25), Graph RAG, and reranking. But we did not start here. We started with one chunker and one vector store, and every addition was a response to a real failure.
+NeuroLink's RAG subsystem registers 10 chunking strategies and includes hybrid vector-plus-BM25 search, Graph RAG, and reranking. These components let an application select a retrieval design that matches its document structure and evaluation criteria instead of forcing every corpus through one splitter.
 
-This post tells the story of why each chunking strategy exists, how we designed the registry/factory pattern to scale them, and the benchmarks that proved which strategies work best for which content.
+This post examines why the strategies exist, how the registry and factory expose them, and how to evaluate their trade-offs on your own corpus.
 
-## The First RAG Pipeline (and Why It Failed)
+## Where Fixed-Size Chunking Breaks Down
 
-Version 1 was simple: split text into 1000-character chunks with 100-character overlap, embed with OpenAI `text-embedding-3-small`, retrieve top-5 by cosine similarity.
+Consider a baseline that splits text into 1000-character chunks with 100-character overlap, embeds each chunk with OpenAI `text-embedding-3-small`, and retrieves the five nearest vectors. That is easy to implement, but its boundaries are unrelated to the source structure.
 
-It worked for blog posts, plain-text documents, and short emails. Then we tested it against real production workloads:
+Common failure modes include:
 
-**Code documentation** split mid-function. A chunk would contain the first half of a function definition and the last half of the previous function's docstring. Neither chunk was useful for answering questions about either function.
+**Code documentation** can split mid-function, separating a definition from the docstring or surrounding explanation that gives it meaning.
 
-**Markdown documents** split mid-heading. A chunk starting with "## Configura" and ending with "tion Options\n\nThe following flags..." lost the heading context entirely. The retriever could not match a query about "configuration options" because the heading was split across two chunks.
+**Markdown documents** can split mid-heading. A chunk beginning with "## Configura" and a following chunk beginning with "tion Options" both lose the intact section title.
 
-**JSON configurations** produced invalid fragments. A chunk containing `{"port": 3000, "host":` is not just unhelpful -- it is misleading. The retriever would surface this fragment for a query about port configuration, but the LLM could not interpret the incomplete JSON.
+**JSON configurations** can produce fragments such as `{"port": 3000, "host":`, which no longer represent complete JSON values.
 
-**LaTeX papers** split mid-equation. A chunk ending with `\frac{1}{2}` and the next starting with `mv^2` destroyed the mathematical meaning entirely.
+**LaTeX papers** can split an equation or environment across chunks, separating notation that must be interpreted together.
 
-The root cause was clear: character chunking has no concept of semantic boundaries. It treats all text as a flat byte stream. But different document types have different natural boundary markers -- headings in Markdown, tags in HTML, object boundaries in JSON, environments in LaTeX. The chunker must understand the structure of the content, not just its characters.
+The limitation is structural: character chunking treats text as a flat sequence. Other strategies can instead use paragraphs, sentences, headings, object boundaries, or LaTeX environments as candidate split points.
 
-## The Chunking Strategy Explosion
+## The 10 Registered Strategies
 
-Each of the 10 strategies was born from a specific failure mode. Here is the full list with the design rationale behind each one.
+NeuroLink exposes 10 strategy names. Their implementations make different compromises, so the right choice depends on the source format and the behavior you validate in retrieval tests.
 
-**Strategy 1: Character.** The baseline. Split at character count with overlap. Still useful for truly unstructured text with no formatting markers. Config: `maxSize: 1000, overlap: 100`.
+There are two implementation sets behind those names. The descriptions below cover the public `createChunker()` / `ChunkerFactory` entry point and the metadata registry exported from `@juspay/neurolink/rag`. `MDocument.chunk()` and `RAGPipeline` ingestion use a separate set of chunkers, and where the two differ, the difference is noted in the strategy entry.
 
-**Strategy 2: Recursive.** The "good default." Tries to split at `\n\n` first, then `\n`, then `.`, then `" "`, then individual characters. Preserves paragraph boundaries when possible. Inspired by LangChain's recursive text splitter, the ordered separator list is the key insight -- try the most meaningful boundary first.
+**Strategy 1: Character.** Splits by character count with optional overlap. Its default configuration is `maxSize: 1000, overlap: 100`. The `MDocument`/`RAGPipeline` version defaults to an overlap of 0.
 
-**Strategy 3: Sentence.** Split at sentence boundaries (periods, question marks, exclamation marks). Groups sentences to fill chunk size. Built for Q&A applications where each chunk should contain complete thoughts.
+**Strategy 2: Recursive.** Tries an ordered separator list, beginning with paragraph and line boundaries before falling back to smaller separators. This is the pipeline's default strategy.
 
-**Strategy 4: Token.** Split by token count using model-specific tokenizers. Ensures chunks fit within model context windows precisely. When you need exact token budgets (for example, embedding models with 512-token limits), character count is not sufficient because token counts vary per word.
+**Strategy 3: Sentence.** Detects sentence endings, groups sentences up to the configured size, and can carry complete trailing sentences into the next chunk as overlap.
 
-**Strategy 5: Markdown.** Split at heading boundaries (`#`, `##`, `###`), preserving the heading hierarchy as metadata. Documentation is mostly Markdown. Splitting at headings preserves section context, and the heading text becomes searchable metadata.
+**Strategy 4: Token.** Approximates token counts from words at about 1.3 tokens per word. It is useful for rough budgeting, but it does not use a model-specific tokenizer and therefore does not guarantee exact token limits. The `MDocument`/`RAGPipeline` version estimates about 4 characters per token instead, which is also an approximation.
 
-**Strategy 6: HTML.** Split at semantic HTML tags (`<article>`, `<section>`, `<p>`, `<h1>`-`<h6>`), with optional tag stripping. Web content scraping was the driver. Tags carry structural meaning that character chunking destroys.
+**Strategy 5: Markdown.** Splits around Markdown headings and preserves section context in chunk metadata. It also detects fenced code blocks and tables so those structures can be handled as units where size permits.
 
-**Strategy 7: JSON.** Split at object boundaries, respecting nesting depth. Ensures no chunk contains an invalid JSON fragment. API responses, configuration files, and structured data all need this.
+**Strategy 6: HTML.** Removes script, style, and HTML tags, normalizes whitespace, and then applies size-based splitting to the extracted text. This version does not retain a semantic tag hierarchy. The `MDocument`/`RAGPipeline` version works differently: it splits on structural tags, keeps elements such as `pre`, `code`, `table`, lists, and `blockquote` together as units, and records the source `tagName` in chunk metadata instead of stripping tags first.
 
-**Strategy 8: LaTeX.** Split at `\section`, `\subsection`, `\begin{environment}`, and math blocks. The academic paper failure that inspired this whole journey. Equations and proofs must stay intact.
+**Strategy 7: JSON.** Parses the document first, emits array elements or the top-level value as items, and serializes them for chunking. An item larger than the configured maximum can still be split into text fragments, so consumers should not assume that every output chunk is independently valid JSON. The `MDocument`/`RAGPipeline` version walks the nesting up to a `maxDepth`, can split on configured `splitKeys`, and can record each chunk's JSON path in metadata.
 
-**Strategy 9: Semantic.** Uses embedding similarity to identify natural topic boundaries. When adjacent chunks are dissimilar, insert a split. For content where structural markers (headings, paragraphs) do not align with topic boundaries. This is the highest-quality strategy but also the slowest due to embedding API calls.
+**Strategy 8: LaTeX.** Uses section commands and selected environments as boundaries, then splits oversized sections by size. This improves structural grouping but does not guarantee that every mathematical expression remains intact.
 
-**Strategy 10: Semantic-Markdown.** Combines Markdown structural splitting with semantic similarity to merge small related sections. Documentation where heading-level splitting produces chunks that are too small. Semantic similarity merges related subsections into coherent retrieval units.
+**Strategy 9: Semantic.** In `RAGPipeline` ingestion and the registry API, this strategy embeds paragraph-sized segments, compares adjacent embeddings, and uses a similarity threshold to find candidate topic boundaries. It defaults to OpenAI `text-embedding-3-small` and falls back to simple size-based chunking if embedding setup fails. One current implementation caveat: the standalone public `createChunker('semantic')` factory path still constructs a `RecursiveChunker` stand-in, so use the pipeline or registry path when you need embedding-based boundaries and pin the SDK version you test.
+
+**Strategy 10: Semantic-Markdown.** Splits by Markdown headings and merges adjacent small sections while they fit the configured maximum. Despite the strategy name, the current `SemanticMarkdownChunker` does not calculate embedding similarity during that merge.
 
 ## The Registry/Factory Pattern
 
-With 10 chunkers, each with different constructors, configurations, and dependencies, we needed a clean management pattern. A giant switch statement was not going to scale.
+With 10 strategy names, different configurations, and some optional provider work, a registry and factory provide a common discovery and construction layer.
 
 ### The Solution: ChunkerRegistry + ChunkerFactory
 
-The `ChunkerRegistry` is a singleton that holds factory functions and metadata for each chunker. The `ChunkerFactory` creates configured instances on demand.
+The metadata registry is a singleton that holds async constructors and metadata for each chunker. It is exported from the `@juspay/neurolink/rag` subpath as the `chunkerRegistry` instance (class `ChunkerRegistryV2`), together with helpers such as `getChunkerMetadata()`. The root package's `ChunkerRegistry` export is a different, static class that only lists, looks up, and recommends strategies. `ChunkerFactory`, also exported from `@juspay/neurolink/rag`, creates configured instances on demand, and the root `createChunker()` wraps it. `RAGPipeline` ingestion reaches a separate document-processing registry through `MDocument`; both registries expose the same 10 strategy names, but the semantic implementation caveat below means their behavior is not identical for every entry point.
 
 ```mermaid
 flowchart LR
-    A["ChunkerRegistry"] -->|"extends"| B["BaseRegistry"]
+    A["ChunkerRegistryV2"] -->|"extends"| B["BaseRegistry"]
     A -->|"singleton"| C["getInstance()"]
     A -->|"lazy load"| D["registerAll()"]
     D --> E["10 Chunkers"]
     A -->|"alias map"| F["md -> markdown"]
-    A -->|"use case"| G["getByUseCase()"]
+    A -->|"use case"| G["getChunkersByUseCase()"]
     H["ChunkerFactory"] -->|"extends"| I["BaseFactory"]
     H -->|"creates"| J["Configured Instances"]
     H -->|"metadata"| K["ChunkerMetadata"]
@@ -97,7 +99,7 @@ flowchart LR
 
 Four key design decisions shaped the architecture:
 
-**Lazy loading via dynamic imports.** Each chunker is loaded only when first used. The registry holds factory functions, not instances. This keeps the initial bundle small -- you pay the import cost only for the strategies you actually use.
+**Lazy construction via dynamic imports.** The public registry and factory register async constructors, and strategy modules are dynamically imported when a chunker is requested through those entry points. This defers initialization work until the application uses the strategy; measure the effect on your own bundler and runtime rather than assuming a fixed bundle-size result.
 
 ```typescript
 import { createChunker, getAvailableStrategies } from '@juspay/neurolink';
@@ -108,11 +110,10 @@ console.log('Available:', strategies);
 // ['character', 'recursive', 'sentence', 'token', 'markdown',
 //  'html', 'json', 'latex', 'semantic', 'semantic-markdown']
 
-// Create a chunker with custom config
+// Create a chunker with custom size and overlap
 const chunker = await createChunker('markdown', {
   maxSize: 1500,
   overlap: 0,
-  headerLevels: [1, 2, 3],
 });
 
 // Aliases work too
@@ -121,10 +122,13 @@ const sameChunker = await createChunker('md'); // resolves to 'markdown'
 
 **Alias support.** `'md'` resolves to `'markdown'`, `'tex'` to `'latex'`, `'langchain-default'` to `'recursive'`. Aliases are stored in the `ChunkerMetadata` and resolved during lookup. This lets users reference strategies by familiar names without the registry maintaining multiple implementations.
 
-**Use-case discovery.** `getChunkersByUseCase('academic')` returns `['latex', 'semantic']`. Each chunker declares its use cases in metadata, enabling programmatic strategy selection without hardcoded mappings.
+**Use-case discovery.** `chunkerRegistry.getChunkersByUseCase('academic')` returns `['latex']` -- LaTeX chunking is the strategy tagged for academic papers. Each chunker declares its use cases in metadata, enabling programmatic strategy selection without hardcoded mappings.
 
 ```typescript
-import { chunkerRegistry, getChunkerMetadata } from '@juspay/neurolink';
+import { chunkerRegistry, getChunkerMetadata } from '@juspay/neurolink/rag';
+
+// Metadata lookups are synchronous, so load the lazy registry first
+await chunkerRegistry.ensureInitialized();
 
 // Get metadata for a strategy
 const markdownMeta = getChunkerMetadata('markdown');
@@ -132,7 +136,7 @@ console.log(markdownMeta);
 // {
 //   description: 'Splits markdown content by headers and structural elements',
 //   defaultConfig: { maxSize: 1000, overlap: 0 },
-//   supportedOptions: ['maxSize', 'overlap', 'headerLevels', 'splitCodeBlocks'],
+//   supportedOptions: ['maxSize', 'overlap', 'headerLevels', 'splitCodeBlocks', 'preserveMetadata'],
 //   useCases: ['Documentation processing', 'README files', 'Technical documentation'],
 //   aliases: ['md', 'markdown-header']
 // }
@@ -142,7 +146,7 @@ const academicChunkers = chunkerRegistry.getChunkersByUseCase('academic');
 console.log(academicChunkers); // ['latex']
 ```
 
-**BaseRegistry foundation.** Both the ChunkerRegistry and ChunkerFactory extend `BaseRegistry` and `BaseFactory` from our shared infrastructure. The `BaseRegistry` pattern provides `register(name, factory, metadata)`, `get(name)` with lazy instantiation, `list()` for all items with metadata, and `ensureInitialized()` for safe startup. This same pattern powers our provider registry, middleware registry, and server adapter registry.
+**Base infrastructure.** The `/rag` registry class (`ChunkerRegistryV2`) extends `BaseRegistry`, while `ChunkerFactory` extends `BaseFactory`. The shared infrastructure handles registration, aliases, lazy initialization, lookup, and discovery so each strategy does not need to reimplement that lifecycle.
 
 ## Beyond Chunking -- Retrieval Architecture
 
@@ -150,15 +154,15 @@ Chunking is the ingestion half of RAG. The retrieval half is equally important a
 
 ### Vector Store Abstraction
 
-We defined a `VectorStore` interface with two core operations: `query(indexName, queryVector, topK, filter)` for similarity search and `upsert(indexName, documents)` for adding embeddings with metadata. The `InMemoryVectorStore` implements this for development, but the interface is designed for production backends: Pinecone, Weaviate, Qdrant, or any vector database.
+NeuroLink defines a `VectorStore` interface with `query({ indexName, queryVector, topK, filter })` for similarity search. Writable stores additionally implement `upsert(indexName, items)` for adding embeddings with metadata. The `InMemoryVectorStore` supports both methods for development. NeuroLink also ships adapters for Pinecone, pgvector, and Chroma, and the interface is structural, so another vector database can implement it too.
 
-The abstraction ensures that changing your vector database requires zero changes to your chunking, embedding, or retrieval code.
+Because the pipeline depends on the interface, an adapter that implements the same methods can usually be substituted without changing chunking or embedding logic. Store-specific configuration, filters, indexing, credentials, and deployment behavior still require integration and testing.
 
 ### BM25 Sparse Retrieval
 
-Vector search excels at semantic similarity but misses exact keyword matches. Searching for "NeuroLink" as a specific term might not surface documents that mention it by name if the embedding model does not weight that token highly.
+Vector search ranks semantic similarity, while sparse retrieval gives direct weight to matching terms. A query containing a product name, identifier, or configuration key can therefore produce a different ranking in the two systems.
 
-We implemented `InMemoryBM25Index` with standard BM25 scoring (k1=1.5, b=0.75), including tokenization, IDF calculation, and document frequency tracking. BM25 catches exact terms that vector search misses.
+`InMemoryBM25Index` implements BM25 scoring with `k1=1.5` and `b=0.75`, including tokenization, IDF calculation, and document-frequency tracking. It provides a sparse ranking based on query-term matches that can differ from the vector ranking.
 
 ### Hybrid Search Fusion
 
@@ -186,8 +190,11 @@ flowchart LR
 The formula `1/(k + rank_vector) + 1/(k + rank_bm25)` where k=60 produces a unified ranking that respects both semantic similarity and keyword relevance.
 
 ```typescript
-import { createHybridSearch, InMemoryBM25Index } from '@juspay/neurolink';
-import { InMemoryVectorStore } from '@juspay/neurolink';
+import {
+  createHybridSearch,
+  InMemoryBM25Index,
+  InMemoryVectorStore,
+} from '@juspay/neurolink';
 
 const vectorStore = new InMemoryVectorStore();
 const bm25Index = new InMemoryBM25Index();
@@ -211,15 +218,15 @@ results.forEach(r => {
 
 ### Graph RAG
 
-Standard retrieval finds chunks similar to the query. Graph RAG follows relationship chains. We build a graph where chunks are nodes and edges represent semantic similarity above a threshold. Query traversal retrieves not just the most similar chunks but also their neighbors, enabling "follow-up" style retrieval.
+`GraphRAG` builds nodes from chunks and creates weighted edges when embedding similarity meets the configured threshold. At query time it seeds from the most query-similar nodes, runs a random walk with restart, and combines visit frequency with direct query similarity to rank the result nodes.
 
 ### Reranking
 
-Post-retrieval reranking applies a cross-encoder model to the top candidates. We over-retrieve by 2x (fetch top-20 to rerank to top-5), and the precision improvement at the top positions is dramatic.
+The pipeline's reranker uses a configured generative provider to score semantic relevance, then combines that score with the original vector score and the candidate's position. It processes candidates in batches and returns the configured top results. This is prompt-based LLM scoring, not a cross-encoder, so evaluate its quality, latency, and model cost for your workload.
 
 ## The RAGPipeline Orchestrator
 
-Before `RAGPipeline`, users had to manually wire chunking, embedding, vector storage, retrieval, and generation. That meant 50+ lines of boilerplate for a basic RAG query.
+Without `RAGPipeline`, an application must wire chunking, embedding, vector storage, retrieval, and generation itself. The class packages those stages behind `ingest()` and `query()` while keeping strategy and retrieval options configurable.
 
 The `RAGPipeline` class orchestrates the entire flow:
 
@@ -253,13 +260,13 @@ import { RAGPipeline } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o-mini' },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4-mini' },
   defaultChunkingStrategy: 'semantic-markdown',
   defaultChunkSize: 1000,
   defaultChunkOverlap: 200,
   enableHybridSearch: true,
   enableReranking: true,
-  rerankingModel: { provider: 'openai', modelName: 'gpt-4o-mini' }, // Must be a generative LLM, not an embedding model
+  rerankingModel: { provider: 'openai', modelName: 'gpt-5.4-mini' }, // Must be a generative LLM, not an embedding model
 });
 
 // Ingest documents
@@ -292,67 +299,56 @@ Key design decisions in `RAGPipeline`:
 - **`query(query, options)`** embeds, retrieves, reranks, and generates in one call.
 - **`getStats()`** provides pipeline health monitoring (document count, chunk count, dimensions).
 - **Lazy initialization**: Embedding and generation providers are created on first use.
-- **Sensible defaults**: Recursive strategy, 1000 chunk size, 200 overlap, top-5 retrieval. Hybrid search and Graph RAG are disabled by default (opt-in).
+- **Documented defaults**: Recursive strategy, 1000-character chunks, 200-character overlap, and top-5 retrieval. Hybrid search, Graph RAG, and reranking are disabled by default.
 
-The convenience factory `createRAGPipeline({ provider: 'openai', enableHybrid: true })` handles common configurations in a single function call.
+The convenience factory `createRAGPipeline({ provider: 'openai', enableHybrid: true })` handles a smaller set of common options. Add `generationModel` when the pipeline should generate an answer instead of returning assembled context only.
 
-Adoption tripled after we introduced `RAGPipeline`. Fifty lines of boilerplate became two function calls: `pipeline.ingest()` and `pipeline.query()`.
+The abstraction reduces manual orchestration to `pipeline.ingest()` and `pipeline.query()`, but applications still need to configure providers and stores, define an ingestion policy, and evaluate retrieval quality.
 
-## Benchmarks -- Which Strategy Wins?
+## How to Benchmark the Strategies
 
-We benchmarked all 10 strategies against 500 documents across five categories: code documentation, Markdown guides, LaTeX papers, JSON configurations, and plain text. Each category had 100 queries. We measured retrieval accuracy (recall@5), answer quality (GPT-4 judge scoring), and latency.
+The repository does not publish a benchmark artifact that supports one universal winner or fixed recall improvements. Chunking quality depends on the corpus, query distribution, embedding model, retrieval settings, and relevance labels. Treat strategy selection as an experiment you can reproduce.
 
-| Strategy | Code Docs | Markdown | LaTeX | JSON | Plain Text |
-|----------|-----------|----------|-------|------|------------|
-| Character | 62% | 71% | 34% | 28% | 78% |
-| Recursive | 81% | 85% | 52% | 41% | 82% |
-| Sentence | 74% | 79% | 48% | 35% | 85% |
-| Token | 76% | 80% | 50% | 38% | 80% |
-| Markdown | 85% | 92% | -- | -- | -- |
-| HTML | -- | -- | -- | -- | -- |
-| JSON | -- | -- | -- | 89% | -- |
-| LaTeX | -- | -- | 88% | -- | -- |
-| Semantic | 83% | 87% | 71% | 62% | 86% |
-| Sem-Markdown | 88% | 94% | -- | -- | -- |
+Build an evaluation set with representative documents and queries, then record at least:
 
-The dashes indicate strategies not applicable to that content type.
+| Dimension | What to compare |
+|---|---|
+| Retrieval | Recall@k, precision@k, or nDCG against human relevance labels |
+| Answer quality | A stable rubric with human review or a calibrated model judge |
+| Latency | Ingestion time, query time, and any external provider calls |
+| Cost | Embedding, semantic chunking, reranking, and generation usage |
+| Integrity | Complete headings, code blocks, tables, JSON values, and LaTeX environments |
 
-**Key findings:**
+Run the same queries against a character or recursive baseline, the format-aware candidate, and any hybrid or reranked variant. Keep the corpus, embedding model, `topK`, and relevance judgments fixed so the comparison isolates the component being tested.
 
-**Format-specific chunkers dominate their domain.** Markdown chunking achieves 92% recall on Markdown documents versus 71% for character chunking. LaTeX chunking achieves 88% on LaTeX versus 34% for character chunking. The difference is not marginal -- it is the difference between a useful RAG system and a broken one.
+Do not assume the strategy name alone proves its behavior. In the current implementation, `RAGPipeline.ingest({ strategy: 'semantic' })` and the registry path use embedding-based boundary detection, while standalone `createChunker('semantic')` still creates a recursive stand-in. Semantic-Markdown merges heading sections by size without embedding comparisons on these paths. Benchmark the exact entry point you ship and pin the SDK version used for the run.
 
-**Recursive is the best general-purpose default.** At 81-85% across code docs, Markdown, and plain text, recursive chunking is consistently good without being the best at anything. It is the safe choice when you do not know the content type in advance.
+## Engineering Lessons
 
-**Semantic-Markdown is the best overall for documentation workloads.** At 94% recall on Markdown and 88% on code docs, it combines the structural awareness of Markdown chunking with the semantic coherence of embedding-based splitting.
+**1. There is no universal chunker.** Document structure matters. The registry pattern lets applications select a strategy without changing the pipeline API, but the selection still needs corpus-specific evaluation.
 
-**Hybrid search adds 8-12% recall improvement** over pure vector search across all strategies. This is a consistent improvement regardless of the chunking strategy used.
+**2. Overlap is a tunable trade-off.** Overlap can preserve facts that cross a boundary, but it also creates duplicate text, more embeddings, and more retrieval candidates. The pipeline defaults to 200 characters for a 1000-character chunk; test smaller and larger values rather than treating that default as optimal.
 
-## Lessons Learned
+**3. Sparse and dense retrieval solve different problems.** BM25 weights matching terms; vectors rank semantic similarity. Hybrid retrieval can help when a query set needs both, but it can also add noisy candidates and requires another index. Compare it with each single-retriever baseline.
 
-Over two years of building and iterating on the RAG pipeline, five lessons emerged:
+**4. Deferred initialization limits upfront work.** Providers and chunkers are initialized on demand. The impact on browser bundles, server startup, and first-request latency depends on the application's build and deployment environment, so measure all three where they matter.
 
-**1. There is no universal chunker.** Document structure matters. The registry pattern lets users pick the right strategy without SDK changes. Trying to build one chunker that handles all formats leads to mediocre performance on everything.
-
-**2. Overlap is underrated.** Even 10% overlap dramatically reduces "orphaned context" where a relevant fact falls on a chunk boundary. We default to 200 characters of overlap on a 1000-character chunk, and our benchmarks show this is near-optimal.
-
-**3. BM25 complements vectors.** Exact keyword matches are trivial for BM25 and surprisingly hard for embedding models. Hybrid search is always better than either alone. The additional index maintenance cost is minimal compared to the quality improvement.
-
-**4. Lazy loading pays off.** Ten chunkers but only one loaded at startup. Bundle size stays constant as strategies grow. This was a deliberate architectural choice that has proven correct as we added strategies 8, 9, and 10 without affecting startup time.
-
-**5. The pipeline abstraction was worth the investment.** Fifty lines of boilerplate became `pipeline.ingest()` + `pipeline.query()`. Adoption tripled. The lesson: developer experience is not a luxury -- it is the difference between an SDK that gets used and one that gets abandoned.
+**5. A pipeline API reduces wiring, not evaluation work.** `pipeline.ingest()` and `pipeline.query()` coordinate the main stages. Teams still own source validation, chunking policy, access controls, retrieval evaluation, monitoring, and store operations.
 
 ## Design Decisions and Trade-offs
 
-We chose the registry/factory pattern over a monolithic chunker because no single strategy handles all document types well. This means more code surface area and more strategies to maintain, but the benchmarks vindicate the decision: format-specific chunkers outperform general-purpose ones by 20-60% recall on their target formats.
+The registry and factory add implementation surface, but they also separate discovery and construction from individual chunkers. That makes additional strategies possible without expanding a single conditional dispatcher.
 
-Hybrid search (vector + BM25) adds index maintenance complexity and doubles storage requirements. We accepted this trade-off because the 8-12% recall improvement is consistent and measurable. For teams where storage cost is a constraint, pure vector search is a reasonable starting point.
+Hybrid search maintains both vector and sparse indexes and queries both paths before fusion. Its storage and operational overhead depend on the adapters, metadata, and corpus. Start with vector or BM25 retrieval as a baseline, then retain hybrid search only when evaluation shows a useful improvement.
 
-The pipeline abstraction hides significant complexity behind `pipeline.ingest()` and `pipeline.query()`. The risk is that developers lose visibility into what happens between those calls. We mitigated this with detailed event logging at each pipeline stage so developers can inspect chunking decisions, embedding generation, and retrieval scoring when they need to.
+Graph RAG adds graph construction and stochastic traversal. LLM-based reranking adds provider calls and prompt-scoring latency. Each should be enabled independently and compared against a simpler retrieval path.
 
-What comes next: multi-modal RAG (images + text chunks), streaming RAG responses for progressive answer display, and an automated evaluation framework for continuous quality measurement.
+The pipeline abstraction also hides work behind `ingest()` and `query()`. Its response metadata reports retrieval method, retrieved-chunk count, reranking status, and query time; combine those fields with application-level traces and evaluation results when diagnosing retrieval behavior.
+
+The subsystem also contains multi-modal ingestion and retrieval primitives. Treat further extensions and roadmap items as version-specific capabilities, and verify them against the release you deploy.
 
 - [How We Built Streaming Tool Calls](/posts/how-we-built-streaming-tool-calls/) -- The engineering story behind real-time tool execution
-- How We Built MCP Integration -- Integrating 58+ tool servers into a unified protocol
+- [How We Built MCP Integration](/posts/how-we-built-mcp-integration/) -- The engineering story behind supporting 4 transport protocols
 - [Advanced RAG](/posts/advanced-rag/) -- The user-facing guide to all the features described here
 
 ---

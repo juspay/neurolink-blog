@@ -59,7 +59,7 @@ The first step in migration is understanding how LangChain concepts map to Neuro
 | Chain | Sequential `generate()` calls | No special abstraction needed |
 | Streaming | `neurolink.stream()` | Native async iterator support |
 | Multiple Providers | `provider` parameter | Switch providers instantly |
-| Message History | `conversationHistory` | Pass conversation history directly |
+| Message History | `conversationMessages` | Pass conversation history directly (each message needs an `id`) |
 
 ## Side-by-Side Code Comparisons
 
@@ -88,11 +88,10 @@ import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Model strings in this guide are illustrative. Current OpenAI flagship (mid-2026): gpt-5.4 / gpt-5.5.
 const response = await neurolink.generate({
   input: { text: "What is the capital of France?" },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   temperature: 0.7,
 });
 
@@ -130,7 +129,7 @@ const response = await neurolink.generate({
   input: { text: "What is AI?" },
   systemPrompt: "You are a helpful assistant that speaks like a pirate.",
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 console.log(response.content);
@@ -168,13 +167,13 @@ const neurolink = new NeuroLink();
 
 const response = await neurolink.generate({
   input: { text: "Tell me about TypeScript." },
-  conversationHistory: [
-    { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user', content: 'Hello!' },
-    { role: 'assistant', content: 'Hi there! How can I help you today?' },
+  conversationMessages: [
+    { id: crypto.randomUUID(), role: 'system', content: 'You are a helpful assistant.' },
+    { id: crypto.randomUUID(), role: 'user', content: 'Hello!' },
+    { id: crypto.randomUUID(), role: 'assistant', content: 'Hi there! How can I help you today?' },
   ],
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 console.log(response.content);
@@ -211,7 +210,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: "Tell me a story about a robot." },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 for await (const chunk of result.stream) {
@@ -252,14 +251,14 @@ const neurolink = new NeuroLink();
 const openaiResponse = await neurolink.generate({
   input: { text: "Hello" },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 // Anthropic - just change two parameters
 const anthropicResponse = await neurolink.generate({
   input: { text: "Hello" },
   provider: 'anthropic',
-  model: 'claude-3-5-sonnet-20241022',
+  model: 'claude-sonnet-5',
 });
 
 // Same API, same response structure
@@ -316,7 +315,7 @@ const summaryResponse = await neurolink.generate({
   input: { text: "Long article about technology..." },
   systemPrompt: "Summarize this text in one sentence.",
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 // Step 2: Translate
@@ -324,7 +323,7 @@ const translationResponse = await neurolink.generate({
   input: { text: summaryResponse.content },
   systemPrompt: "Translate this to French.",
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 console.log(translationResponse.content);
@@ -366,19 +365,19 @@ const [summary, keywords, sentiment] = await Promise.all([
     input: { text },
     systemPrompt: "Summarize this text concisely.",
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   }),
   neurolink.generate({
     input: { text },
     systemPrompt: "Extract 5 keywords from this text.",
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   }),
   neurolink.generate({
     input: { text },
     systemPrompt: "Analyze the sentiment of this text.",
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   }),
 ]);
 
@@ -425,24 +424,24 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 // Simple in-memory conversation history
-const conversationHistory: Array<{ role: string; content: string }> = [
-  { role: 'system', content: 'You are a helpful assistant.' },
+const conversationMessages: Array<{ id: string; role: string; content: string }> = [
+  { id: crypto.randomUUID(), role: 'system', content: 'You are a helpful assistant.' },
 ];
 
 async function chat(userMessage: string): Promise<string> {
-  // Add user message to history
-  conversationHistory.push({ role: 'user', content: userMessage });
-
-  // Generate response
+  // Generate with prior turns only; input.text carries the current user message
   const response = await neurolink.generate({
     input: { text: userMessage },
-    conversationHistory,
+    conversationMessages,
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
-  // Add assistant response to history
-  conversationHistory.push({ role: 'assistant', content: response.content });
+  // Record the completed turn after a successful response
+  conversationMessages.push(
+    { id: crypto.randomUUID(), role: 'user', content: userMessage },
+    { id: crypto.randomUUID(), role: 'assistant', content: response.content }
+  );
 
   return response.content;
 }
@@ -483,7 +482,7 @@ try {
   const response = await neurolink.generate({
     input: { text: "Hello" },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
   console.log(response.content);
 } catch (error) {
@@ -517,7 +516,7 @@ async function generate(
     input: { text: prompt },
     systemPrompt: options.system,
     provider: options.provider || 'openai',
-    model: options.model || 'gpt-4',
+    model: options.model || 'gpt-5.4',
     temperature: options.temperature,
   });
   return response.content;
@@ -531,7 +530,7 @@ const summary = await generate("Summarize: ...", {
 const translation = await generate("Hello world", {
   system: "Translate to Spanish.",
   provider: 'anthropic',
-  model: 'claude-3-5-sonnet-20241022',
+  model: 'claude-sonnet-5',
 });
 ```
 
@@ -550,8 +549,8 @@ interface ProviderConfig {
 }
 
 const providers: ProviderConfig[] = [
-  { provider: 'openai', model: 'gpt-4' },
-  { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' },
+  { provider: 'openai', model: 'gpt-5.4' },
+  { provider: 'anthropic', model: 'claude-sonnet-5' },
   { provider: 'google-ai', model: 'gemini-2.5-flash' },
 ];
 
@@ -602,7 +601,7 @@ app.post("/new", async (req, res) => {
   const result = await neurolink.generate({
     input: { text: req.body.prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
   res.json({ content: result.content });
 });
@@ -628,7 +627,7 @@ export async function generateText(prompt: string): Promise<string> {
     const response = await neurolink.generate({
       input: { text: prompt },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
     return response.content;
   } else {
@@ -678,7 +677,7 @@ describe("Migration Validation", () => {
       const neurolinkResult = await neurolink.generate({
         input: { text: prompt },
         provider: 'openai',
-        model: 'gpt-4',
+        model: 'gpt-5.4',
       });
 
       // Both should return meaningful content
@@ -729,7 +728,7 @@ const text = response.content; // Can be string or array
 const response = await neurolink.generate({
   input: { text: "Hello" },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 const text = response.content; // Always string
 ```
@@ -750,7 +749,7 @@ const model = new ChatOpenAI({
 const response = await neurolink.generate({
   input: { text: "Hello" },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   temperature: 0.7,
   maxTokens: 1000,
 });
@@ -852,18 +851,16 @@ import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-const history: Array<{ role: string; content: string }> = [
-  { role: 'system', content: 'You are a helpful assistant.' },
+const history: Array<{ id: string; role: string; content: string }> = [
+  { id: crypto.randomUUID(), role: 'system', content: 'You are a helpful assistant.' },
 ];
 
 async function chat(userInput: string): Promise<void> {
-  history.push({ role: 'user', content: userInput });
-
   const result = await neurolink.stream({
     input: { text: userInput },
-    conversationHistory: history,
+    conversationMessages: history,
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   let fullResponse = '';
@@ -875,7 +872,10 @@ async function chat(userInput: string): Promise<void> {
   }
   console.log();
 
-  history.push({ role: 'assistant', content: fullResponse });
+  history.push(
+    { id: crypto.randomUUID(), role: 'user', content: userInput },
+    { id: crypto.randomUUID(), role: 'assistant', content: fullResponse }
+  );
 }
 ```
 
@@ -888,7 +888,7 @@ By now you have a working migration path for every major LangChain pattern: prov
 1. Install NeuroLink alongside LangChain
 2. Migrate one route or feature at a time using `generate()` and `stream()`
 3. Replace chain patterns with direct NeuroLink calls or direct API calls
-4. Manage conversation history as plain JavaScript arrays passed via `conversationHistory`
+4. Manage conversation history as plain JavaScript arrays passed via `conversationMessages`
 5. Remove LangChain once all routes are validated
 
 The result is a simpler codebase with fewer abstractions, standard JavaScript patterns, and the ability to switch providers with a single parameter change.

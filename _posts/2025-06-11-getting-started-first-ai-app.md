@@ -61,10 +61,10 @@ Before you begin, make sure you have the following:
 
 - **Node.js >= 20.18.1** -- NeuroLink requires a modern Node.js runtime. Check your version with `node --version`.
 - **npm >= 10.0.0 or pnpm >= 8.0.0** -- Either package manager works. This tutorial uses npm, but pnpm commands are identical.
-- **An API key from at least one supported provider** -- OpenAI, Anthropic, Google, AWS, or any of the 13 supported providers. If you do not have one yet, OpenAI and Google AI Studio both offer quick signup with free trial credits.
+- **An API key from at least one supported provider** -- OpenAI, Anthropic, Google, AWS, or any of the 33+ supported providers. If you do not have one yet, OpenAI and Google AI Studio both offer quick signup with free trial credits.
 - **Basic TypeScript/JavaScript knowledge** -- NeuroLink is TypeScript-native, but you can use it from plain JavaScript too.
 
-> **Tip:** Not sure which provider to pick? Think of it like choosing a phone carrier -- they all do the same basic thing, just with different pricing. OpenAI (`gpt-4o`) has the biggest community, while Google AI Studio (`gemini-2.5-flash`) lets you get started for free.
+> **Tip:** Not sure which provider to pick? Think of it like choosing a phone carrier -- they all do the same basic thing, just with different pricing. OpenAI (`gpt-5.4`) has the biggest community, while Google AI Studio (`gemini-2.5-flash`) lets you get started for free.
 {: .prompt-tip }
 
 ---
@@ -164,7 +164,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Explain quantum computing in simple terms' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4'
 });
 
 console.log(result.content);
@@ -190,7 +190,7 @@ Let us break down what each part does.
 |---|---|---|
 | `input.text` | `string` | The prompt or question for the AI model |
 | `provider` | `string` | Which AI provider to use (e.g., `'openai'`, `'anthropic'`, `'vertex'`) |
-| `model` | `string` | The specific model to use (e.g., `'gpt-4o'`, `'claude-sonnet-4-5-20250929'`) |
+| `model` | `string` | The specific model to use (e.g., `'gpt-5.4'`, `'claude-sonnet-4-5-20250929'`) |
 | `temperature` | `number` | Creativity control: 0 = deterministic, 1 = creative (optional) |
 | `maxTokens` | `number` | Maximum tokens in the response (optional) |
 | `systemPrompt` | `string` | Instructions that shape the AI's behavior (optional) |
@@ -225,7 +225,7 @@ const neurolink = new NeuroLink();
 const openaiResult = await neurolink.generate({
   input: { text: 'What is machine learning?' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4'
 });
 
 // Anthropic Claude
@@ -239,14 +239,14 @@ const anthropicResult = await neurolink.generate({
 const vertexResult = await neurolink.generate({
   input: { text: 'What is machine learning?' },
   provider: 'vertex',
-  model: 'gemini-3-flash'
+  model: 'gemini-2.5-flash'
 });
 
 // AWS Bedrock
 const bedrockResult = await neurolink.generate({
   input: { text: 'What is machine learning?' },
   provider: 'bedrock',
-  model: 'anthropic.claude-3-sonnet-20240229-v1:0'
+  model: 'anthropic.claude-sonnet-4-6'
 });
 ```
 
@@ -258,7 +258,7 @@ Every call returns the same `GenerateResult` type. Your application code that pr
 ```mermaid
 flowchart TD
     A["neurolink.generate()"] --> B{"provider?"}
-    B -->|"openai"| C["OpenAI GPT-4o"]
+    B -->|"openai"| C["OpenAI GPT-5.4"]
     B -->|"anthropic"| D["Claude Sonnet"]
     B -->|"vertex"| E["Gemini Flash"]
     B -->|"bedrock"| F["AWS Bedrock"]
@@ -291,9 +291,9 @@ console.log(result.content);
 
 This is especially useful for libraries and shared modules where you do not want to assume which provider your user has configured.
 
-### All 13 Supported Providers
+### Common Supported Providers
 
-Here is the complete list of providers from the `AIProviderName` enum:
+Here are common provider identifiers and their environment variables:
 
 | Provider | Config Key | Environment Variable |
 |---|---|---|
@@ -310,6 +310,11 @@ Here is the complete list of providers from the `AIProviderName` enum:
 | AWS SageMaker | `sagemaker` | AWS credentials |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` |
 | OpenAI-Compatible | `openai-compatible` | Configurable |
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
+| xAI | `xai` | `XAI_API_KEY` |
+| Cohere | `cohere` | `COHERE_API_KEY` |
+
+_(Plus more via NeuroLink's provider catalog -- see the `AIProviderName` enum for the full, current list.)_
 
 ---
 
@@ -337,7 +342,7 @@ for await (const chunk of result.stream) {
 }
 ```
 
-The `result.stream` async iterator delivers text chunks as they arrive from the provider. This works identically across all 13 providers -- NeuroLink normalizes the different streaming protocols (SSE, WebSocket, HTTP chunking) into a single consistent interface.
+The `result.stream` async iterator delivers text chunks as they arrive from the provider. This works identically across all providers -- NeuroLink normalizes the different streaming protocols (SSE, WebSocket, HTTP chunking) into a single consistent interface.
 
 > **Note:** The streaming property is `result.stream`, not `result.textStream`. This is consistent across all NeuroLink streaming operations.
 {: .prompt-info }
@@ -353,7 +358,7 @@ app.post('/chat', async (req, res) => {
   const result = await neurolink.stream({
     input: { text: req.body.message },
     provider: 'openai',
-    model: 'gpt-4o'
+    model: 'gpt-5.4'
   });
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -379,7 +384,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'How do I handle errors in async/await?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   systemPrompt: 'You are a senior TypeScript developer. Provide concise, practical answers with code examples. Always mention edge cases.',
   temperature: 0.3  // Lower temperature for more deterministic, technical answers
 });

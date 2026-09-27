@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Security Best Practices for AI Applications
+title: 'Security Best Practices for AI Applications'
 date: '2025-08-30 10:00:00 +0530'
 categories:
   - Guide
@@ -134,7 +134,7 @@ async function secureGenerate(
   const result = await neurolink.generate({
     input: { text: sanitized },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   // 4. Filter output
@@ -873,7 +873,7 @@ async function secureAIRequest(
     const result = await neurolink.generate({
       input: { text: sanitized },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
 
     // Filter output
@@ -883,7 +883,7 @@ async function secureAIRequest(
     auditEvent.success = true;
     auditEvent.outputLength = filtered.length;
     auditEvent.provider = 'openai';
-    auditEvent.model = 'gpt-4';
+    auditEvent.model = 'gpt-5.4';
     auditEvent.latencyMs = Date.now() - startTime;
     auditLogger.log(auditEvent);
 

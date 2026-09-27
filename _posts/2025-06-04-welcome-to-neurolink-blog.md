@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Welcome to the NeuroLink Blog
+title: 'Welcome to the NeuroLink Blog'
 date: '2025-06-04 10:00:00 +0530'
 categories:
   - Announcement

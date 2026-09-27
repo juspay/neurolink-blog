@@ -76,22 +76,21 @@ export OTEL_SERVICE_VERSION=1.0.0
 
 ### TelemetryService API
 
-The `TelemetryService` is a singleton that initializes the OpenTelemetry SDK and provides instrumentation methods:
+Telemetry is initialized and inspected through two top-level functions, `initializeTelemetry()` and `getTelemetryStatus()`. They wrap an internal `TelemetryService` singleton, which is not part of the public API:
 
 ```typescript
-import { TelemetryService } from '@juspay/neurolink';
+import { initializeTelemetry, getTelemetryStatus } from '@juspay/neurolink';
 
-const telemetry = TelemetryService.getInstance();
-await telemetry.initialize();
+await initializeTelemetry();
 
 // Check status
-const status = telemetry.getStatus();
+const status = await getTelemetryStatus();
 console.log(`Enabled: ${status.enabled}`);
 console.log(`Endpoint: ${status.endpoint}`);
 console.log(`Service: ${status.service}`);
 ```
 
-The `getStatus()` method returns the current telemetry configuration: whether it is enabled, the OTLP endpoint, and the service name. Use this to verify that telemetry is properly configured before running diagnostic queries.
+`getTelemetryStatus()` returns the current telemetry configuration: whether it is enabled and initialized, the OTLP endpoint, and the service name/version. Use this to verify that telemetry is properly configured before running diagnostic queries.
 
 ## Debugging layer 1: request-level tracing
 
@@ -99,44 +98,34 @@ The first layer of debugging is understanding what happened at the request level
 
 ### AI request tracing
 
-```typescript
-// TelemetryService wraps AI requests in OpenTelemetry spans
-const result = await telemetry.traceAIRequest('openai', async () => {
-  return await neurolink.generate({
-    input: { text: 'Analyze this data...' },
-    provider: 'openai',
-    model: 'gpt-4o',
-  });
-}, 'generate_text');
+Once telemetry is enabled, NeuroLink wraps every `generate()` and `stream()` call in an OpenTelemetry span automatically — there is no method you need to call to opt a request in:
 
-// Each span includes:
+```typescript
+const result = await neurolink.generate({
+  input: { text: 'Analyze this data...' },
+  provider: 'openai',
+  model: 'gpt-5.4',
+});
+
+// The span NeuroLink creates for this call includes:
+// - name: ai.openai.generate_text
 // - ai.provider: "openai"
 // - ai.operation: "generate_text"
 // - Status: OK or ERROR with message
 ```
 
-The `traceAIRequest()` method creates a span named `ai.openai.generate_text` with attributes for the provider, operation type, and status. If the request fails, the span captures the error message and sets the status to ERROR. These spans flow to your tracing backend (Jaeger, Grafana Tempo, Datadog) where you can visualize the full request timeline.
+Each request produces a span named `ai.{provider}.{operation}` with attributes for the provider, operation type, and status. If the request fails, the span captures the error message and sets the status to ERROR. These spans flow to your tracing backend (Jaeger, Grafana Tempo, Datadog) where you can visualize the full request timeline.
 
 ### Recording metrics
 
-Beyond tracing, the telemetry service provides methods for recording structured metrics:
+Beyond tracing, NeuroLink records structured metrics for every request automatically once telemetry is enabled, with no extra call required in your application code:
 
-```typescript
-// Record AI request metrics
-telemetry.recordAIRequest('openai', 'gpt-4o', tokenCount, durationMs);
+- AI request counters and duration histograms, labeled by provider and model
+- Token-usage counters, labeled by provider and model
+- Provider error counters, labeled by provider and error type
+- MCP tool-call counters, labeled by tool name and success/failure
 
-// Record errors
-telemetry.recordAIError('openai', new Error('Rate limit exceeded'));
-
-// Record MCP tool calls
-telemetry.recordMCPToolCall('web_search', 1200, true);
-
-// Record custom metrics
-telemetry.recordCustomMetric('cache_hits', 1, { cache_type: 'prompt' });
-telemetry.recordCustomHistogram('prompt_length', 2500, { model: 'gpt-4o' });
-```
-
-Each method maps to an OpenTelemetry counter or histogram with standardized labels (provider, model, tool name, success/failure). This consistency means your Grafana dashboards work the same way regardless of which provider or model you are using.
+Each of these maps to an OpenTelemetry counter or histogram with standardized labels. This consistency means your Grafana dashboards work the same way regardless of which provider or model you are using.
 
 ## Debugging layer 2: middleware insights
 
@@ -149,17 +138,16 @@ The analytics middleware automatically captures token usage, response time, and 
 ```typescript
 const neurolink = new NeuroLink();
 
-// Configure middleware separately
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    analytics: { enabled: true },
-  },
-});
-
+// Middleware configuration is passed per call
 const result = await neurolink.generate({
   input: { text: 'Summarize this report...' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
+  middleware: {
+    middlewareConfig: {
+      analytics: { enabled: true },
+    },
+  },
 });
 
 // Access analytics from result metadata
@@ -205,7 +193,7 @@ Auto-evaluation provides structured quality scores for every response:
 //   isPassing: true,
 //   suggestedImprovements: "...",
 //   reasoning: "...",
-//   evaluationModel: "gemini-1.5-flash",
+//   evaluationModel: "gemini-2.5-flash",
 //   evaluationTime: 3200,
 // }
 ```

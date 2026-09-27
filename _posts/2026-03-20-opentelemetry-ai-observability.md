@@ -147,64 +147,24 @@ flowchart TD
     J -->|Threshold Hit| M[Open Circuit]
 ```
 
-Here is how you register the OTEL exporter alongside the Langfuse exporter:
+`ExporterRegistry` itself is exported from `@juspay/neurolink`, but it isn't directly usable standalone today — the `BaseExporter` interface it registers against, and the concrete `OtelExporter`/`LangfuseExporter` implementations, are all internal. The supported way to reach both backends is what you already set up above: the `observability.langfuse` config on the `NeuroLink` constructor for Langfuse, and your own OpenTelemetry `NodeSDK` for OTLP. If you need a second OTLP-compatible backend, attach its exporter to that same `NodeSDK` alongside NeuroLink's span processors:
 
 ```typescript
-import {
-  ExporterRegistry,
-  getExporterRegistry,
-  OtelExporter,
-  LangfuseExporter,
-} from "@juspay/neurolink";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { BatchSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
 
-// Get the singleton registry
-const registry = getExporterRegistry();
-
-// Register the OTLP HTTP exporter
-const otelExporter = new OtelExporter({
-  endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT!,
-  protocol: "http",
-  serviceName: "my-ai-service",
-  serviceVersion: "1.0.0",
-  compression: "gzip",
-  flushIntervalMs: 5000,
-  resourceAttributes: {
-    "deployment.environment": process.env.NODE_ENV ?? "development",
-    "service.team": "ai-platform",
-  },
+const sdk = new NodeSDK({
+  spanProcessors: [
+    new BatchSpanProcessor(otlpExporter),
+    // Any additional OTLP-compatible backend plugs in the same way
+    new BatchSpanProcessor(new ConsoleSpanExporter()),
+    ...neurolinkProcessors,
+  ],
+  instrumentations: [getNodeAutoInstrumentations()],
 });
-
-// Register the Langfuse exporter
-const langfuseExporter = new LangfuseExporter({
-  publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
-  secretKey: process.env.LANGFUSE_SECRET_KEY!,
-  baseUrl: process.env.LANGFUSE_BASE_URL,
-  release: "1.0.0",
-  flushIntervalMs: 5000,
-});
-
-// Register both and set Langfuse as default
-registry.register(otelExporter);
-registry.register(langfuseExporter);
-registry.setDefault("langfuse");
-
-// Configure circuit breaker for resilience
-registry.configureCircuitBreaker({
-  failureThreshold: 5,
-  resetTimeout: 30000,
-});
-
-// Initialize all exporters
-await registry.initializeAll();
-
-// Export a span to all backends simultaneously
-const result = await registry.exportToAll(spanData);
-for (const [name, exportResult] of result) {
-  console.log(`${name}: ${exportResult.success ? "OK" : "FAILED"}`);
-}
 ```
 
-The circuit breaker prevents a failing exporter from degrading the entire pipeline. After five consecutive failures, the circuit opens and the registry stops sending spans to that exporter. After 30 seconds it enters half-open state, probing with a single export. If the probe succeeds, the circuit closes and normal operation resumes.
+Internally, NeuroLink's own exporters run behind circuit breaker protection: after five consecutive failures the registry stops sending spans to that exporter, and after 30 seconds it enters half-open state, probing with a single export. If the probe succeeds, the circuit closes and normal operation resumes. That behavior is automatic and is not something application code configures directly today.
 
 ## Span processing pipeline
 
@@ -220,27 +180,16 @@ NeuroLink ships five built-in processors:
 | `FilterProcessor` | Drops spans that match a predicate (health checks, internal pings) |
 | `BatchProcessor` | Buffers spans and flushes them in configurable batches |
 
-Chain them together with `CompositeProcessor`:
+Internally, NeuroLink chains them together with a `CompositeProcessor`. None of these processor classes are exported from `@juspay/neurolink` today, so treat the sketch below as a description of that internal pipeline rather than a copy-paste sample:
 
-```typescript
-import {
-  SpanProcessorFactory,
-  CompositeProcessor,
-  AttributeEnrichmentProcessor,
-  RedactionProcessor,
-  TruncationProcessor,
-  FilterProcessor,
-  BatchProcessor,
-} from "@juspay/neurolink";
-
-// Option 1: Use the factory for a production-ready pipeline
-const pipeline = SpanProcessorFactory.createProductionPipeline({
-  serviceName: "my-ai-service",
-  environment: "production",
-});
-
-// Option 2: Build a custom pipeline
+```text
+// Internal shape only — SpanProcessorFactory, CompositeProcessor, and the
+// individual processor classes are not exported from "@juspay/neurolink".
 const customPipeline = new CompositeProcessor([
+  // Filter early so dropped spans skip the remaining work
+  new FilterProcessor((span) => {
+    return span.name !== "health-check" && span.name !== "readiness-probe";
+  }),
   // Enrich with deployment metadata
   new AttributeEnrichmentProcessor({
     staticAttributes: {
@@ -248,64 +197,41 @@ const customPipeline = new CompositeProcessor([
       "deployment.environment": "production",
       "deployment.region": "ap-south-1",
     },
-    dynamicAttributes: (span) => ({
-      "span.processed_at": new Date().toISOString(),
-      "span.has_error": span.status === 2 ? "true" : "false",
-    }),
   }),
   // Redact sensitive data before export
   new RedactionProcessor({
-    sensitiveKeys: [
-      "api_key", "apiKey", "secret", "password",
-      "token", "authorization", "credentials",
-    ],
+    sensitiveKeys: ["api_key", "apiKey", "secret", "password", "token", "authorization", "credentials"],
     redactedValue: "[REDACTED]",
   }),
-  // Filter out noisy health-check spans
-  new FilterProcessor((span) => {
-    return span.name !== "health-check" && span.name !== "readiness-probe";
-  }),
   // Truncate large payloads
-  new TruncationProcessor({
-    maxStringLength: 10000,
-    maxArrayLength: 100,
-  }),
+  new TruncationProcessor({ maxStringLength: 10000, maxArrayLength: 100 }),
 ]);
-
-// Process a span through the pipeline
-const processed = customPipeline.process(rawSpan);
-if (processed) {
-  await registry.exportToAll(processed);
-}
 ```
 
-The `CompositeProcessor` short-circuits if any processor returns `null`. This means the `FilterProcessor` can drop a span before redaction or truncation ever runs, saving CPU cycles.
+The `CompositeProcessor` short-circuits if any processor returns `null`, so the `FilterProcessor` can drop a span before redaction or truncation ever runs. This enrichment/redaction/truncation chain is what runs automatically once you enable NeuroLink's observability config; there is currently no supported way to construct or reorder it from application code.
 
 ## Token tracking across providers
 
 Token counts drive cost calculations, but every provider reports them differently. OpenAI uses `prompt_tokens` and `completion_tokens`. Anthropic adds `cache_creation_input_tokens`. Google Gemini reports `totalTokenCount`. NeuroLink's `TokenTracker` normalizes all of these into a unified schema.
 
 ```typescript
-import {
-  TokenTracker,
-  getTokenTracker,
-  enrichSpanWithTokenUsage,
-} from "@juspay/neurolink";
+import { TokenTracker } from "@juspay/neurolink";
 
-// Get the global singleton tracker
-const tracker = getTokenTracker();
+// TokenTracker is exported as a class, not a global singleton accessor —
+// create and hold your own instance for the lifetime of the process.
+const tracker = new TokenTracker();
 
 // Configure custom pricing (overrides built-in defaults)
-tracker.setModelPricing("gpt-4o", {
-  inputPricePerMillion: 2.50,
-  outputPricePerMillion: 10.00,
-  cachedInputPricePerMillion: 1.25,
+tracker.setObservabilityModelPricing("gpt-5.4", {
+  inputPricePerMillion: openAIInputRate,
+  outputPricePerMillion: openAIOutputRate,
+  cachedInputPricePerMillion: openAICachedInputRate,
 });
 
-tracker.setModelPricing("claude-sonnet-4-20250514", {
-  inputPricePerMillion: 3.00,
-  outputPricePerMillion: 15.00,
-  cachedInputPricePerMillion: 0.30,
+tracker.setObservabilityModelPricing("claude-sonnet-5", {
+  inputPricePerMillion: anthropicInputRate,
+  outputPricePerMillion: anthropicOutputRate,
+  cachedInputPricePerMillion: anthropicCachedInputRate,
 });
 
 // Track usage from a simple object (no span needed)
@@ -313,16 +239,8 @@ tracker.trackUsage({
   promptTokens: 1500,
   completionTokens: 800,
   totalTokens: 2300,
-  model: "gpt-4o",
+  model: "gpt-5.4",
   provider: "openai",
-});
-
-// Or enrich a span with token attributes for export
-const enrichedSpan = enrichSpanWithTokenUsage(span, {
-  promptTokens: 1500,
-  completionTokens: 800,
-  cacheReadTokens: 200,
-  reasoningTokens: 150,
 });
 
 // Get aggregated stats
@@ -341,7 +259,7 @@ for (const [provider, providerStats] of stats.byProvider) {
 }
 ```
 
-The built-in pricing database covers OpenAI, Anthropic, Google, and Mistral models. Use `loadPricingFromConfig` to load pricing from a JSON file or environment variable for models not in the defaults.
+The tracker includes a small built-in table, but model prices change faster than application code. Use `setObservabilityModelPricing` or `loadPricingFromConfig` with rates from your own reviewed configuration, as the example does for current model IDs.
 
 ## MetricsAggregator: real-time analytics
 
@@ -556,12 +474,11 @@ groups:
 
 ## The OtelBridge: bidirectional context propagation
 
-NeuroLink's `OtelBridge` is the glue between its internal span model and the OpenTelemetry SDK. It handles three critical flows: extracting trace context from incoming requests, injecting context into outgoing requests, and wrapping functions with dual-system tracing.
+NeuroLink's `OtelBridge` is the glue between its internal span model and the OpenTelemetry SDK. It handles three critical flows: extracting trace context from incoming requests, injecting context into outgoing requests, and wrapping functions with dual-system tracing. `OtelBridge` is not itself exported from `@juspay/neurolink` — the snippet below documents its shape rather than a sample you can import directly:
 
-```typescript
-import { OtelBridge } from "@juspay/neurolink";
-import { SpanType } from "@juspay/neurolink";
-
+```text
+// Internal shape only — OtelBridge is not exported from "@juspay/neurolink".
+// SpanType (used for the second argument below) IS a real root export.
 const bridge = new OtelBridge();
 
 // Extract trace context from incoming HTTP headers
@@ -576,7 +493,7 @@ app.use((req, _res, next) => {
 // Wrap an AI operation with dual tracing
 const result = await bridge.wrapWithTracing(
   "rag-pipeline",
-  SpanType.AGENT_ACTION,
+  SpanType.RAG,
   async (neurolinkSpan) => {
     // Both an OTel span and a NeuroLink span are active
     neurolinkSpan.attributes["pipeline.stage"] = "retrieval";
@@ -602,43 +519,41 @@ bridge.injectContext(outgoingHeaders);
 // outgoingHeaders now contains W3C traceparent and tracestate
 ```
 
+In practice, the parts of this bridge you can reach today are the ones already shown in Setup: `getSpanProcessors()` and the `useExternalTracerProvider`/`autoDetectOperationName` config, which cover context propagation between NeuroLink and your own `NodeSDK` without constructing `OtelBridge` yourself.
+
 ## Sampling strategies for cost control
 
-At scale, exporting every span to every backend is expensive. NeuroLink's sampling system supports ratio-based, attribute-based, priority, and composite samplers.
+At scale, exporting every span to every backend is expensive. Internally, NeuroLink's sampling system supports ratio-based, attribute-based, priority, and composite samplers, but of these only `AlwaysSampler` and `NeverSampler` are exported from `@juspay/neurolink` — the rest (`RatioSampler`, `AttributeBasedSampler`, `PrioritySampler`, `CompositeSampler`, and friends) are internal:
 
-```typescript
-import {
-  SamplerFactory,
-  RatioSampler,
-  AttributeBasedSampler,
-  CompositeSampler,
-  ErrorOnlySampler,
-  PrioritySampler,
-} from "@juspay/neurolink";
+```text
+// Internal shape only — RatioSampler, AttributeBasedSampler, PrioritySampler,
+// and CompositeSampler are not exported from "@juspay/neurolink".
+// AlwaysSampler and NeverSampler ARE real root exports.
 
 // Sample 10% of normal traffic
 const ratioSampler = new RatioSampler(0.1);
 
-// Always sample errors and expensive models
-const smartSampler = new CompositeSampler([
-  new ErrorOnlySampler(),
-  new AttributeBasedSampler((span) => {
-    const model = span.attributes["ai.model"] as string;
-    return model?.includes("gpt-4") || model?.includes("claude-3");
-  }),
-  new PrioritySampler([
-    { predicate: (s) => s.status === 2, priority: 100 },
-    { predicate: (s) => (s.durationMs ?? 0) > 10000, priority: 80 },
-    { predicate: () => true, priority: 10, sampleRate: 0.1 },
-  ]),
-]);
+// Always keep errors and premium-tier calls; sample the rest at 10%
+const smartSampler = new AttributeBasedSampler(
+  [
+    { conditions: { "span.status": "error" }, sample: true, priority: 100 },
+    { conditions: { "ai.model.tier": "premium" }, sample: true, priority: 90 },
+  ],
+  ratioSampler,
+);
 
-// Apply the sampler to the registry
-const registry = getExporterRegistry();
-registry.setSampler(smartSampler);
+// The same internal API also offers standalone priority and weighted samplers.
+const prioritySampler = new PrioritySampler(
+  ["model.generation", "tool.call"],
+  ratioSampler,
+);
+const weightedSampler = new CompositeSampler([
+  { sampler: prioritySampler, weight: 3 },
+  { sampler: new AlwaysSampler(), weight: 1 },
+]);
 ```
 
-This ensures that all errors and high-latency requests are always captured, expensive model calls are always traced, and normal traffic is sampled at 10% to control costs.
+The `smartSampler` sketch above keeps spans whose attributes mark an error or premium model and applies a 10% fallback ratio to everything else. `PrioritySampler` and `CompositeSampler` are shown separately because a composite chooses among weighted samplers; it does not OR their decisions together. From application code today, the only sampling levers you can reach directly are the two exported extremes — `new AlwaysSampler()` and `new NeverSampler()` — everything finer-grained than that is currently internal to NeuroLink's observability config.
 
 ## Production deployment checklist
 
@@ -653,36 +568,34 @@ Before shipping your OTEL-instrumented AI service to production, verify each lay
 
 **Span processing:**
 
-- Enable the `RedactionProcessor` to strip API keys and PII
-- Configure `TruncationProcessor` to cap payload sizes (10KB default is sensible)
-- Add `FilterProcessor` rules to drop health-check and readiness-probe spans
-- Use `BatchProcessor` with 100-span batches and 5-second flush intervals
+NeuroLink runs redaction, truncation, filtering, and batching on every span automatically once observability is enabled — these processors are internal, not independently configurable from application code today. Worth confirming before shipping:
+
+- API keys and PII are stripped before export (internal `RedactionProcessor`)
+- Oversized payloads are capped (internal `TruncationProcessor`, 10KB default)
+- Health-check and readiness-probe spans are dropped rather than exported (internal `FilterProcessor`)
+- Spans are flushed in batches rather than one at a time (internal `BatchProcessor`)
 
 **Resilience:**
 
 - Set circuit breaker thresholds (5 failures, 30-second reset is a good default)
-- Configure sampling to reduce export volume by 80-90% for high-traffic services
+- Configure and measure sampling against your required trace coverage before reducing export volume
 - Implement graceful shutdown to flush pending spans on SIGTERM
 
 ```typescript
-import {
-  flushOpenTelemetry,
-  shutdownOpenTelemetry,
-  getExporterRegistry,
-} from "@juspay/neurolink";
+import { flushOpenTelemetry, shutdownOpenTelemetry } from "@juspay/neurolink";
 
+// `sdk` is the NodeSDK instance created in the setup step above.
 process.on("SIGTERM", async () => {
   console.log("Graceful shutdown initiated...");
 
-  // Flush all pending spans to exporters
-  const registry = getExporterRegistry();
-  await registry.flushAll();
-
-  // Flush the OTEL SDK
+  // Flush NeuroLink's own Langfuse/observability state
   await flushOpenTelemetry();
 
-  // Shutdown cleanly
-  await registry.shutdownAll();
+  // Flush and shut down your OpenTelemetry SDK, which drains its
+  // BatchSpanProcessors (including NeuroLink's) before exiting
+  await sdk.shutdown();
+
+  // Shutdown NeuroLink's observability state cleanly
   await shutdownOpenTelemetry();
 
   console.log("Shutdown complete");
@@ -692,31 +605,25 @@ process.on("SIGTERM", async () => {
 
 **Health monitoring:**
 
-- Expose a `/health/observability` endpoint that checks exporter health
-- Monitor `getTotalPendingSpans()` for backpressure detection
-- Set alerts on circuit breaker state changes
+- Expose a `/health/observability` endpoint that reports initialization state
+- Check `getLangfuseHealthStatus()` when Langfuse is enabled
+- Set alerts on telemetry initialization failures
 
 ```typescript
-app.get("/health/observability", async (_req, res) => {
-  const registry = getExporterRegistry();
-  const health = await registry.healthCheckAll();
-  const allHealthy = await registry.isHealthy();
-  const pendingSpans = registry.getTotalPendingSpans();
+import {
+  getLangfuseHealthStatus,
+  isOpenTelemetryInitialized,
+} from "@juspay/neurolink";
 
-  const status: Record<string, unknown> = {};
-  for (const [name, exporterHealth] of health) {
-    const cbStatus = registry.getCircuitBreakerStatus(name);
-    status[name] = {
-      healthy: exporterHealth.healthy,
-      circuitBreaker: cbStatus?.state ?? "closed",
-      failures: cbStatus?.failures ?? 0,
-    };
-  }
+app.get("/health/observability", (_req, res) => {
+  const langfuse = getLangfuseHealthStatus();
+  const openTelemetry = isOpenTelemetryInitialized();
+  const healthy = openTelemetry && langfuse.isHealthy;
 
-  res.status(allHealthy ? 200 : 503).json({
-    healthy: allHealthy,
-    pendingSpans,
-    exporters: status,
+  res.status(healthy ? 200 : 503).json({
+    healthy,
+    openTelemetry,
+    langfuse,
   });
 });
 ```
@@ -725,7 +632,7 @@ app.get("/health/observability", async (_req, res) => {
 
 OpenTelemetry gives AI pipelines the same observability that backend engineers have enjoyed for years -- but with the token tracking, cost attribution, and multi-provider awareness that AI workloads demand. NeuroLink's OTEL integration builds on this foundation with a bidirectional bridge, a registry of circuit-breaker-protected exporters, a composable span processing pipeline, and a MetricsAggregator that computes latency percentiles, cost breakdowns, and throughput metrics in real time.
 
-The key takeaways: use `useExternalTracerProvider` to avoid duplicate registration conflicts, chain span processors for enrichment, redaction, and filtering before export, track tokens through the global `TokenTracker` with per-model pricing, and wire the MetricsAggregator into Prometheus for dashboarding and alerting. With these pieces in place, you can trace every token from the moment it enters your pipeline to the moment it reaches the user.
+The key takeaways: use `useExternalTracerProvider` to avoid duplicate registration conflicts, lean on NeuroLink's automatic span enrichment, redaction, and filtering rather than trying to reconfigure it, track tokens through your own `TokenTracker` instance with per-model pricing, and wire the exported `MetricsAggregator` into Prometheus for dashboarding and alerting. With these pieces in place, you can trace every token from the moment it enters your pipeline to the moment it reaches the user.
 
 ---
 

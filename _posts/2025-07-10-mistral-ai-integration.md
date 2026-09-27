@@ -348,7 +348,7 @@ Codestral is one of the best code generation models available, rivaling dedicate
 
 ### Model Range
 
-From the 3B Ministral (suitable for edge deployment) to their Large model (available up to 675B parameters on Bedrock), Mistral covers an exceptionally wide range of deployment scenarios. Parameter counts are approximate and may differ from official specifications.
+From the 3B Ministral (suitable for edge deployment) to their Large flagship model, Mistral covers an exceptionally wide range of deployment scenarios. Exact parameter counts are not published for every model, so check Mistral's own documentation for current specifications.
 
 ## What's Next
 
@@ -364,6 +364,6 @@ Mistral's combination of speed, EU hosting, competitive pricing, and model bread
 
 **Related posts:**
 
-- [OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink](/posts/openai-integration-guide/)
+- [OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink](/posts/openai-integration-guide/)
 - [Google AI Studio: Free-Tier Gemini Access with NeuroLink](/posts/google-ai-studio-gemini-integration/)
 - [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)

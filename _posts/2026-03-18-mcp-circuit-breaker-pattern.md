@@ -25,7 +25,7 @@ image:
   alt: 'MCP Circuit Breaker: Preventing Cascading Failures in AI Tool Calls'
 ---
 
-We designed NeuroLink's MCP circuit breaker because a single flaky Jira MCP server was taking down entire AI agent workflows. One tool returning timeouts should not cascade into every other tool call queuing up behind it, exhausting connection pools, and eventually crashing the whole system. The circuit breaker pattern -- borrowed from electrical engineering and popularized by Michael Nygard's "Release It!" -- gives us a clean abstraction for isolating failures and letting the system heal itself.
+Picture an AI agent workflow where a single flaky Jira MCP server starts timing out: every other tool call queues up behind it, exhausts connection pools, and eventually takes the whole system down. NeuroLink's MCP circuit breaker exists to prevent exactly that scenario -- one tool returning timeouts should not cascade into every other tool call failing alongside it. The circuit breaker pattern -- borrowed from electrical engineering and popularized by Michael Nygard's "Release It!" -- gives NeuroLink a clean abstraction for isolating failures and letting the system heal itself.
 
 This post walks through the real implementation in NeuroLink's codebase: the state machine, the MCP-specific failure modes it handles, the configuration surface, and the production monitoring patterns we use to keep hundreds of MCP tool connections healthy at scale.
 
@@ -154,7 +154,7 @@ The `Math.max(10000, ...)` floor prevents misconfiguration from setting dangerou
 
 ### Transport-layer failures
 
-MCP supports multiple transport protocols -- stdio, SSE, WebSocket, HTTP, TCP, and Unix sockets. Each has distinct failure characteristics:
+MCP supports multiple transport protocols -- stdio, SSE, WebSocket, and HTTP. Each has distinct failure characteristics:
 
 | Transport | Common Failure | Circuit Breaker Behavior |
 |-----------|----------------|--------------------------|

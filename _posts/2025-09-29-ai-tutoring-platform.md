@@ -26,11 +26,11 @@ image:
 ---
 
 
-We designed the multi-agent orchestration architecture to solve a fundamental trade-off in AI tutoring: no single model excels at every subject. We built NeuroLink's multi-agent orchestration to solve a problem that single-model tutoring platforms cannot: different subjects demand fundamentally different AI capabilities. Mathematical reasoning requires a model optimized for logical deduction. Creative writing needs a model with natural language fluency. Simple factual queries need a fast, cost-efficient model that does not waste budget on unnecessary sophistication.
+Multi-agent orchestration addresses a fundamental trade-off in AI tutoring: no single model excels at every subject. A single-model tutoring platform cannot serve every subject well, because different subjects demand fundamentally different AI capabilities. Mathematical reasoning requires a model optimized for logical deduction. Creative writing needs a model with natural language fluency. Simple factual queries need a fast, cost-efficient model that does not waste budget on unnecessary sophistication.
 
-The design decision was to treat subject routing as a first-class orchestration concern, not an application-level afterthought. We chose to combine task classification, middleware guardrails, evaluation scoring, and human-in-the-loop oversight into a unified pipeline. The trade-off is increased architectural complexity in exchange for measurably better per-subject response quality and dramatically lower cost per interaction.
+This design treats subject routing as a first-class orchestration concern rather than an application-level afterthought, combining task classification, middleware guardrails, evaluation scoring, and human-in-the-loop oversight into a unified pipeline. The trade-off is increased architectural complexity in exchange for measurably better per-subject response quality and lower cost per interaction.
 
-This deep dive covers the architecture we designed, the provider selection rationale for each subject domain, and the adaptive difficulty system that uses auto-evaluation scores to personalize the learning experience.
+This deep dive covers the resulting architecture, the provider selection rationale for each subject domain, and the adaptive difficulty system that uses auto-evaluation scores to personalize the learning experience.
 
 ## System architecture
 
@@ -40,9 +40,9 @@ The platform uses a multi-agent architecture where each subject area is handled 
 flowchart TB
     Student[Student Interface] --> Gateway[NeuroLink Gateway]
     Gateway --> Classifier[Task Classifier]
-    Classifier -->|Math/Logic| MathAgent[Math Agent<br/>Bedrock Claude 3 Opus]
+    Classifier -->|Math/Logic| MathAgent[Math Agent<br/>Bedrock Claude Opus 4.6]
     Classifier -->|Science| ScienceAgent[Science Agent<br/>Vertex Gemini Pro]
-    Classifier -->|Language| LangAgent[Language Agent<br/>OpenAI GPT-4o]
+    Classifier -->|Language| LangAgent[Language Agent<br/>OpenAI GPT-5.4]
     Classifier -->|General| GeneralAgent[General Agent<br/>Gemini Flash]
 
     MathAgent --> Evaluator[Auto-Evaluation Middleware]
@@ -57,7 +57,7 @@ flowchart TB
     HITL --> Response
 ```
 
-The routing pattern is powered by NeuroLink's `TaskClassifier`. It analyzes student prompts using pattern matching against predefined categories. Math and logic questions matching reasoning patterns (words like "solve," "prove," "calculate") route to a strong reasoning model through Bedrock. Simple factual questions ("What is photosynthesis?") route to a fast, cost-efficient model. Creative writing assignments route to GPT-4o for its natural language generation strengths.
+The routing pattern is application-level logic: a classifier function analyzes student prompts using pattern matching against predefined categories and dispatches to the agent for that subject. Math and logic questions matching reasoning patterns (words like "solve," "prove," "calculate") route to a strong reasoning model through Bedrock. Simple factual questions ("What is photosynthesis?") route to a fast, cost-efficient model. Creative writing assignments route to GPT-5.4 for its natural language generation strengths. (NeuroLink itself uses an internal binary task classifier to help pick default models per request, but that classifier is not part of the public API -- the subject router here is code you write.)
 
 Each agent is created through `AIProviderFactory.createProvider()` with a subject-specific system prompt that shapes the model's teaching style for that domain.
 
@@ -71,7 +71,7 @@ import { AIProviderFactory } from '@juspay/neurolink';
 // Math agent - strong reasoning model via Bedrock
 const mathAgent = await AIProviderFactory.createProvider(
   "bedrock",
-  "anthropic.claude-3-opus-20240229-v1:0"
+  "anthropic.claude-opus-4-6-v1"
 );
 
 // Science agent - balanced model via Vertex AI
@@ -83,7 +83,7 @@ const scienceAgent = await AIProviderFactory.createProvider(
 // Language arts agent - creative model via OpenAI
 const langAgent = await AIProviderFactory.createProvider(
   "openai",
-  "gpt-4o"
+  "gpt-5.4"
 );
 
 // General/fast agent - cost-efficient for simple queries
@@ -97,7 +97,7 @@ The `ModelConfigurationManager` organizes models into three tiers per provider: 
 
 The tier system is backed by constants like `MODEL_NAMES.BEDROCK.QUALITY` which maps to the specific model identifier. These can be overridden with environment variables (`BEDROCK_QUALITY_MODEL`, `VERTEX_BALANCED_MODEL`) for deployment-time configuration without code changes.
 
-> **Tip:** Model selection is one of the most impactful cost decisions in a multi-agent system. A simple "What is the capital of France?" query costs roughly $0.0001 with Gemini Flash but $0.003 with Claude Opus -- a 30x difference. Route wisely.
+> **Tip:** Model selection is one of the most impactful cost decisions in a multi-agent system. A simple "What is the capital of France?" query costs an order of magnitude less with Gemini Flash than with a flagship reasoning model like Claude Opus (check current provider pricing pages for exact rates, since these change independently of NeuroLink). Route wisely.
 {: .prompt-tip }
 
 ## Middleware for Content Safety
@@ -105,52 +105,54 @@ The tier system is backed by constants like `MODEL_NAMES.BEDROCK.QUALITY` which 
 In an educational context, content safety is paramount. Students might try to get the AI to give them answers to homework assignments, bypass learning exercises, or access inappropriate content. NeuroLink's middleware system provides layered protection.
 
 ```typescript
-import { MiddlewareFactory } from '@juspay/neurolink';
+let evaluationScore = 0;
 
-const middleware = new MiddlewareFactory({
-  preset: "security",
-  middlewareConfig: {
-    guardrails: {
-      enabled: true,
-      config: {
-        badWords: ["cheat", "hack", "answer key", "bypass"],
-        precallEvaluation: {
-          enabled: true,
-        },
-        modelFilter: {
-          enabled: true,
-          filterModel: generalAgent, // Use fast model for filtering
+const response = await scienceAgent.generate({
+  input: { text: studentQuestion },
+  middleware: {
+    preset: "security",
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          badWords: {
+            enabled: true,
+            list: ["cheat", "hack", "answer key", "bypass"],
+          },
+          precallEvaluation: {
+            enabled: true,
+          },
+          modelFilter: {
+            enabled: true,
+            // A provider:model string is resolved to a model handle by guardrails
+            filterModel: "google-ai:gemini-2.5-flash",
+          },
         },
       },
-    },
-    autoEvaluation: {
-      enabled: true,
-      config: {
-        minScore: 6, // Minimum acceptable quality score
+      autoEvaluation: {
+        enabled: true,
+        config: {
+          threshold: 6,
+          blocking: true,
+          onEvaluationComplete: (evaluation) => {
+            evaluationScore = evaluation.overall ?? 0;
+          },
+        },
       },
     },
   },
 });
-
-// Apply middleware to each subject agent's model
-const safeModel = middleware.applyMiddleware(
-  await scienceAgent.getModel(),
-  middleware.createContext("vertex", "gemini-2.5-pro", {}, {
-    sessionId: studentSessionId,
-    userId: studentId,
-  })
-);
 ```
 
 The middleware operates through a multi-stage pipeline:
 
-1. **Pre-call evaluation** (`handlePrecallGuardrails`): Before the prompt reaches the LLM, it is analyzed for harmful intent. A student asking "Give me the answer key for chapter 5" would be blocked here.
+1. **Pre-call evaluation** (`handlePrecallGuardrails`): Before the prompt reaches the LLM, it is analyzed for harmful intent. Whether a suspicious request is blocked, sanitized, warned, or allowed depends on the configured actions and thresholds.
 
-2. **Content filtering** (`applyContentFiltering`): The `badWords` list catches explicit attempts to bypass the tutoring intent. These words trigger immediate blocking without consuming LLM tokens.
+2. **Content filtering** (`applyContentFiltering`): After generation, the `badWords` list replaces matching terms with the configured replacement text. It is a simple output filter, not a semantic detector of cheating intent.
 
-3. **Model-based safety** (`modelFilter`): A secondary model (the fast Gemini Flash agent in this case) provides AI-powered safety checking that catches sophisticated attempts to subvert the system that a word list would miss.
+3. **Model-based safety** (`modelFilter`): A secondary model (Gemini Flash in this case) checks the generated response and redacts it when the classifier returns `unsafe`, complementing the static term list.
 
-4. **Post-generation quality scoring** (`autoEvaluation`): After generation, the response is scored for educational quality. Responses scoring below 6/10 trigger additional review.
+4. **Post-generation quality scoring** (`autoEvaluation`): After generation, the response is scored for educational quality. The callback captures that score so the application can route responses below 6/10 for additional review.
 
 The `"security"` preset activates a pre-configured set of guardrails optimized for safety-sensitive applications. Built-in presets include `"default"`, `"all"`, and `"security"`, each with different middleware combinations.
 
@@ -159,41 +161,55 @@ The `"security"` preset activates a pre-configured set of guardrails optimized f
 The auto-evaluation system is the core of adaptive learning. After every response, NeuroLink evaluates the AI tutor's output for relevance, accuracy, and completeness. These scores drive difficulty adjustment.
 
 ```typescript
-import { generateEvaluation } from '@juspay/neurolink';
+// The evaluation score is not a field on the generate() result -- it only
+// arrives through the autoEvaluation middleware's onEvaluationComplete
+// callback. `blocking: true` makes generate() await the evaluation, so the
+// callback has already run by the time the score is read below.
+let evaluationScore = 0;
 
-const evaluation = await generateEvaluation({
-  userQuery: studentQuestion,
-  aiResponse: tutorResponse,
-  primaryDomain: "mathematics",
-  toolUsage: [],
-  conversationHistory: sessionHistory,
+const result = await mathAgent.generate({
+  input: { text: studentQuestion },
+  middleware: {
+    middlewareConfig: {
+      autoEvaluation: {
+        enabled: true,
+        config: {
+          threshold: 6,
+          blocking: true,
+          onEvaluationComplete: (evaluation) => {
+            evaluationScore = evaluation.overall ?? 0;
+          },
+        },
+      },
+    },
+  },
 });
 
-// Evaluation returns scores 1-10 for:
-// - relevance, accuracy, completeness, overall
-// - domainAlignment, terminologyAccuracy (when domain specified)
+// Evaluation scores (1-10) cover relevance, accuracy, completeness, and
+// overall, plus domainAlignment/terminologyAccuracy when a domain is
+// configured for the middleware's evaluation prompt.
 
-if (evaluation.overall >= 8) {
-  // Increase difficulty for next question
+if (evaluationScore >= 8 && studentAssessment.passed) {
+  // Advance only when both the tutor response and student assessment pass
   difficultyLevel++;
-} else if (evaluation.overall < 5) {
+} else if (evaluationScore < 5) {
   // Flag for human tutor review
-  await hitlManager.requestConfirmation(
+  await hitl.requestConfirmation(
     "low-quality-response",
-    { question: studentQuestion, response: tutorResponse, score: evaluation.overall }
+    { question: studentQuestion, response: result?.content, score: evaluationScore }
   );
 }
 ```
 
-The `generateEvaluation()` function uses a Zod schema (`EvaluationSchema`) for validated scoring, ensuring that evaluation results are always well-formed. The evaluation considers the student's question, the AI's response, the conversation history for context, and the domain for appropriate scoring criteria.
+The auto-evaluation middleware scores the tutor's output for relevance, accuracy, and completeness using an LLM-as-judge. The evaluation considers the student's question and the AI's response, scored against the configured rubric.
 
-When `primaryDomain` is set to "mathematics," the evaluator weighs accuracy and logical correctness more heavily. For "language arts," it might prioritize creativity and grammar. The `parseEvaluationResult()` function uses both JSON parsing and regex fallback for robust score extraction, handling cases where the evaluating model returns slightly malformed JSON.
+Domain-specific weighting (accuracy and logical correctness for math, creativity and grammar for language arts) is configured through NeuroLink's domain evaluation settings rather than a per-call parameter -- see the domain-specific evaluation pattern in the [prompt versioning guide](/posts/prompt-versioning-management/) for how to set it.
 
-The adaptive learning loop is straightforward: high scores (8+) indicate the student is mastering the material at the current difficulty level, so increase it. Low scores (below 5) indicate the AI produced a questionable response, so flag it for human review before the student sees it.
+The adaptive learning loop is straightforward, but the signal needs careful interpretation: the auto-evaluation score measures the tutor response, not the student's mastery. High tutor-response scores (8+) allow the application to continue its planned progression, while scores below 5 indicate a questionable AI response that should be held for human review. Adapt actual difficulty using student answers or assessment results alongside this response-quality gate.
 
 ## Human-in-the-Loop for Sensitive Content
 
-In educational settings, HITL serves two purposes: ensuring AI response quality and providing teacher oversight for sensitive topics. NeuroLink's `HITLManager` provides event-based confirmation with full audit logging for FERPA compliance.
+In educational settings, HITL serves two purposes: ensuring AI response quality and providing teacher oversight for sensitive topics. NeuroLink's `HITLManager` provides event-based confirmation and optional audit events for the confirmation workflow; applications must export and retain those records under their own education-data policies.
 
 ```typescript
 import { HITLManager } from '@juspay/neurolink';
@@ -205,17 +221,6 @@ const hitl = new HITLManager({
   confirmationMethod: "event",
   allowArgumentModification: true,
   auditLogging: true,
-  customRules: [
-    {
-      name: "low-confidence-response",
-      requiresConfirmation: true,
-      condition: (toolName, args) => {
-        const typedArgs = args as { score?: number };
-        return typedArgs?.score !== undefined && typedArgs.score < 5;
-      },
-      customMessage: "AI response scored below threshold. Teacher review required.",
-    },
-  ],
 });
 
 // Listen for confirmation requests
@@ -225,9 +230,9 @@ hitl.on("hitl:confirmation-request", (event) => {
 });
 ```
 
-The `customRules` configuration is the bridge between auto-evaluation and HITL. When the evaluation score drops below 5, the custom rule triggers a confirmation request that appears on the teacher's dashboard. The teacher can then review the AI's response, modify it if needed (`allowArgumentModification: true`), and either approve the modified version or reject it entirely.
+The direct low-score path shown earlier calls `requestConfirmation()` explicitly. For action-based policies, add `customRules`, call `hitl.requiresConfirmation(toolName, args)` before execution, and request confirmation only when it returns true. The teacher can review the request, submit modified arguments when `allowArgumentModification` is enabled, and approve or reject it.
 
-The audit logging supports FERPA (Family Educational Rights and Privacy Act) compliance by recording every AI interaction with student data, every teacher review, and every decision. The `ConfirmationResult` includes `approved`, `reason`, `modifiedArguments`, and `responseTime`, creating a comprehensive audit trail.
+With `auditLogging` enabled, `HITLManager` emits audit entries for confirmation requests, decisions, timeouts, and configuration changes. It does not record every AI interaction automatically. The `ConfirmationResult` includes `approved`, `reason`, `modifiedArguments`, and `responseTime`; persist those results with request and reviewer identifiers in your approved audit store if your policy requires them.
 
 > **Warning:** FERPA compliance requires comprehensive data governance including consent management, data minimization, breach notification procedures, and institutional policies beyond what audit logging alone provides. This implementation addresses the technical audit trail requirement but does not constitute full FERPA compliance.
 {: .prompt-warning }
@@ -258,37 +263,39 @@ Using Gemini Flash for summarization keeps the cost low while maintaining enough
 A tutoring platform used by thousands of students simultaneously needs resilience patterns. If the Bedrock math agent goes down during an exam review session, students cannot be left waiting.
 
 ```typescript
-import { withRetry, CircuitBreaker } from '@juspay/neurolink';
+import { withRetry, executeWithCircuitBreaker } from '@juspay/neurolink';
 
-const mathCircuit = new CircuitBreaker(3, 30000); // 3 failures, 30s timeout
-
-const response = await mathCircuit.execute(async () => {
-  return withRetry(
-    () => mathAgent.generate({ input: { text: studentQuestion } }),
-    { maxAttempts: 3, initialDelay: 1000, backoffMultiplier: 2 }
-  );
-});
+const response = await executeWithCircuitBreaker(
+  "math-agent", // breaker name -- state is tracked per name
+  async () => {
+    return withRetry(
+      () => mathAgent.generate({ input: { text: studentQuestion } }),
+      { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 8000 }
+    );
+  },
+  "generate",
+);
 ```
 
-The `CircuitBreaker` wraps each agent with health monitoring. After three consecutive failures, it opens and immediately fails all subsequent requests, allowing the system to fall back to an alternative provider. The `withRetry` wrapper handles transient failures with exponential backoff (1s, 2s, 4s delays) and jitter (`calculateBackoffDelay()`) to prevent thundering herd problems when many student sessions retry simultaneously.
+`executeWithCircuitBreaker()` wraps the operation with a named circuit breaker (created and cached on first use, defaulting to 5 consecutive failures before it opens). Once open, it immediately fails subsequent requests for that name, allowing the system to fall back to an alternative provider -- pass a `config` with a custom `failureThreshold` via `getCircuitBreaker()` to tune this per agent. The `withRetry` wrapper handles transient failures with exponential backoff, doubling the delay on each attempt up to `maxDelayMs`, to reduce thundering-herd problems when many student sessions retry simultaneously.
 
-For critical scenarios, `AIProviderFactory.createProviderWithFallback()` provides automatic provider switching. If the primary math agent (Bedrock Claude) is down, it transparently switches to a fallback (such as Vertex Gemini Pro) without the student noticing any disruption.
+For critical scenarios, `AIProviderFactory.createProviderWithFallback()` instantiates a primary and a fallback provider together (`{ primary, fallback }`) in one call. It does not switch between them itself -- combine it with the circuit breaker and retry logic above, catching failures on the primary math agent (Bedrock Claude) and falling back to the secondary (such as Vertex Gemini Pro) so the student sees a slower response rather than an outage.
 
 ## Deployment considerations
 
 Building the platform is one challenge. Running it efficiently at scale is another.
 
-**Cost optimization** is critical for EdTech. Route simple questions to Gemini Flash at approximately $0.000075 per 1K input tokens. Reserve Claude Opus (approximately $0.0015 per 1K input tokens) for complex reasoning tasks. Use `ModelConfigurationManager.getCostInfo()` for real-time cost tracking per interaction.
+**Cost optimization** is critical for EdTech. Route simple questions to a fast, cheap model like Gemini Flash and reserve a flagship reasoning model like Claude Opus for complex reasoning tasks -- check current provider pricing pages for per-token rates, since these change independently of NeuroLink. A `ModelConfigurationManager` instance exposes `getCostInfo(provider, model)` for configured per-token rates; combine that with each generation result's `usage` fields to estimate interaction cost.
 
-**Monitoring** middleware performance with `MiddlewareFactory.getChainStats()` gives you visibility into how much latency each middleware layer adds and whether guardrails or evaluation are becoming bottlenecks.
+**Monitoring** middleware performance is straightforward: a `MiddlewareFactory` instance's `getChainStats(context, config)` reports, per middleware layer, whether it was applied and its average execution time, plus chain totals -- useful for spotting which layer adds latency.
 
-**Scaling** across serverless functions requires singleton management. `ServiceRegistry` from NeuroLink ensures that provider instances, middleware chains, and HITL managers are properly shared across function invocations without re-initialization overhead.
+**Scaling** across serverless functions requires singleton management. Cache provider instances, middleware chains, and `HITLManager` instances at module scope (outside the request handler) so a warm serverless invocation reuses them instead of re-initializing on every request.
 
 **Compliance** is simplified by the audit logging built into every HITL interaction. These logs help address FERPA requirements for educational data protection, providing a detailed trail of every AI interaction with student data. Full FERPA compliance requires additional institutional policies and data governance measures beyond audit logging.
 
 ## Design decisions and Trade-offs
 
-The multi-agent architecture introduces complexity that a single-model approach avoids: more provider configurations, more middleware chains, more failure modes. We chose this trade-off because the per-subject quality improvement is measurable and significant. A math question routed to a reasoning-optimized model scores 15-20% higher on evaluation than the same question routed to a general-purpose model.
+The multi-agent architecture introduces complexity that a single-model approach avoids: more provider configurations, more middleware chains, more failure modes. That trade-off is worth making when the per-subject quality improvement is measurable: run the same test cases through both a reasoning-optimized model and a general-purpose model via the auto-evaluation middleware from earlier, and compare the resulting scores for your own subject mix before committing to the added complexity.
 
 The adaptive difficulty system using evaluation scores is a pragmatic compromise. Ideally, difficulty would adapt based on pedagogical assessment of the student's understanding. In practice, evaluation scores are a reliable proxy that can be implemented without custom ML models.
 

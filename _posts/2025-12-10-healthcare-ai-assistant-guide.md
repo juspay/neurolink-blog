@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Building a Healthcare AI Assistant with NeuroLink
+title: 'Building a Healthcare AI Assistant with NeuroLink'
 description: >-
   An implementation guide demonstrating technical patterns for building
   privacy-conscious healthcare AI applications with NeuroLink.
@@ -205,7 +205,7 @@ async function processWithDeidentification(clinicalNote: string): Promise<string
   // Step 2: Process with AI using de-identified data
   const response = await neurolink.generate({
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     input: {
       text: `You are a clinical documentation assistant. Summarize the provided clinical note.\n\n${deidentifiedNote}`,
     },
@@ -267,7 +267,7 @@ async function generateWithAudit(
 ): Promise<{ content: string; auditId: string }> {
   const response = await neurolink.generate({
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     input: { text: prompt },
   });
 
@@ -278,7 +278,7 @@ async function generateWithAudit(
     sessionId,
     action: 'generate',
     contentHash: auditLogger.hashContent(response.content),
-    modelId: 'gpt-4o',
+    modelId: 'gpt-5.4',
     metadata: {
       auditId,
       promptLength: prompt.length,
@@ -295,24 +295,33 @@ async function generateWithAudit(
 
 ### Pattern 3: Provider Failover for Reliability
 
-Next, you will configure provider failover so your healthcare application maintains uptime even when a provider goes down.
+Next, you will configure provider failover so your healthcare application can try an approved alternative when a provider goes down. The primary and every fallback deployment must be covered by the organization's BAAs, security controls, and data-handling requirements before any PHI is routed to them.
 
-**Option A: Built-in Orchestration (Recommended)**
+**Option A: Built-in `providerFallback` Callback (Recommended)**
 
-NeuroLink provides built-in failover orchestration that automatically handles provider failures:
+NeuroLink provides a `providerFallback` callback that is invoked whenever a `generate()`/`stream()` call errors (network errors, 5xx, timeouts, auth failures, and model-access-denied all trigger it). Return the next `{ provider, model }` to retry with, or `null` to bubble the original error. Defining it per call gives each request a fresh fallback iterator:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 
-const neurolink = new NeuroLink({
-  enableOrchestration: true, // Enables automatic failover to configured backup providers
-});
+const backupProviders = [
+  { provider: 'anthropic', model: 'claude-sonnet-5' },
+  { provider: 'vertex', model: 'gemini-2.5-pro' },
+];
+
+const neurolink = new NeuroLink();
 
 async function generateWithBuiltInFailover(prompt: string): Promise<string> {
+  let nextFallback = 0;
+  const providerFallback = async () =>
+    backupProviders[nextFallback++] ?? null;
+
   const response = await neurolink.generate({
-    model: 'gpt-4o',
+    provider: 'openai',
+    model: 'gpt-5.4',
     input: { text: prompt },
     timeout: 30000,
+    providerFallback,
   });
 
   return response.content;
@@ -331,14 +340,15 @@ const neurolink = new NeuroLink();
 async function generateWithManualFailover(prompt: string): Promise<string> {
   // Configure multiple providers for fallback
   const providers = [
-    { model: 'gpt-4o', provider: 'openai' },
-    { model: 'claude-3-5-sonnet-20241022', provider: 'anthropic' },
-    { model: 'gemini-1.5-pro', provider: 'google-ai' },
+    { model: 'gpt-5.4', provider: 'openai' },
+    { model: 'claude-sonnet-5', provider: 'anthropic' },
+    { model: 'gemini-2.5-pro', provider: 'vertex' },
   ];
 
   for (const { model, provider } of providers) {
     try {
       const response = await neurolink.generate({
+        provider,
         model,
         input: { text: prompt },
         timeout: 30000, // 30 second timeout
@@ -411,7 +421,7 @@ async function generateClinicalDocumentation(
 ): Promise<{ content: string; validation: ValidationResult }> {
   const response = await neurolink.generate({
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     input: {
       text: `You are a clinical documentation assistant. Generate a structured clinical note based on the encounter information. Flag any areas of uncertainty. Always defer to physician judgment for clinical decisions.\n\n${encounterNotes}`,
     },
@@ -434,6 +444,7 @@ For healthcare AI applications, human review is typically essential:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
+import crypto from 'crypto';
 
 type ReviewStatus = 'pending' | 'approved' | 'modified' | 'rejected';
 
@@ -458,7 +469,7 @@ class ClinicalDocumentationWorkflow {
   async generateDraft(encounterData: string): Promise<DocumentDraft> {
     const response = await this.neurolink.generate({
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
       input: {
         text: `Generate a clinical note draft. This is a draft for physician review.\n\n${encounterData}`,
       },

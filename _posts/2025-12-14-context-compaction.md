@@ -14,9 +14,9 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Manage long AI conversations with NeuroLink's context compaction. Automatic
-  summarization, importance-based filtering, and key information preservation
-  for conversations that span hours.
+  Manage long AI conversations with NeuroLink's context compaction. A
+  multi-stage pipeline of pruning, deduplication, and structured
+  summarization preserves key information for conversations that span hours.
 toc: true
 mermaid: true
 pin: false
@@ -27,7 +27,7 @@ image:
 
 We designed context compaction to solve a fundamental constraint in long-running AI conversations: every LLM has a finite context window, and naive truncation destroys critical information. The trade-off space is well-defined -- you can sacrifice older message fidelity for continued conversation coherence, but only if you preserve the right information.
 
-Every LLM has a finite context window -- ranging from 4,000 tokens for older models to 200,000 tokens for the latest ones. Long conversations, especially those involving tool calls (which consume significant tokens for function definitions, arguments, and results), fill context windows fast. A single tool-heavy exchange can use 2,000-5,000 tokens. Truncation drops messages indiscriminately: account numbers, approval decisions, error codes -- all gone. Context compaction takes a different approach: we use an LLM to summarize older messages while preserving five categories of semantically critical information (identifiers, decisions, technical details, action items, and sentiment). The result is a compressed conversation history that retains what matters while freeing token budget for new exchanges.
+Every LLM has a finite context window -- ranging from roughly 8,000 tokens for older models to 1,000,000+ tokens for the latest ones. Long conversations, especially those involving tool calls (which consume significant tokens for function definitions, arguments, and results), fill context windows fast. A single tool-heavy exchange can use 2,000-5,000 tokens. Truncation drops messages indiscriminately: account numbers, approval decisions, error codes -- all gone. Context compaction takes a different approach: a multi-stage pipeline prunes oversized tool output and deduplicates repeated file reads before it ever calls an LLM, then uses an LLM only as a later stage to summarize the messages that are still over budget into a structured summary -- one section of which (constraints and established rules) is explicitly guaranteed to carry forward until the user revokes it. The result is a compressed conversation history that retains what matters while freeing token budget for new exchanges.
 
 ## How Context Compaction Works
 
@@ -45,19 +45,19 @@ flowchart TB
     end
 
     subgraph Compaction["Compaction Pipeline"]
-        CHECK -->|"Yes"| ANALYZE["Analyze Messages"]
-        ANALYZE --> EXTRACT["Extract Key Info<br/>names, numbers, decisions"]
-        EXTRACT --> SUMMARIZE["Summarize Older Messages"]
+        CHECK -->|"Yes"| PRUNE["Stage 1: Prune<br/>oversized tool outputs"]
+        PRUNE --> DEDUP["Stage 2: Deduplicate<br/>repeated file reads"]
+        DEDUP --> SUMMARIZE["Stage 3: Summarize<br/>older messages via LLM"]
         SUMMARIZE --> COMPACT["Replace 15 messages<br/>with summary"]
     end
 
     subgraph Result["After Compaction"]
-        SUM["Summary of messages 1-15<br/>(~200 tokens)"]
+        SUM["Summary of messages 1-15<br/>~200 tokens"]
         SUM --> M16R["Message 16"]
         M16R --> M17R["Message 17"]
         M17R --> DOTS2["..."]
         DOTS2 --> M21R["Message 21"]
-        M21R --> NEW["New message<br/>(context space freed!)"]
+        M21R --> NEW["New message<br/>context space freed"]
     end
 
     CHECK -->|"No"| CONTINUE["Continue normally"]
@@ -77,12 +77,16 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    compaction: {
+    enableSummarization: true,      // Turn on the LLM summarization stage
+    tokenThreshold: 6000,            // Trigger summarization when history exceeds this
+    summarizationProvider: 'openai',
+    summarizationModel: 'gpt-5.4-mini', // Use a cheaper model for summarization
+    contextCompaction: {
       enabled: true,
-      tokenThreshold: 6000,      // Trigger compaction when context exceeds this
-      targetTokens: 3000,        // Aim to reduce context to this size
-      preserveRecentMessages: 5, // Always keep last 5 messages intact
-      strategy: 'summarize',     // 'summarize' or 'importance'
+      threshold: 0.8,                // Fraction of the model's context window (default: 0.8)
+      enablePruning: true,           // Drop oversized tool outputs first
+      enableDeduplication: true,     // Collapse repeated file reads
+      enableSlidingWindow: true,     // Fallback: drop oldest messages if still over budget
     },
   },
 });
@@ -92,87 +96,68 @@ const result = await neurolink.generate({
   input: { text: 'What was the account number I mentioned earlier?' },
   context: { sessionId: 'support-session-123' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
-// The AI can still recall information from compacted messages
-// because key details (account numbers, names, decisions) are preserved in the summary
+// The AI can still recall information from compacted messages, because the
+// summarization stage writes a structured summary whose "constraints and
+// established rules" section is explicitly guaranteed to carry forward
 ```
 
 The configuration parameters control the compaction behavior:
 
-- **`tokenThreshold`**: The token count at which compaction triggers. Set this below your model's context limit to leave room for the new message and response.
-- **`targetTokens`**: The target size after compaction. The system compresses enough older messages to bring the total below this number.
-- **`preserveRecentMessages`**: Recent messages are never compacted. This ensures the immediate conversation context is always available in full detail.
-- **`strategy`**: The compaction algorithm -- either summarization-based or importance-based.
+- **`tokenThreshold`**: The absolute token count that triggers summarization for a session. Left unset, it defaults to 80% of the active model's context window.
+- **`summarizationProvider` / `summarizationModel`**: Which provider and model run the summarization call. Use a cheaper model here -- summarization is a simpler task than the main conversation.
+- **`contextCompaction.threshold`**: A 0.0-1.0 fraction of the context window at which the compaction pipeline runs (default `0.8`).
+- **`contextCompaction.enablePruning` / `enableDeduplication` / `enableSlidingWindow`**: Toggle the pipeline's tool-output pruning, file-read deduplication, and sliding-window fallback stages independently of LLM summarization.
 
-> **Note:** Set `tokenThreshold` to roughly 75% of your model's context window. This leaves headroom for the system prompt, new user message, and AI response.
+> **Note:** The default `contextCompaction.threshold` of 0.8 already leaves headroom for the system prompt, new user message, and AI response. Lower it only if your prompts or tool outputs are unusually large.
 {: .prompt-info }
 
-## Compaction Strategies
+## The Compaction Pipeline
 
-We implemented two compaction strategies, each targeting a different set of trade-offs in the information-preservation vs. token-reduction spectrum.
+Rather than a single strategy, compaction is a pipeline of independently-toggleable stages that run in order -- cheapest first -- until the conversation fits back under budget:
 
-### Summarization Strategy (Default)
+1. **Prune tool outputs** -- drop or shrink oversized tool-call results. No LLM call needed.
+2. **Deduplicate file reads** -- collapse repeated reads of the same file into a single copy.
+3. **Summarize** -- an LLM condenses the remaining older messages into a structured summary (see below).
+4. **Truncate** -- a sliding-window fallback drops the oldest messages if the earlier stages still didn't reach the target.
 
-The summarization strategy uses an LLM to generate a concise summary of older messages. It preserves the narrative flow, key decisions, and important details while dramatically reducing token count.
+For conversations where exact wording matters more than compressing token count -- code reviews, debugging sessions -- you can disable summarization and rely on pruning and deduplication alone; older messages then stay verbatim until the sliding-window fallback has to drop them:
 
 ```typescript
-compaction: {
-  strategy: 'summarize',
-  summaryPrompt: `Summarize the following conversation messages. Preserve ALL of:
-- Names, account numbers, order IDs, and other identifiers
-- Decisions made and agreements reached
-- Action items and pending tasks
-- Technical details and specifications mentioned
-- Emotional tone and user sentiment
-
-Be concise but do not lose any critical details.`,
-  summaryProvider: 'openai',
-  summaryModel: 'gpt-4o-mini', // Use cheap model for summarization
+conversationMemory: {
+  enabled: true,
+  enableSummarization: false, // keep exact wording; skip the LLM summarization stage
+  contextCompaction: {
+    enabled: true,
+    enablePruning: true,
+    enableDeduplication: true,
+    enableSlidingWindow: true,
+  },
 }
 ```
 
-This strategy is best for general conversations, customer support sessions, and project discussions where the narrative arc matters. The summary model can be a cheaper model than the main conversation model -- summarization is a simpler task than the original conversation.
-
-### Importance-Based Strategy
-
-The importance-based strategy scores each message individually and keeps high-importance messages verbatim while removing low-importance ones. This preserves the exact wording of critical exchanges.
-
-```typescript
-compaction: {
-  strategy: 'importance',
-  importanceThreshold: 0.6,  // Keep messages scoring above 0.6
-  scoringCriteria: [
-    'Contains specific data (numbers, IDs, names)',
-    'Records a decision or agreement',
-    'Provides technical specifications',
-    'Expresses user frustration or satisfaction',
-    'Contains action items',
-  ],
-}
-```
-
-This strategy is best for technical conversations where exact wording matters -- code reviews, debugging sessions, and specification discussions. A brief context note replaces removed messages so the AI knows something was discussed without consuming tokens for the full text.
+Summarization is best left on for general conversations, customer support sessions, and project discussions where the narrative arc matters more than exact wording; the summarization model can be cheaper than the main conversation model since summarizing is a simpler task than the original conversation.
 
 ## What Gets Preserved During Compaction
 
-The most critical aspect of compaction is what survives. Both strategies are designed to preserve five categories of information:
+The most critical aspect of compaction is what survives. The summarization stage doesn't write free-form prose -- it fills a structured 10-section summary (primary request and intent, key technical concepts, files and code touched, problem solving, pending tasks, task evolution, current work, next step, required files, and constraints/established rules). Section 10, constraints and established rules, is explicitly guaranteed: the summarizer is told that user-imposed constraints and established agreements are never "no longer relevant" and must carry forward into every incremental re-summary until the user revokes them. The other nine sections are best-effort -- specific details like an account number or a decision survive only if the conversation actually populated that section:
 
 ```mermaid
 flowchart LR
-    subgraph Before["Before Compaction (20 messages, 8000 tokens)"]
-        B1["Greeting<br/>(low importance)"]
-        B2["Account: ACC-12345<br/>(HIGH importance)"]
-        B3["General chitchat<br/>(low importance)"]
-        B4["Problem described<br/>(medium importance)"]
-        B5["Troubleshooting steps<br/>(medium importance)"]
-        B6["Decision: refund approved<br/>(HIGH importance)"]
-        B7["Follow-up questions<br/>(low importance)"]
+    subgraph Before["Before Compaction: 20 messages, 8000 tokens"]
+        B1["Greeting"]
+        B2["Account: ACC-12345"]
+        B3["General chitchat"]
+        B4["Problem described"]
+        B5["Troubleshooting steps"]
+        B6["Decision: refund approved"]
+        B7["Follow-up questions"]
     end
 
-    subgraph After["After Compaction (summary + 5 recent, 3500 tokens)"]
-        A1["SUMMARY: Customer ACC-12345<br/>reported billing issue.<br/>Refund approved for $99."]
+    subgraph After["After Compaction: structured summary + 5 recent, 3500 tokens"]
+        A1["SUMMARY section 4, Problem Solving:<br/>Customer ACC-12345 billing issue,<br/>refund approved"]
         A2["Recent message 16"]
         A3["Recent message 17"]
         A4["Recent message 18"]
@@ -183,33 +168,28 @@ flowchart LR
     Before -->|"Compaction"| After
 ```
 
-1. **Identifiers**: Names, account numbers, order IDs, email addresses, phone numbers. These are the anchors that connect the conversation to real-world entities.
-2. **Decisions**: Agreements, approvals, rejections, policy exceptions. If a supervisor approved a refund, that decision must survive compaction.
-3. **Technical details**: Error codes, configuration values, specifications, version numbers. Losing a single digit in an error code makes it useless.
-4. **Action items**: Tasks assigned, deadlines, commitments, next steps. Dropping an action item means it never gets done.
-5. **Sentiment**: User frustration, satisfaction, urgency. The AI needs to maintain appropriate tone throughout the conversation.
+The 10 sections, in order: primary request and intent, key technical concepts, files and code sections, problem solving, pending tasks, task evolution, current work, next step, required files, and constraints/established rules. An identifier like an account number, or a decision like a refund approval, survives only if the conversation's content lands in one of the first nine sections during summarization; the tenth section is the one carried forward unconditionally.
 
 ## Manual Compaction Control
 
-While automatic compaction handles most scenarios, you sometimes need manual control -- checking how much context is being used, triggering compaction early before a known-large prompt, or reviewing what has been compacted:
+While automatic compaction handles most scenarios, you sometimes need manual control -- checking how much context is being used, or triggering compaction early before a known-large prompt:
 
 ```typescript
-// Check current context size
-const stats = await neurolink.getConversationStats();
-console.log('Total tokens in session:', stats.total);
+// Check current context usage for a session
+const usage = await neurolink.getContextStats('session-123', 'openai', 'gpt-5.4');
+console.log('Estimated tokens:', usage?.estimatedInputTokens, '/', usage?.availableInputTokens);
+console.log('Should compact:', usage?.shouldCompact);
 
-// Manually trigger compaction
-await neurolink.compactSession('session-123', {
-  targetTokens: 2000,
-  preserveRecentMessages: 3,
+// Manually trigger the compaction pipeline
+const result = await neurolink.compactSession('session-123', {
+  keepRecentRatio: 0.3, // keep the most recent 30% of the target budget verbatim
 });
 
-// Get compaction history for a session
-const compactionLog = await neurolink.getCompactionHistory('session-123');
-console.log('Compactions performed:', compactionLog.length);
-console.log('Last compaction:', compactionLog[compactionLog.length - 1]);
-// { timestamp: '...', messagesBefore: 25, messagesAfter: 8,
-//   tokensBefore: 8500, tokensAfter: 3200 }
+if (result?.compacted) {
+  console.log('Stages used:', result.stagesUsed); // e.g. ['prune', 'summarize']
+  console.log('Tokens before/after:', result.tokensBefore, '->', result.tokensAfter);
+  console.log('Tokens saved:', result.tokensSaved);
+}
 ```
 
 Manual compaction is useful in several scenarios:
@@ -225,39 +205,33 @@ Different models have vastly different context windows. Your compaction threshol
 ```typescript
 // For models with smaller context windows (4K-8K)
 const smallContextConfig = {
-  compaction: {
+  conversationMemory: {
     enabled: true,
-    tokenThreshold: 3000,
-    targetTokens: 1500,
-    preserveRecentMessages: 3,
+    tokenThreshold: 3000, // trigger summarization earlier
+    contextCompaction: { enabled: true, threshold: 0.75 },
   },
 };
 
 // For models with large context windows (128K-200K)
 const largeContextConfig = {
-  compaction: {
+  conversationMemory: {
     enabled: true,
     tokenThreshold: 100000,
-    targetTokens: 50000,
-    preserveRecentMessages: 20,
+    contextCompaction: { enabled: true, threshold: 0.8 }, // default
   },
 };
 
 // Per-request override
 const result = await neurolink.generate({
   input: { text: userMessage },
-  context: {
-    sessionId: 'session-123',
-    compaction: {
-      tokenThreshold: 8000, // Override for this specific request
-    },
-  },
+  context: { sessionId: 'session-123' },
+  compactionThreshold: 0.6, // compact earlier than the 0.8 default for this request
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-5',
 });
 ```
 
-The per-request override is particularly useful when you switch models mid-conversation. If a session starts on a 128K model and is later routed to a smaller model (perhaps due to cost optimization or provider failover), you can lower the compaction threshold for that specific request.
+The per-request `compactionThreshold` override is particularly useful when you switch models mid-conversation. If a session starts on a 128K model and is later routed to a smaller model (perhaps due to cost optimization or provider failover), you can lower the compaction threshold for that specific request -- it must be at or below the instance-level default, never above.
 
 ## Compaction Decision Flow
 
@@ -268,14 +242,15 @@ flowchart TD
     MSG["New Message"] --> COUNT["Count Total Tokens"]
     COUNT --> CHECK{"tokens > threshold?"}
     CHECK -->|"No"| ADD["Add to History"]
-    CHECK -->|"Yes"| COMPACT["Run Compaction"]
-    COMPACT --> STRATEGY{"Strategy?"}
-    STRATEGY -->|"summarize"| SUM["LLM Summarization"]
-    STRATEGY -->|"importance"| IMP["Importance Scoring"]
-    SUM --> REPLACE["Replace Old Messages<br/>with Summary"]
-    IMP --> FILTER["Keep High-Importance<br/>Drop Low-Importance"]
-    REPLACE --> ADD
-    FILTER --> ADD
+    CHECK -->|"Yes"| PRUNE["Stage 1: Prune Tool Outputs"]
+    PRUNE --> DEDUP["Stage 2: Deduplicate File Reads"]
+    DEDUP --> FIT1{"Under target?"}
+    FIT1 -->|"Yes"| ADD
+    FIT1 -->|"No"| SUM["Stage 3: LLM Summarization"]
+    SUM --> FIT2{"Under target?"}
+    FIT2 -->|"Yes"| ADD
+    FIT2 -->|"No"| TRUNC["Stage 4: Sliding-Window Truncate"]
+    TRUNC --> ADD
     ADD --> GENERATE["Send to LLM"]
 ```
 
@@ -308,12 +283,9 @@ describe('Context Compaction', () => {
     const neurolink = new NeuroLink({
       conversationMemory: {
         enabled: true,
-        compaction: {
-          enabled: true,
-          tokenThreshold: 500, // Low threshold for testing
-          targetTokens: 200,
-          preserveRecentMessages: 2,
-        },
+        enableSummarization: true,
+        tokenThreshold: 500, // Low threshold for testing
+        contextCompaction: { enabled: true, threshold: 0.5 },
       },
     });
 
@@ -355,7 +327,7 @@ Key test scenarios to cover:
 - Decision records (approvals, rejections) survive compaction
 - Error codes and technical details survive compaction
 - Multi-compaction sessions (compaction triggers multiple times) still preserve early data
-- Different strategies (summarize vs importance) both preserve critical information
+- The constraints/established-rules section of the summary survives incremental re-summarization
 
 ## Production Patterns
 
@@ -367,14 +339,11 @@ For 24/7 support bots where conversations can span hours:
 const supportBot = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    compaction: {
-      enabled: true,
-      tokenThreshold: 6000,
-      targetTokens: 3000,
-      preserveRecentMessages: 5,
-      strategy: 'summarize',
-      summaryModel: 'gpt-4o-mini',
-    },
+    enableSummarization: true,
+    tokenThreshold: 6000,
+    summarizationProvider: 'openai',
+    summarizationModel: 'gpt-5.4-mini',
+    contextCompaction: { enabled: true, threshold: 0.8 },
   },
 });
 ```
@@ -397,16 +366,16 @@ Track compaction metrics to identify issues:
 
 - **Compaction frequency**: Sessions that compact more than 3 times in an hour may indicate overly verbose prompts or unnecessary back-and-forth
 - **Token savings**: Monitor the ratio of tokens before vs after compaction. Healthy compaction achieves 50-70% reduction
-- **Information loss incidents**: If users report the AI "forgetting" things after compaction, your summary prompt or importance threshold needs tuning
+- **Information loss incidents**: If users report the AI "forgetting" things after compaction, check which stages ran (`result.stagesUsed`) and whether `keepRecentRatio` or the compaction threshold need tuning
 
 > **Note:** Archive compaction summaries for compliance-regulated industries. The summary provides an auditable record of what was discussed even after the original messages are compacted.
 {: .prompt-info }
 
 ## Conclusion
 
-Context compaction sits at the intersection of information theory and practical systems engineering. We made deliberate trade-offs: summarization sacrifices exact wording for narrative coherence, while importance-based filtering preserves critical verbatim exchanges at the cost of losing low-value context. Neither is universally better -- the right choice depends on whether your domain values narrative continuity (customer support, project discussions) or exact phrasing (code reviews, legal analysis).
+Context compaction sits at the intersection of information theory and practical systems engineering. The pipeline makes a deliberate trade-off between stages: the cheap, lossless stages (pruning, deduplication) run first, and the LLM summarization stage -- which sacrifices exact wording for narrative coherence -- only runs if those weren't enough. You can also disable summarization entirely and rely on pruning, deduplication, and sliding-window truncation alone when exact wording matters more than compression, at the cost of losing more low-value context sooner.
 
-The key design decisions we would highlight: setting `tokenThreshold` at 75% of context window leaves headroom for system prompts and response generation. Using a cheaper model for summarization (`gpt-4o-mini`) avoids the cost trap of spending more on compression than you save on context reduction. The five-category preservation taxonomy (identifiers, decisions, technical details, action items, sentiment) emerged from analyzing failure modes in production -- each category represents a class of information loss that causes downstream conversation breakdowns.
+The key design decisions worth highlighting: the pipeline's default 80% threshold (`contextCompaction.threshold`) leaves headroom for system prompts and response generation. Using a cheaper model for summarization (`summarizationModel`) avoids the cost trap of spending more on compression than you save on context reduction. And the structured 10-section summary format, with its hard guarantee that constraints and established rules always carry forward, targets the specific failure mode where a conversation's ground rules quietly disappear after compaction.
 
 The combination of automatic compaction, manual control, and per-request overrides gives operators the flexibility to handle any conversation pattern, from quick support exchanges to multi-day technical debugging sessions.
 

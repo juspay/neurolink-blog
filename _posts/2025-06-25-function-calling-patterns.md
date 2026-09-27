@@ -25,7 +25,7 @@ image:
 
 By the end of this guide, you'll have AI function calling working with NeuroLink -- from basic tool definitions to multi-step agentic workflows that query databases, call APIs, and take actions.
 
-You will define tools once using Zod schemas or JSON Schema, register them with NeuroLink, and use them across any of the 13 supported providers. The same tool works with OpenAI, Anthropic, Google, and more -- no provider-specific rewrites.
+You will define tools once using Zod schemas or JSON Schema, register them with NeuroLink, and use them across any of its supported providers. The same tool works with OpenAI, Anthropic, Google, and more -- no provider-specific rewrites.
 
 ## Understanding Function Calling in NeuroLink
 
@@ -247,7 +247,7 @@ neurolink.registerTool('get_company_metrics', {
 const result = await neurolink.generate({
   input: { text: 'What is our current monthly revenue?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 console.log(result.content);
@@ -268,7 +268,7 @@ Sometimes you want to disable tool use for a specific request:
 const result = await neurolink.generate({
   input: { text: 'What is our revenue?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   disableTools: true  // Tools won't be available for this request
 });
 ```
@@ -289,7 +289,7 @@ const responseSchema = z.object({
 const result = await neurolink.generate({
   input: { text: 'Summarize the data' },
   provider: 'vertex',
-  model: 'gemini-2.0-flash',
+  model: 'gemini-2.5-flash',
   schema: responseSchema,
   disableTools: true  // Required for Google providers with schemas
 });
@@ -444,13 +444,13 @@ neurolink.registerTool('calculate', {
 const openaiResult = await neurolink.generate({
   input: { text: 'What is 15% of 847?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 const anthropicResult = await neurolink.generate({
   input: { text: 'Calculate 15% of 847' },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-5',
 });
 ```
 
@@ -463,7 +463,7 @@ NeuroLink supports streaming responses that include tool execution:
 const result = await neurolink.stream({
   input: { text: 'Get our sales data and summarize trends' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 // Process the stream using the async iterator on result.stream
@@ -548,7 +548,7 @@ const result = await neurolink.generate({
     text: 'Research the latest developments in quantum computing and save your findings'
   },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-5',
   systemPrompt: `You are a research assistant. When given a research topic:
 1. Search for relevant information
 2. Read the most relevant sources

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Building an E-commerce Recommendation Engine with NeuroLink
+title: 'Building an E-commerce Recommendation Engine with NeuroLink'
 description: >-
   Technical patterns for building AI-powered product recommendation systems
   using NeuroLink's batch processing and generation capabilities.
@@ -211,7 +211,9 @@ ${description}`,
     schema: complianceSchema
   });
 
-  const compliance = complianceCheck.content;
+  // Structured output lands in `structuredData`, not `content` -- `content`
+  // stays the raw text; `structuredData` is the parsed, schema-validated object.
+  const compliance = complianceCheck.structuredData as z.infer<typeof complianceSchema>;
 
   // Factual accuracy verification against source data
   const factCheck = await neurolink.generate({
@@ -227,7 +229,7 @@ Source Data: ${JSON.stringify(productData)}`,
     schema: factCheckSchema
   });
 
-  const facts = factCheck.content;
+  const facts = factCheck.structuredData as z.infer<typeof factCheckSchema>;
 
   // Note: calculateReadabilityScore, calculateKeywordDensity, and checkUniqueness
   // are user-implemented helper functions for quality scoring
@@ -300,7 +302,7 @@ Ensure the description feels native, not translated.`,
         schema: localizationSchema
       });
 
-      const result = response.content;
+      const result = response.structuredData as z.infer<typeof localizationSchema>;
       return {
         language,
         description: result.description,
