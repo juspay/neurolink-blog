@@ -164,7 +164,7 @@ const result = await neurolink.generate({
     text: "Write a comprehensive analysis of the P vs NP problem and its implications for cryptography.",
   },
   provider: "anthropic",
-  model: "claude-3-7-sonnet-20250219",
+  model: "claude-sonnet-5",
   thinkingConfig: {
     enabled: true,
     budgetTokens: 10000, // Allow up to 10K tokens for internal reasoning
@@ -231,7 +231,7 @@ const geminiResult = await solveWithThinking(
 const claudeResult = await solveWithThinking(
   "Optimize this algorithm...",
   "anthropic",
-  "claude-3-7-sonnet-20250219"
+  "claude-sonnet-5"
 );
 ```
 

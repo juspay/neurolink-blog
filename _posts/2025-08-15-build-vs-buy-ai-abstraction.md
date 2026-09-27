@@ -47,7 +47,7 @@ This is the layer most teams think about:
 - **Model mapping and capability detection** -- not all models support tool calling, not all support images, not all support streaming. Your abstraction needs to know what each model can do
 - **Default model selection** -- what happens when the user does not specify a model?
 
-NeuroLink handles 29 exported providers (plus OpenRouter registered dynamically), each with unique quirks. The `src/lib/providers/` directory contains 35 implementation files -- and that does not count the shared infrastructure.
+NeuroLink handles 33+ LLM providers -- native integrations plus a JSON-driven catalog -- and a generic OpenAI-compatible adapter for anything else, each with unique quirks. The `src/lib/providers/` directory holds the implementation for every one of them, plus the shared infrastructure.
 
 ### Layer 2: Streaming Normalization
 
@@ -114,13 +114,13 @@ The key insight: **the initial build is 20% of the cost. Maintenance is 80%.** E
 
 ### The Maintenance Multiplier
 
-Maintenance cost scales linearly with the number of providers. Each provider is an independent dependency that can change at any time. Three providers means triple the maintenance surface. Supporting 29+ providers means your abstraction layer requires dedicated engineering attention every sprint.
+Maintenance cost scales linearly with the number of providers. Each provider is an independent dependency that can change at any time. Three providers means triple the maintenance surface. Supporting 33+ providers means your abstraction layer requires dedicated engineering attention every sprint.
 
 This is the trap: the initial build feels manageable, but the ongoing maintenance quietly consumes engineering bandwidth that should be going into your actual product.
 
 ### The Hidden Testing Cost
 
-Integration testing across providers is particularly expensive. You cannot mock provider APIs reliably because the bugs you are trying to catch are in the provider-specific behaviors. Real integration tests require real API keys, real requests, and real costs. Running these tests across 29 providers, with multiple models per provider, is a significant ongoing expense.
+Integration testing across providers is particularly expensive. You cannot mock provider APIs reliably because the bugs you are trying to catch are in the provider-specific behaviors. Real integration tests require real API keys, real requests, and real costs. Running these tests across 33+ providers, with multiple models per provider, is a significant ongoing expense.
 
 ## When Building Makes Sense
 

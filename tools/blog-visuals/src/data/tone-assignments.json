@@ -61,7 +61,7 @@
   },
   {
     "slug": "openai-integration-guide",
-    "title": "OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink",
+    "title": "OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink",
     "tone": "tutorial",
     "reason": "practical guide/tutorial content"
   },
@@ -937,7 +937,7 @@
   },
   {
     "slug": "four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one",
-    "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
+    "title": "Four MCP transports: stdio, http, sse, websocket \u2014 picking the right one",
     "tone": "tutorial",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
   },
@@ -1030,5 +1030,11 @@
     "title": "Two decision providers, one decide(): what Laya forced on NeuroLink",
     "tone": "deep-dive",
     "reason": "architecture/internals post on generalizing the shared decision-provider base for a second provider"
+  },
+  {
+    "slug": "provider-switching-at-runtime-providerfallback-callbacks-and-modelchain-arrays",
+    "title": "Provider switching at runtime: providerFallback callbacks and modelChain arrays",
+    "tone": "tutorial",
+    "reason": "hands-on configuration walkthrough with code"
   }
 ]

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: How to Reduce LLM Costs by 60% with Smart Model Routing
+title: 'How to Reduce LLM Costs by 60% with Smart Model Routing'
 date: '2025-12-04 10:00:00 +0530'
 categories:
   - Tutorial
@@ -35,20 +35,22 @@ Now you will start with the cost landscape, then build from NeuroLink's built-in
 
 Before building a router, you need to understand the cost differences between models. The gap between the cheapest and most expensive options is enormous:
 
-| Model | Input Cost (per 1M tokens) | Output Cost (per 1M tokens) | Avg Latency | Best For |
+| Model | Input Cost (per 1M tokens, illustrative) | Output Cost (per 1M tokens, illustrative) | Avg Latency | Best For |
 |---|---|---|---|---|
-| GPT-4o | $2.50 | $10.00 | ~2s | Complex reasoning |
-| GPT-4o-mini | $0.15 | $0.60 | ~1s | General tasks |
-| Gemini 2.5 Flash | $0.075 | $0.30 | ~0.8s | Fast tasks |
-| Claude Sonnet 4 | $3.00 | $15.00 | ~3s | Deep analysis |
-| Claude Haiku 3.5 | $0.80 | $4.00 | ~1s | Quick responses |
+| GPT-5.4 | ~$2.50 | ~$10.00 | ~2s | Complex reasoning |
+| GPT-5.4-mini | ~$0.15 | ~$0.60 | ~1s | General tasks |
+| Gemini 2.5 Flash | ~$0.075 | ~$0.30 | ~0.8s | Fast tasks |
+| Claude Sonnet 4.5 | ~$3.00 | ~$15.00 | ~3s | Deep analysis |
+| Claude Haiku 4.5 | ~$0.80 | ~$4.00 | ~1s | Quick responses |
 
-The cost difference between Gemini 2.5 Flash and Claude Sonnet 4 is **40x for input tokens and 50x for output tokens**. If 70% of your traffic is simple enough for Flash and you are currently running everything on Sonnet, the savings are massive.
+The figures above are illustrative example rates for the calculations below, not verified current list prices -- check each provider's pricing page for current numbers.
 
-Here is the math for a realistic production workload of 1,000,000 requests per month averaging 500 input tokens and 200 output tokens per request:
+The cost difference between Gemini 2.5 Flash and Claude Sonnet 4.5 is, at these illustrative rates, roughly **40x for input tokens and 50x for output tokens**. If 70% of your traffic is simple enough for Flash and you are currently running everything on Sonnet, the savings are massive.
 
-- **Without routing (all GPT-4o):** ~$3,250/month
-- **With routing (70% Gemini Flash + 30% Claude Sonnet):** ~$1,420/month
+Here is the math for a realistic production workload of 1,000,000 requests per month averaging 500 input tokens and 200 output tokens per request, using the illustrative rates above:
+
+- **Without routing (all GPT-5.4):** ~$3,250/month
+- **With routing (70% Gemini Flash + 30% Claude Sonnet 4.5):** ~$1,420/month
 - **Savings:** ~$1,830/month (56% reduction)
 
 ```mermaid
@@ -59,12 +61,14 @@ flowchart TD
     Gemini 2.5 Flash
     $0.075/1M tokens"]
     C -->|Complex/Reasoning| E["Reasoning Tier
-    Claude Sonnet 4
-    $3/1M tokens"]
+    Claude Sonnet 4.5
+    ~$3/1M tokens"]
     D --> F[Response]
     E --> F
     F --> G[Analytics Tracking]
 ```
+
+*Pricing shown in the diagram is illustrative, not verified current list prices.*
 
 ![Smart Model Routing](/assets/img/posts/reduce-llm-costs-smart-model-routing/smart-model-routing.gif)
 
@@ -88,11 +92,11 @@ const simple = await neurolink.generate({
 });
 // Uses Gemini 2.5 Flash (~$0.075/1M tokens, ~800ms)
 
-// Complex prompt -> routed to reasoning tier (Claude Sonnet 4)
+// Complex prompt -> routed to reasoning tier (Claude Sonnet 4.5)
 const complex = await neurolink.generate({
   input: { text: "Design a distributed consensus algorithm for a banking system..." },
 });
-// Uses Claude Sonnet 4 (~$3/1M tokens, ~3000ms)
+// Uses Claude Sonnet 4.5 (illustrative ~$3/1M tokens, ~3000ms)
 ```
 
 The classifier looks for signals of complexity: multi-step reasoning requirements, technical depth, creative composition, code generation, and multi-constraint optimization. Simple tasks include summarization, extraction, classification, formatting, and factual lookups.
@@ -109,15 +113,15 @@ The model router maps task types to specific model configurations. The built-in 
 ```typescript
 // The built-in routing configuration:
 // Fast tier:
-//   Primary: vertex / gemini-2.5-flash (800ms, $0.075/1M tokens)
-//   Fallback: vertex / gemini-2.5-pro (1200ms, $0.30/1M tokens)
+//   Primary: vertex / gemini-2.5-flash (~800ms)
+//   Fallback: vertex / claude-haiku-4-5@20251001 (~1200ms)
 //
 // Reasoning tier:
-//   Primary: vertex / claude-sonnet-4@20250514 (3000ms, $3/1M tokens)
-//   Fallback: vertex / claude-opus-4@20250514 (4000ms, $5/1M tokens)
+//   Primary: vertex / claude-sonnet-4-5@20250929 (~3000ms)
+//   Fallback: vertex / claude-opus-4-5@20251101 (~4000ms)
 ```
 
-Each model configuration in the router includes: `provider`, `model`, `capabilities` (what the model can do), `avgResponseTime` (for latency-aware routing), `costPerToken` (for cost-aware routing), and a `reasoning` flag indicating whether the model supports chain-of-thought.
+Each model configuration in the router includes: `provider`, `model`, `capabilities` (what the model can do), `avgResponseTime` (for latency-aware routing), `costPerToken` (an internal weight for cost-aware routing), and a `reasoning` string explaining why the router picked that model.
 
 You can override the router's decision when you know better than the classifier:
 
@@ -214,11 +218,11 @@ function classifyTask(prompt: string): TaskCategory {
 }
 
 const ROUTING_TABLE: Record<TaskCategory, { provider: string; model: string }> = {
-  extraction: { provider: "openai", model: "gpt-4o-mini" },
-  classification: { provider: "google-ai", model: "gemini-2.0-flash" },
-  analysis: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-  creative: { provider: "openai", model: "gpt-4o" },
-  code: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+  extraction: { provider: "openai", model: "gpt-5.4-mini" },
+  classification: { provider: "google-ai", model: "gemini-2.5-flash" },
+  analysis: { provider: "anthropic", model: "claude-sonnet-5" },
+  creative: { provider: "openai", model: "gpt-5.4" },
+  code: { provider: "anthropic", model: "claude-sonnet-5" },
 };
 
 const neurolink = new NeuroLink();
@@ -237,9 +241,9 @@ async function smartGenerate(prompt: string) {
 }
 ```
 
-This five-tier routing is more nuanced than binary classification. Extraction and classification tasks go to the cheapest models because they have well-defined outputs. Analysis and code tasks go to premium models because they require reasoning. Creative tasks go to GPT-4o because it produces the most natural prose.
+This five-tier routing is more nuanced than binary classification. Extraction and classification tasks go to the cheapest models because they have well-defined outputs. Analysis and code tasks go to premium models because they require reasoning. Creative tasks go to GPT-5.4 because it produces the most natural prose.
 
-Tune the routing table based on your evaluation data. If extraction quality drops below acceptable levels on GPT-4o-mini, promote it to a higher-tier model. If analysis tasks produce good results on a cheaper model, demote them. The routing table is your cost optimization lever.
+Tune the routing table based on your evaluation data. If extraction quality drops below acceptable levels on GPT-5.4-mini, promote it to a higher-tier model. If analysis tasks produce good results on a cheaper model, demote them. The routing table is your cost optimization lever.
 
 ## Step 5 -- Use Workflow Engine for Quality-Critical Tasks
 
@@ -292,7 +296,7 @@ interface CostEstimate {
 function estimateSavings(estimate: CostEstimate) {
   const { monthlyRequests, avgInputTokens, avgOutputTokens, fastPercentage } = estimate;
 
-  // Without routing: all premium (GPT-4o pricing)
+  // Without routing: all premium (GPT-5.4 pricing, illustrative)
   const premiumInputRate = 2.50 / 1_000_000;
   const premiumOutputRate = 10.00 / 1_000_000;
   const withoutRouting = monthlyRequests * (
@@ -302,7 +306,7 @@ function estimateSavings(estimate: CostEstimate) {
   // With routing: fast tier + reasoning tier
   const fastInputRate = 0.075 / 1_000_000; // Gemini Flash
   const fastOutputRate = 0.30 / 1_000_000;
-  const reasoningInputRate = 3.00 / 1_000_000; // Claude Sonnet
+  const reasoningInputRate = 3.00 / 1_000_000; // Claude Sonnet 4.5, illustrative
   const reasoningOutputRate = 15.00 / 1_000_000;
 
   const fastRequests = monthlyRequests * fastPercentage;
@@ -330,7 +334,7 @@ console.log(estimateSavings({
 // { withoutRouting: "3250.00", withRouting: "1158.75", savings: "2091.25", savingsPercentage: "64.3" }
 ```
 
-> **Note:** These estimates use list prices. Negotiated enterprise rates or commitment discounts will change the absolute numbers, but the percentage savings from routing remain similar.
+> **Note:** These estimates use illustrative per-token rates, not verified current list prices. Actual provider pricing, negotiated enterprise rates, or commitment discounts will change the absolute numbers, but the percentage savings from routing remain similar.
 {: .prompt-info }
 
 ## Monitoring and Dashboards

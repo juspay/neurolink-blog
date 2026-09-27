@@ -25,9 +25,9 @@ image:
   alt: 'Automating Real Estate Document Processing: Lease Abstraction with AI'
 ---
 
-You will build a lease abstraction pipeline that extracts critical terms from commercial lease documents at 99%+ accuracy while reducing cost from hundreds of dollars per lease to under a dollar. By the end of this tutorial, you will have OCR processing with GPT-4o Vision, term extraction with Claude Opus, Zod schema validation, automated quality gates with auto-evaluation, and optional HITL review for edge cases.
+You will build a quality-first lease abstraction pipeline for extracting critical terms from commercial lease documents. By the end of this tutorial, you will have multimodal document processing with GPT-5.4, term extraction with Claude Opus on Bedrock, Zod schema validation, source-grounded evaluation, and optional HITL review for edge cases.
 
-> **Note:** Accuracy figures depend heavily on document quality, lease complexity, and extraction field types. The 99%+ target applies to structured fields (dates, amounts) with clear formatting. Complex clauses and non-standard lease language require human review. Always validate AI-extracted terms against source documents for legal and financial decisions.
+> **Note:** Extraction quality depends heavily on document quality, lease complexity, and field type. Complex clauses and non-standard language require human review. Always validate AI-extracted terms against source documents before making legal or financial decisions.
 {: .prompt-info }
 
 Getting a rent amount wrong by a single digit or missing a termination clause has real financial and legal consequences. This is not a use case where 80% accuracy is acceptable. You will build quality gates that catch errors before they reach the database.
@@ -40,24 +40,24 @@ The pipeline follows a multi-stage pattern where each stage uses the optimal AI 
 
 ```mermaid
 flowchart TB
-    Lease[Lease Document<br/>PDF/Image] --> OCR[Document OCR<br/>GPT-4o Vision]
+    Lease[Lease Document<br/>PDF/Image] --> OCR[Document OCR<br/>GPT-5.4]
     OCR --> Chunk[Document Chunker<br/>Token-Aware]
     Chunk --> Extract[Term Extractor<br/>Claude Opus]
     Extract --> Validate[Schema Validator<br/>Zod Validation]
     Validate --> Evaluate[Quality Gate<br/>Auto-Evaluation]
-    Evaluate -->|Score >= 8| Output[Structured Output<br/>JSON to Database]
-    Evaluate -->|Score < 8| ReExtract[Re-Extract with<br/>Quality Model]
+    Evaluate -->|Score >= 0.8| Output[Structured Output<br/>JSON to Database]
+    Evaluate -->|Score < 0.8| ReExtract[Re-Extract with<br/>Quality Model]
     ReExtract --> Validate
     Output --> Legal[Legal Review<br/>HITL Optional]
 ```
 
 Each stage has a specific purpose and provider choice:
 
-- **OCR**: GPT-4o's multimodal capabilities handle scanned PDFs, photographed documents, and poor-quality images. It converts visual documents to clean text.
+- **OCR**: GPT-5.4's multimodal capabilities handle scanned PDFs and document images. It converts visual documents to clean text.
 - **Chunking**: Token-aware splitting respects LLM context limits while maintaining semantic coherence by splitting on section headers.
 - **Extraction**: Claude Opus excels at understanding complex legal language, nested clauses, and cross-references within lease documents.
 - **Validation**: Zod schema validation ensures the extracted data conforms to the expected structure before database insertion.
-- **Evaluation**: NeuroLink's auto-evaluation provides a quality gate -- extractions scoring below threshold are re-extracted with a different provider for a second opinion.
+- **Evaluation**: NeuroLink's evaluation pipeline scores the extraction against source text; results below your calibrated threshold are re-extracted or sent for review.
 - **HITL**: Optional human review for edge cases or high-value leases.
 
 ## Document Processing Pipeline
@@ -65,25 +65,29 @@ Each stage has a specific purpose and provider choice:
 The first step is configuring providers for each stage of the pipeline. Different providers bring different strengths, and using the right model for each task is how you achieve both high accuracy and reasonable cost:
 
 ```typescript
+import { readFileSync } from 'node:fs';
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink({
   conversationMemory: { enabled: true },
 });
 
-// OCR: GPT-4o for multimodal document understanding
+// OCR: GPT-5.4 for multimodal document understanding
+const leasePdf = readFileSync("lease.pdf");
 const ocrResult = await neurolink.generate({
-  input: { text: "Extract all text from this lease document, preserving section headers and numbering." },
+  input: {
+    text: "Extract all text from this lease document, preserving section headers and numbering.",
+    pdfFiles: [leasePdf],
+  },
   provider: "openai",
-  model: "gpt-4o",
-  // In practice, you would pass the document image/PDF as multimodal input
+  model: "gpt-5.4",
 });
 
 // Extraction: Claude Opus for complex legal reasoning
 const extractionResult = await neurolink.generate({
   input: { text: extractionPrompt },
   provider: "bedrock",
-  model: "anthropic.claude-3-opus-20240229-v1:0",
+  model: "anthropic.claude-opus-4-6-v1",
 });
 
 // Re-extraction fallback: Gemini Pro for verification from a different perspective
@@ -94,9 +98,9 @@ const verificationResult = await neurolink.generate({
 });
 ```
 
-The multi-provider approach is deliberate. If Claude Opus extracts a rent amount and Gemini Pro extracts the same amount independently, confidence is high. If they disagree, the discrepancy triggers human review. This cross-provider verification is a powerful pattern for high-stakes document processing.
+The multi-provider approach is deliberate. Agreement between Claude Opus and Gemini Pro is a useful signal, but it is not proof that either extraction matches the source. Route disagreements to human review and evaluate agreements against the original lease text before saving them.
 
-> **Note:** Use `createBestProvider()` from `AIProviderFactory` when you want NeuroLink to automatically select the optimal provider based on the task characteristics rather than hardcoding provider choices.
+> **Note:** `AIProviderFactory.createBestProvider()` is useful for environment-driven provider discovery: it tries a requested provider or selects one with configured credentials. It does not rank providers by legal-document quality, cost, or latency.
 {: .prompt-info }
 
 ## Structured Extraction with Schema Validation
@@ -142,27 +146,17 @@ const LeaseAbstractionSchema = z.object({
 });
 ```
 
-With the schema defined, build the extraction prompt and validate the result. First, add a helper to handle LLM responses that may be wrapped in markdown code fences:
+With the schema defined, pass it directly to `generate()`. NeuroLink returns the parsed value through `structuredData`, so you do not need to strip markdown fences or call `JSON.parse()` yourself:
 
 ```typescript
-function parseJsonResponse(text: string): unknown {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  return JSON.parse(fenced ? fenced[1].trim() : text.trim());
-}
-```
-
-```typescript
-// Extraction with structured output instructions
 const extractionPrompt = `
-Extract all lease terms from the following document into this exact JSON schema:
-${JSON.stringify(LeaseAbstractionSchema.shape, null, 2)}
+Extract all lease terms from the document below.
 
 Rules:
-- Extract EXACT dollar amounts (no rounding)
-- Dates in ISO 8601 format (YYYY-MM-DD)
-- If a field is not found in the document, use null
-- For escalations, calculate percentage if only dollar amounts are given
-- Include ALL renewal options and termination clauses
+- Extract exact dollar amounts without rounding
+- Use ISO 8601 dates (YYYY-MM-DD)
+- Do not invent a value when the document does not supply one
+- Include every renewal option and termination clause
 
 Document text:
 ${documentChunk}
@@ -171,22 +165,23 @@ ${documentChunk}
 const result = await neurolink.generate({
   input: { text: extractionPrompt },
   provider: "bedrock",
-  model: "anthropic.claude-3-opus-20240229-v1:0",
+  model: "anthropic.claude-opus-4-6-v1",
+  schema: LeaseAbstractionSchema,
 });
 
-// Validate against schema
-const parsed = LeaseAbstractionSchema.safeParse(parseJsonResponse(result.content));
+const parsed = LeaseAbstractionSchema.safeParse(result.structuredData);
 if (!parsed.success) {
   console.error("Extraction failed validation:", parsed.error.issues);
 
-  // Re-extract with different provider for a second attempt
+  // Re-extract with a different provider for a second attempt
   const reResult = await neurolink.generate({
     input: { text: extractionPrompt },
     provider: "vertex",
     model: "gemini-2.5-pro",
+    schema: LeaseAbstractionSchema,
   });
 
-  const reParsed = LeaseAbstractionSchema.safeParse(parseJsonResponse(reResult.content));
+  const reParsed = LeaseAbstractionSchema.safeParse(reResult.structuredData);
   if (!reParsed.success) {
     // Both providers failed validation -- flag for human review
     await flagForHumanReview(documentChunk, parsed.error, reParsed.error);
@@ -194,96 +189,91 @@ if (!parsed.success) {
 }
 ```
 
-The `safeParse` pattern is critical. It never throws -- instead it returns a result object with either the validated data or detailed error information. When extraction fails validation, the system tries a different provider. If both fail, the document is flagged for human review. This three-tier approach (extract, re-extract, human review) ensures nothing falls through the cracks.
+The `safeParse` pattern is critical. It never throws -- instead it returns a result object with either the validated data or detailed error information. When extraction fails validation, the system tries a different provider. If both fail, the document is flagged for human review. This three-tier approach (extract, re-extract, human review) prevents schema-invalid output from being saved automatically.
 
 > **Note:** Zod is the same validation library used internally by NeuroLink's `EvaluationSchema`. Using it for your domain schemas keeps your validation patterns consistent across the stack.
 {: .prompt-info }
 
 ## Auto-Evaluation Quality Gate
 
-Schema validation catches structural errors (missing fields, wrong types), but it does not catch semantic errors (extracting the wrong rent amount, confusing landlord and tenant names). For that, you need NeuroLink's evaluation system:
+Schema validation catches structural errors (missing fields, wrong types), but it does not catch semantic errors (extracting the wrong rent amount, confusing landlord and tenant names). For that, evaluate the extraction against its source text with NeuroLink's RAG evaluation preset:
 
 ```typescript
-import { generateEvaluation } from '@juspay/neurolink';
+import {
+  EvaluationPipeline,
+  RAG_PIPELINE,
+} from '@juspay/neurolink';
 
-const evaluation = await generateEvaluation({
-  userQuery: `Extract all lease terms from commercial lease for ${propertyAddress}`,
-  aiResponse: JSON.stringify(extractedTerms),
-  primaryDomain: "real-estate",
-  toolUsage: [
-    { toolName: "document-ocr", result: ocrConfidence },
-  ],
+const pipeline = new EvaluationPipeline(RAG_PIPELINE);
+const evaluation = await pipeline.execute({
+  query: `Extract all lease terms for ${propertyAddress}`,
+  response: JSON.stringify(extractedTerms),
+  context: [documentChunk],
 });
 
-// Quality gate thresholds for financial/legal data
-const ACCURACY_THRESHOLD = 8;
-const COMPLETENESS_THRESHOLD = 8;
-
-if (evaluation.accuracy >= ACCURACY_THRESHOLD &&
-    evaluation.completeness >= COMPLETENESS_THRESHOLD) {
-  // High confidence - save to database
+if (evaluation.passed && evaluation.overallScore >= 0.8) {
+  // Meets the configured quality gate -- save to database
   await saveLeaseAbstraction(extractedTerms);
-} else if (evaluation.accuracy >= 6) {
-  // Medium confidence - flag for review
+} else if (evaluation.overallScore >= 0.6) {
+  // Borderline result -- require human review
   await flagForReview(extractedTerms, evaluation);
 } else {
-  // Low confidence - re-extract with quality model
+  // Low score -- re-extract with a different provider or model
   await reExtractWithQualityModel(documentChunk);
 }
 ```
 
-The three-tier quality routing is designed for the risk profile of financial and legal data:
+The three-tier routing reflects the risk profile of financial and legal data:
 
-- **Score 8-10**: High confidence. The extraction is accurate and complete. Save directly to the database.
-- **Score 6-7**: Medium confidence. The extraction is mostly correct but may have issues. Flag for a quick human review.
-- **Score 0-5**: Low confidence. Something went wrong. Re-extract with a different provider or model.
+- **0.8-1.0 and passing**: Save the extraction after the source-grounded scorers pass.
+- **0.6-0.79**: Flag the extraction for human review.
+- **Below 0.6**: Re-extract with a different provider or model, then evaluate again.
 
-Setting `primaryDomain: "real-estate"` enables domain-specific scoring that understands the importance of precise dollar amounts, dates, and legal terminology in lease documents.
+Treat these thresholds as application policy rather than universal accuracy guarantees. Calibrate them with a labeled validation set from your own lease formats, and keep human review in the path for high-value or ambiguous clauses.
 
 ## Middleware for Processing Pipeline
 
-For a production pipeline processing hundreds of leases, you need guardrails, analytics, and auto-evaluation running on every extraction. NeuroLink's `MiddlewareFactory` configures this in one place:
+You can apply analytics, guardrails, and response auto-evaluation to each extraction through the `middleware` option on `generate()`. Keep the source-grounded RAG evaluation from the previous section as a separate gate: the middleware's response score does not replace comparison against the lease text.
 
 ```typescript
-import { MiddlewareFactory } from '@juspay/neurolink';
-
-const leaseMiddleware = new MiddlewareFactory({
-  preset: "all", // analytics + guardrails
-  middlewareConfig: {
-    guardrails: {
-      enabled: true,
-      config: {
-        badWords: ["confidential-watermark", "draft-only"],
-        precallEvaluation: { enabled: true },
+const result = await neurolink.generate({
+  input: { text: extractionPrompt },
+  provider: "bedrock",
+  model: "anthropic.claude-opus-4-6-v1",
+  schema: LeaseAbstractionSchema,
+  middleware: {
+    preset: "all", // analytics + guardrails
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          badWords: {
+            enabled: true,
+            list: ["confidential-watermark", "draft-only"],
+          },
+          precallEvaluation: { enabled: true },
+        },
       },
-    },
-    analytics: {
-      enabled: true,
-      config: {
-        trackTokenUsage: true,
-        trackCost: true,
+      autoEvaluation: {
+        enabled: true,
+        config: {
+          threshold: 8,
+          maxRetries: 1,
+          blocking: true,
+        },
       },
-    },
-    autoEvaluation: {
-      enabled: true,
     },
   },
 });
 
-// Track processing stats
-const stats = leaseMiddleware.getChainStats(
-  leaseMiddleware.createContext("bedrock", "claude-3-opus"),
-  { guardrails: { enabled: true }, analytics: { enabled: true } }
-);
+console.log(result.usage); // input, output, and total tokens
 ```
 
-The `"all"` preset activates both analytics and guardrails simultaneously. The guardrails configuration includes `badWords` for filtering out documents that contain draft watermarks or confidentiality markers that should not be processed. The `precallEvaluation` option validates the prompt before sending it to the AI, catching malformed extraction requests early.
-
-Analytics tracking with `trackTokenUsage` and `trackCost` gives you per-document cost visibility, essential for pricing your lease abstraction service.
+The `"all"` preset enables analytics and guardrails; `autoEvaluation` is enabled explicitly. Content filtering redacts configured watermark phrases rather than deciding whether a document is legally eligible for processing, so enforce document-status rules separately in application code. The returned `usage` object provides token counts that you can combine with your provider's current pricing for per-document cost tracking.
 
 ## Token-Aware Document Chunking
 
-Commercial leases routinely exceed 50,000 tokens, far beyond the context window of most models. Chunking is essential, but naive chunking (splitting every N tokens) breaks semantic coherence and causes the AI to miss cross-section references.
+Long commercial leases can reach tens of thousands of tokens. Current flagship models may fit such documents in one context window, but section-aware chunking still helps control cost, localize evidence, and retry only the sections that fail validation. Naive chunking (splitting every N tokens) can break semantic coherence and hide cross-section references.
 
 The smart approach is to chunk by section headers while maintaining overlap:
 
@@ -326,9 +316,10 @@ async function processFullLease(document: string) {
     const result = await neurolink.generate({
       input: { text: buildExtractionPrompt(chunk) },
       provider: "bedrock",
-      model: "anthropic.claude-3-opus-20240229-v1:0",
+      model: "anthropic.claude-opus-4-6-v1",
+      schema: LeaseAbstractionSchema,
     });
-    extractions.push(parseJsonResponse(result.content));
+    extractions.push(LeaseAbstractionSchema.parse(result.structuredData));
   }
 
   // Merge extractions from all chunks
@@ -336,27 +327,40 @@ async function processFullLease(document: string) {
 }
 ```
 
-## Cost Analysis
+## Cost Measurement
 
-The economics of AI lease abstraction are compelling:
+Do not rely on a fixed per-lease estimate: document length, image count, model pricing, retries, and evaluation frequency all change the result. Measure each stage from the `usage` returned by NeuroLink and apply the current provider price for the exact model you invoked:
 
-| Stage | Model | Cost per Lease |
-|---|---|---|
-| OCR (GPT-4o) | 50-100 page scanned PDF | ~$0.15 |
-| Extraction (Claude Opus) | ~50,000 tokens of legal text | ~$0.10 |
-| Evaluation (Gemini Flash) | Quality gate scoring | ~$0.005 |
-| Re-extraction (when needed) | ~20% of leases need re-extraction | ~$0.02 avg |
-| **Total AI Cost** | | **~$0.28/lease** |
-| **Manual Processing** | Paralegal/analyst time | **$50-$200/lease** |
+```typescript
+import type { GenerateResult } from '@juspay/neurolink';
 
-At scale, processing 1,000 leases per month costs approximately $280 in AI charges versus $50,000-$200,000 for manual processing. Even with engineering costs for building and maintaining the pipeline, the ROI is achieved within the first month.
+type StageUsage = {
+  stage: "ocr" | "extraction" | "evaluation" | "re-extraction";
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+};
 
-> **Note:** The cost estimates assume average document lengths. Very long leases (200+ pages) or documents requiring multiple re-extractions will cost more. Track per-document costs using NeuroLink's analytics middleware.
-{: .prompt-info }
+function recordStageUsage(
+  stage: StageUsage["stage"],
+  result: GenerateResult,
+): StageUsage {
+  return {
+    stage,
+    provider: result.provider ?? "unknown",
+    model: result.model ?? "unknown",
+    inputTokens: result.usage?.input ?? 0,
+    outputTokens: result.usage?.output ?? 0,
+  };
+}
+```
+
+Store these records with the document ID, then calculate costs from your provider's current pricing table. This lets you compare one-pass extraction with re-extraction and human-review rates using your own corpus instead of assuming a universal lease length or success rate.
 
 ## What You Built
 
-You built an AI lease abstraction pipeline with multi-provider orchestration (GPT-4o for OCR, Claude Opus for extraction, Gemini Flash for evaluation), Zod schema validation for structural correctness, auto-evaluation for semantic correctness with configurable quality thresholds, and HITL approval for edge cases that fall below the confidence threshold. The pipeline processes leases at approximately $0.28 each versus $50-$200 for manual processing.
+You built an AI lease abstraction pipeline with multi-provider orchestration (GPT-5.4 for document OCR, Claude Opus on Bedrock for extraction, and NeuroLink's source-grounded RAG evaluation), Zod schema validation for structural correctness, configurable quality thresholds, usage tracking, and HITL review for results that fall below the confidence threshold.
 
 The same architecture applies to insurance policy analysis, loan document processing, regulatory compliance review, and any domain where accuracy matters and manual processing is expensive. For related patterns, explore:
 

@@ -15,9 +15,9 @@ tags:
   - deep-dive
 author: neurolink
 description: >-
-  A deep dive into how NeuroLink built streaming tool calls that work across 13
-  AI providers -- the problems we hit, the architecture we chose, and the
-  results.
+  A deep dive into how NeuroLink built streaming tool calls that work across
+  its native AI providers -- the problems we hit, the architecture we chose,
+  and the results.
 toc: true
 mermaid: true
 pin: false
@@ -29,7 +29,7 @@ image:
 
 Our first streaming implementation worked perfectly -- until a user added a tool call. The stream froze, the response hung, and we realized our entire streaming architecture had a fundamental flaw.
 
-NeuroLink supports 13 AI providers, each with different streaming behaviors. When we added tool calling support, we discovered that streaming plus tools is a fundamentally different problem than streaming text. This post tells the story of how we built a streaming tool call system that works reliably across every provider, and the three failed attempts that taught us how.
+NeuroLink supports 14 native AI providers, each with different streaming behaviors. When we added tool calling support, we discovered that streaming plus tools is a fundamentally different problem than streaming text. This post tells the story of how we built a streaming tool call system that works reliably across every provider, and the three failed attempts that taught us how.
 
 ## Why streaming plus tools is hard
 
@@ -44,7 +44,7 @@ The naive assumption is straightforward: stream text tokens as they arrive, and 
 
 **The state machine problem** is the core challenge. A streaming response with tools is not a single stream -- it is a sequence of interleaved text and tool calls. The model generates text, stops, calls a tool, waits for the result, then continues generating text. Each "step" is a full generation cycle, and the model's next step depends on the previous tool result.
 
-**The stakes are real.** At Juspay, streaming is used for customer-facing payment assistants. A frozen stream means a confused customer and a lost transaction.
+**The stakes are real.** Picture a customer-facing payment assistant built on streaming: a frozen stream mid-checkout reads as a confused customer and a lost transaction, not just a slow response.
 
 ![Streaming Tool Calls](/assets/img/posts/how-we-built-streaming-tool-calls/streaming-tool-calls.gif)
 
@@ -72,13 +72,16 @@ We tried buffering, queueing, and synchronization primitives. Every solution int
 
 The breakthrough came when we reframed the problem. Streaming with tools is not one stream -- it is a sequence of generation steps, where each step either produces text or calls tools.
 
-The Vercel AI SDK provides `maxSteps` in `generateText()` that automatically handles the tool-call-then-continue loop. It executes tool calls, feeds results back, and continues generation until the model is done or the step limit is reached. But `streamText()` with tools had provider-specific edge cases that made it unreliable across our 13 providers.
+The Vercel AI SDK provides `maxSteps` in `generateText()` that automatically handles the tool-call-then-continue loop. It executes tool calls, feeds results back, and continues generation until the model is done or the step limit is reached. But `streamText()` with tools had provider-specific edge cases that made it unreliable across our native providers.
 
 **Our solution:** For tool-enabled requests, use `generateText()` with `maxSteps` (which handles the multi-step loop reliably), then wrap the final result in a synthetic `AsyncGenerator` that streams the output to the user.
 
 This works because the AI SDK's `generateText` with `maxSteps` and `onStepFinish` handles the tool execution loop correctly across all providers. We get reliable tool execution AND streaming output. The user sees text appearing rapidly -- whether the tokens come from a live stream or a buffer of pre-generated text, the UX is identical.
 
 ## The architecture
+
+> **Note:** The module names and code below reflect the architecture as it was originally built. NeuroLink's internal tool-execution loop has continued to evolve since -- later versions replaced the AI-SDK-driven `generateText()` loop described here with a native step loop over each provider's own generation call, for the reliability reasons this post gets into. The concepts (multi-step execution, synthetic streaming, event-driven observability) still hold; the specific class names are historical.
+{: .prompt-info }
 
 ### Stream Decision Point
 
@@ -163,20 +166,17 @@ const result = await generateText({
   onStepFinish: ({ toolCalls, toolResults }) => {
     logger.info('Tool execution completed', { toolResults, toolCalls });
 
-    // Store tool executions for analytics and debugging
-    this.handleToolStorageFn(
-      toolCalls,
-      toolResults,
-      options,
-      new Date(),
-    ).catch((error) => {
-      logger.warn('Failed to store tool executions', { error });
-    });
+    // Persist tool executions for analytics and debugging (fire-and-forget)
+    this.handleToolStorageFn(toolCalls, toolResults, options, new Date()).catch(
+      (error) => {
+        logger.warn('Failed to store tool executions', { error });
+      },
+    );
   },
 });
 ```
 
-The `maxSteps: 10` default means the model can execute up to 10 tool calls in sequence before the generation is terminated. Each step fires the `onStepFinish` callback, which logs the tool calls and results for analytics and debugging. The `handleToolStorageFn` persists tool execution data for later analysis.
+The `maxSteps: 10` default means the model can execute up to 10 tool calls in sequence before the generation is terminated. Each step fires the `onStepFinish` callback, which logs the tool calls and results for analytics and debugging, and persists the tool execution data for later analysis.
 
 The `NoObjectGeneratedError` automatic retry handles a subtle edge case: when structured output is requested alongside tools, the model sometimes generates a tool call instead of the expected object. The retry mechanism detects this and re-prompts the model.
 
@@ -223,7 +223,7 @@ Every tool execution emits `tool:start` and `tool:end` events through NeuroLink'
 
 ## Event-Driven Tool Observability
 
-The event wrapping adds approximately 0.1ms overhead per tool call -- negligible compared to tool execution times that typically range from 100ms to 500ms for network calls. But the observability it provides is comprehensive:
+The event wrapping adds negligible overhead per tool call -- a function call and an event emission, dwarfed by tool execution times that typically range from 100ms to 500ms for network calls. But the observability it provides is comprehensive:
 
 ```mermaid
 sequenceDiagram
@@ -268,19 +268,15 @@ flowchart LR
 - **GenerationHandler:** Owns the `generateText` execution loop, tool call step management, and result enhancement. Central to both streaming-with-tools and pure generation.
 - **ToolsManager:** Owns tool aggregation from all sources, event wrapping for observability, and tool execution delegation.
 
-## Benchmarks
+## What we validated
 
-We ran extensive benchmarks across four providers to validate the architecture:
+We tested the architecture across four providers to confirm it held up in practice:
 
-**Latency (internal benchmark, p50/p95):**
+**Latency profile:** Pure text streaming has the lowest time-to-first-token, since tokens flow directly from the provider as they're generated. Each additional tool call adds meaningfully to total response time, and that added time is dominated by tool execution itself rather than model or framework overhead -- which is expected, since the model has to wait for a tool result before it can continue generating.
 
-- Pure text streaming: 120ms / 340ms TTFT (time to first token)
-- Text with 1 tool call: 1.2s / 2.8s total (dominated by tool execution time)
-- Text with 3 sequential tool calls: 3.1s / 6.2s total
+**Provider consistency:** Tested across OpenAI, Anthropic, Vertex, and Bedrock. All produce the same result format regardless of internal tool-call format differences. The synthetic streaming approach eliminates provider-specific edge cases entirely.
 
-**Provider consistency:** Tested across OpenAI, Anthropic, Vertex, and Bedrock. All produce identical `EnhancedGenerateResult` format regardless of internal tool call format differences. The synthetic streaming approach eliminates provider-specific edge cases entirely.
-
-**Reliability:** 99.97% success rate over 10,000 tool-augmented generation calls in production (Juspay internal metrics). The 0.03% failures were all network-level issues (DNS resolution, TLS handshake timeouts), not streaming or tool execution bugs.
+**Reliability:** The failures we did see were overwhelmingly network-level issues -- DNS resolution, TLS handshake timeouts -- rather than streaming or tool-execution bugs, which is what you'd want from an architecture that correctly separates "the tool call failed" from "the model generation failed."
 
 ## Lessons learned
 
@@ -290,7 +286,7 @@ Building streaming tool calls for a multi-provider SDK taught us five hard lesso
 
 2. **Consolidate provider differences early.** The `StreamHandler` consolidation eliminated 7 copies of nearly identical validation code across providers. Duplication is not just a maintenance burden -- it is a source of subtle inconsistencies that surface as provider-specific bugs in production.
 
-3. **Event emission is free observability.** Wrapping tool execution with events costs approximately 0.1ms overhead but provides complete execution traces. The cost-to-value ratio is extraordinary.
+3. **Event emission is nearly-free observability.** Wrapping tool execution with events costs a negligible amount of overhead but provides complete execution traces. The cost-to-value ratio is extraordinary.
 
 4. **Synthetic streaming is not a hack.** Users perceive rapid token delivery. Whether the tokens come from a live stream or a buffer of pre-generated text, the UX is identical. What matters is that text appears progressively, not whether it was generated in real-time.
 

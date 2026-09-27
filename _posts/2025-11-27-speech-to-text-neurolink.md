@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Speech-to-Text and Text-to-Speech with NeuroLink
+title: 'Speech-to-Text and Text-to-Speech with NeuroLink'
 date: '2025-11-27 10:00:00 +0530'
 categories:
   - Tutorial
@@ -15,9 +15,8 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Add text-to-speech capabilities to your AI applications with NeuroLink. Google
-  Cloud TTS integration with Neural2 voices, SSML support, and streaming audio
-  in TypeScript.
+  Transcribe recorded audio and synthesize AI responses with NeuroLink's STT and
+  Google Cloud TTS integrations, including SSML and incremental audio streaming.
 toc: true
 mermaid: true
 pin: false
@@ -26,11 +25,11 @@ image:
   alt: Speech-to-Text and Text-to-Speech with NeuroLink
 ---
 
-You will add text-to-speech capabilities to your AI applications using NeuroLink's built-in Google Cloud TTS integration. By the end of this tutorial, you will synthesize AI-generated responses into spoken audio with Neural2, Wavenet, Standard, and Chirp voices across 40+ languages -- all through the same `generate()` function you already use for text generation.
+You will add speech-to-text and text-to-speech to an AI application through NeuroLink's `generate()` and `stream()` APIs. You will transcribe recorded audio with one of NeuroLink's shipped STT handlers, then synthesize input text or an AI-generated response with Google Cloud voices such as Neural2, Wavenet, Standard, and Chirp.
 
-The integration supports two modes: synthesize input text directly (skip AI generation), or synthesize the AI-generated response (ask a question, get a spoken answer). Now you will configure TTS and build your first voice-enabled AI application.
+The TTS integration supports two non-streaming modes: synthesize input text directly (skip AI generation), or synthesize the AI-generated response (ask a question, get a spoken answer). STT runs before generation, injects the transcript into the prompt, and exposes the same transcript on the result.
 
-## Architecture
+## TTS Architecture
 
 The TTS pipeline integrates seamlessly with NeuroLink's generation flow. When the `tts` option is enabled, the system either synthesizes the input text directly or first generates an AI response and then synthesizes that response into audio.
 
@@ -101,22 +100,55 @@ The distinction between the two modes is important:
 > **Note:** Mode 1 (`useAiResponse: false`) does not consume AI provider tokens since it skips the generation step entirely. Use it for pure TTS workloads to minimize costs.
 {: .prompt-info }
 
+## Speech-to-Text
+
+NeuroLink ships handlers for Whisper/OpenAI STT, Deepgram, Google STT, and Azure STT. Pass the recorded audio buffer through `stt.audio`; NeuroLink transcribes it before the model call and attaches the result as `result.transcription`:
+
+```typescript
+import { readFileSync } from 'node:fs';
+import { NeuroLink } from '@juspay/neurolink';
+
+const neurolink = new NeuroLink();
+const audio = readFileSync('question.mp3');
+
+const result = await neurolink.generate({
+  input: { text: 'Answer the question in the recording.' },
+  provider: 'openai',
+  model: 'gpt-5.4',
+  stt: {
+    enabled: true,
+    provider: 'whisper',
+    audio,
+    format: 'mp3',
+    language: 'en-US',
+    punctuation: true,
+  },
+});
+
+console.log('Transcript:', result.transcription?.text);
+console.log('AI response:', result.content);
+```
+
+If `input.text` is empty, NeuroLink uses the transcript itself as the model prompt. With both text and audio present, it prepends the transcription to your instruction. The `STTResult` can also include confidence, detected language, duration, word timings, segments, and speaker labels when the chosen provider supplies them.
+
 ## Voice Selection
 
-Google Cloud TTS offers four voice families, each optimized for different quality and latency tradeoffs:
+NeuroLink classifies Google Cloud voice names into four families:
 
-| Voice Type | Quality | Latency | Cost | Example |
-|---|---|---|---|---|
-| **Neural2** | Highest | Medium | Higher | en-US-Neural2-C |
-| **Wavenet** | High | Medium | Medium | en-US-Wavenet-A |
-| **Standard** | Good | Fast | Low | en-US-Standard-B |
-| **Chirp** | Natural | Variable | Higher | en-US-Chirp-A |
+| Voice Type | Example |
+|---|---|
+| **Neural2** | en-US-Neural2-C |
+| **Wavenet** | en-US-Wavenet-A |
+| **Standard** | en-US-Standard-B |
+| **Chirp** | en-US-Chirp-A |
 
-Voice names follow the convention `{lang}-{region}-{type}-{variant}`. For example, `en-US-Neural2-C` is an English (US) Neural2 voice with variant C (male). The variant letter typically maps to a specific voice identity, and the gender detection logic in NeuroLink's `detectVoiceType()` function parses these tokens to classify the voice.
+Voice names follow the convention `{lang}-{region}-{type}-{variant}`. For example, `en-US-Neural2-C` is an English (US) Neural2 voice with variant C. NeuroLink parses the name to classify the voice family; gender comes from the `ssmlGender` metadata returned by Google Cloud.
 
 To discover available voices programmatically, use the `GoogleTTSHandler` directly:
 
 ```typescript
+import { GoogleTTSHandler } from '@juspay/neurolink';
+
 // List available voices
 const handler = new GoogleTTSHandler();
 const voices = await handler.getVoices("en-US");
@@ -130,26 +162,22 @@ for (const voice of voices) {
 // ...
 ```
 
-Each `TTSVoice` object includes: `id`, `name`, `languageCode`, `languageCodes[]` (all supported locales), `gender`, `type`, and `naturalSampleRateHertz`. The `getVoices()` method accepts an optional `languageCode` parameter to filter results. Without it, all voices across all 40+ supported languages are returned.
+Each `TTSVoice` object includes: `id`, `name`, `languageCode`, `languageCodes[]` (all supported locales), `gender`, `type`, and `naturalSampleRateHertz`. The `getVoices()` method accepts an optional `languageCode` parameter to filter results. Without it, all voices returned by the configured Google Cloud project are included.
 
-For production applications, choose your voice based on the use case:
-
-- **Customer-facing voice assistants:** Neural2 for the highest quality human-like speech
-- **Internal tools and notifications:** Standard voices for fast, cost-effective synthesis
-- **Content narration (podcasts, articles):** Wavenet for a good balance of quality and cost
-- **Experimental/conversational:** Chirp for the most natural-sounding output
+Choose the voice from Google's current catalog based on the languages, latency, streaming mode, and pricing your application requires. Query `getVoices()` at setup time rather than assuming a sample voice is available in every project or region.
 
 ## Audio Configuration
 
-NeuroLink exposes the full range of Google Cloud TTS audio parameters through the `tts` option:
+The Google Cloud handler applies these audio parameters from the `tts` option:
 
-- **Format** (`AudioFormat`): `mp3`, `wav`, `ogg`, `opus` -- mapped internally to Google's encoding constants (MP3, LINEAR16, OGG_OPUS)
-- **Speaking rate**: 0.25 to 4.0 (default: 1.0) -- control how fast the voice speaks
-- **Pitch**: -20.0 to 20.0 semitones (default: 0.0) -- adjust the voice pitch
-- **Volume gain**: -96.0 to 16.0 dB (default: 0.0) -- boost or reduce volume
-- **Quality**: `standard` or `hd` -- higher quality increases audio fidelity
+- **Format**: `mp3`, `wav`, `ogg`, or `opus` -- mapped to Google's MP3, LINEAR16, or OGG_OPUS encoding
+- **Speaking rate**: 0.25 to 4.0 (default: 1.0)
+- **Pitch**: -20.0 to 20.0 semitones (default: 0.0)
+- **Volume gain**: -96.0 to 16.0 dB (default: 0.0)
 
 ```typescript
+import { writeFileSync } from 'node:fs';
+
 const result = await neurolink.generate({
   input: { text: "Important announcement for all team members." },
   provider: "google-ai",
@@ -160,13 +188,15 @@ const result = await neurolink.generate({
     speed: 0.85,
     pitch: -2.0,
     volumeGainDb: 3.0,
-    quality: "hd",
-    output: "./announcement.wav", // Save to file
   },
 });
+
+if (result.audio) {
+  writeFileSync('./announcement.wav', result.audio.buffer);
+}
 ```
 
-The `output` parameter saves the audio directly to a file. Without it, the audio is available only as a buffer in `result.audio.buffer`. For web applications, you would typically convert the buffer to a base64 data URL or stream it through an HTTP response.
+The generated bytes are returned in `result.audio.buffer`. Save that buffer to disk, send it in an HTTP response, or convert it to the representation your client expects.
 
 > **Note:** WAV format produces larger files but has zero compression artifacts. Use it when audio quality is paramount (announcements, professional narration). Use MP3 or OGG for general-purpose applications where file size matters.
 {: .prompt-info }
@@ -202,7 +232,7 @@ Common SSML tags and their uses:
 - `<prosody rate="slow" pitch="+2st">` -- Control speed and pitch for specific passages
 - `<phoneme alphabet="ipa">` -- Override pronunciation for technical terms or names
 
-NeuroLink validates SSML input and throws a `TTSError` with code `INVALID_INPUT` if the `<speak>` tags are mismatched or malformed. Always ensure your SSML opens with `<speak>` and closes with `</speak>`.
+NeuroLink validates SSML input and throws a `TTSError` with code `TTS_INVALID_INPUT` if the `<speak>` tags are mismatched or malformed. Always ensure your SSML opens with `<speak>` and closes with `</speak>`.
 
 ## Streaming TTS
 
@@ -216,9 +246,28 @@ Each `TTSChunk` contains:
 - `isFinal` -- whether this is the last chunk
 - `cumulativeSize` -- total bytes received so far
 
-Streaming reduces time-to-first-audio significantly. For a 30-second audio clip, non-streaming synthesis might take 3-5 seconds before any audio plays. With streaming, the first chunk arrives in under a second, and playback can begin immediately while remaining chunks load in the background.
+Use `stream()` with TTS enabled to consume synthesized audio incrementally. In streaming mode, TTS always synthesizes the streamed AI response:
 
-This is particularly valuable for voice assistants and phone-based interfaces where users expect immediate auditory feedback.
+```typescript
+const result = await neurolink.stream({
+  input: { text: 'Explain how a solar panel produces electricity.' },
+  provider: 'google-ai',
+  model: 'gemini-2.5-flash',
+  tts: {
+    enabled: true,
+    voice: 'en-US-Chirp3-HD-Aoede',
+    format: 'pcm16',
+  },
+});
+
+for await (const chunk of result.stream) {
+  if ('type' in chunk && chunk.type === 'tts_audio') {
+    sendAudioChunk(chunk.audio.data, chunk.audio.isFinal);
+  }
+}
+```
+
+Google's streaming API requires a supported streaming voice such as Chirp3-HD, Chirp-HD, or Journey, plain non-SSML text, and a streaming format (`pcm16`, `ogg`, or `opus`). Incremental delivery lets playback begin before the complete response has been synthesized, which is useful for conversational interfaces.
 
 ## Error Handling
 
@@ -226,11 +275,13 @@ The TTS system uses a dedicated `TTSError` class with typed error codes for prec
 
 | Error Code | Category | Description | Retriable |
 |---|---|---|---|
-| `PROVIDER_NOT_CONFIGURED` | Configuration | Missing Google Cloud credentials | No |
-| `INVALID_INPUT` | Validation | Bad voice ID format or malformed SSML | No |
-| `SYNTHESIS_FAILED` | Execution | Google API returned empty or error | Yes |
+| `TTS_PROVIDER_NOT_CONFIGURED` | Configuration | Missing Google Cloud credentials | No |
+| `TTS_INVALID_INPUT` | Validation | Bad voice ID format or malformed SSML | No |
+| `TTS_SYNTHESIS_FAILED` | Execution | Google API returned empty or error | Yes |
 
 ```typescript
+import { TTSError } from '@juspay/neurolink';
+
 try {
   const result = await neurolink.generate({
     input: { text: "Hello world" },
@@ -240,13 +291,13 @@ try {
 } catch (error) {
   if (error instanceof TTSError) {
     switch (error.code) {
-      case 'PROVIDER_NOT_CONFIGURED':
+      case 'TTS_PROVIDER_NOT_CONFIGURED':
         console.error("Set GOOGLE_APPLICATION_CREDENTIALS env var");
         break;
-      case 'INVALID_INPUT':
+      case 'TTS_INVALID_INPUT':
         console.error("Check voice ID format: {lang}-{region}-{type}-{variant}");
         break;
-      case 'SYNTHESIS_FAILED':
+      case 'TTS_SYNTHESIS_FAILED':
         console.error("Google TTS API error -- retry may succeed");
         break;
     }
@@ -256,7 +307,7 @@ try {
 
 Errors are categorized by severity (LOW, MEDIUM, HIGH, CRITICAL) and include a `retriable` flag. Synthesis failures (transient Google API issues) are retriable, while validation errors (bad voice ID, malformed SSML) are not. Use the `retriable` flag to build intelligent retry logic that does not waste requests on errors that will never succeed.
 
-> **Note:** The `GOOGLE_APPLICATION_CREDENTIALS` environment variable must point to a valid service account JSON file with the Text-to-Speech API enabled. This is the most common source of `PROVIDER_NOT_CONFIGURED` errors.
+> **Note:** The `GOOGLE_APPLICATION_CREDENTIALS` environment variable must point to a valid service account JSON file with the Text-to-Speech API enabled. This is the most common source of `TTS_PROVIDER_NOT_CONFIGURED` errors.
 {: .prompt-warning }
 
 ## Production Patterns
@@ -297,6 +348,8 @@ async function voiceAssistant(userText: string, sessionId: string) {
 Generate audio in multiple languages for content localization:
 
 ```typescript
+import { writeFileSync } from 'node:fs';
+
 const languages = [
   { code: "en-US", voice: "en-US-Neural2-C" },
   { code: "es-ES", voice: "es-ES-Neural2-B" },
@@ -311,7 +364,7 @@ async function narrateInAllLanguages(text: string) {
       const translated = await neurolink.generate({
         input: { text: `Translate to ${lang.code}: ${text}` },
         provider: "openai",
-        model: "gpt-4o",
+        model: "gpt-5.4",
       });
 
       const audio = await neurolink.generate({
@@ -321,9 +374,12 @@ async function narrateInAllLanguages(text: string) {
           enabled: true,
           voice: lang.voice,
           format: "mp3",
-          output: `./output/${lang.code}.mp3`,
         },
       });
+
+      if (audio.audio) {
+        writeFileSync(`./output/${lang.code}.mp3`, audio.audio.buffer);
+      }
 
       return { language: lang.code, audio };
     })
@@ -335,7 +391,7 @@ async function narrateInAllLanguages(text: string) {
 
 ## What You Built
 
-You built TTS integration with Neural2 voices for production customer-facing applications and Standard voices for cost-effective internal tools. You configured both synthesis modes -- direct input synthesis for narrating existing text and AI response synthesis for intelligent voice assistants. You used SSML for fine-grained speech control including pauses, emphasis, and pronunciation, and streaming for low-latency audio delivery.
+You built an STT-to-LLM-to-TTS flow: recorded audio is transcribed before generation, and either input text or the AI response can be synthesized with Google Cloud voices. You also used SSML for pauses, emphasis, and pronunciation, and consumed supported TTS formats incrementally from `stream()`.
 
 Next, explore model evaluation and quality scoring to add automated quality assurance to your AI responses, ensuring that the text your TTS system speaks is accurate and relevant.
 

@@ -44,14 +44,14 @@ flowchart LR
     style RERANK fill:#4a9eff,color:#fff
 ```
 
-The impact is measurable. In our internal benchmarks across 500 queries against a documentation corpus, adding reranking to hybrid search improved precision@3 from 0.71 to 0.89. That means the answer moved from "probably in the top five" to "almost certainly in the top three." For production systems where every token of context costs money and latency, this precision gain is significant.
+The impact is measurable. In our benchmarks across 500 queries against a documentation corpus (detailed below), adding reranking to hybrid search improved precision@5 from 0.71 with no reranking to as high as 0.88 with LLM-based reranking. For production systems where every token of context costs money and latency, this precision gain is significant.
 
 ## The Five Strategies
 
 NeuroLink's `RerankerFactory` exposes five built-in reranker types through a factory-plus-registry pattern. Each type is lazily loaded -- the code for a reranker is not imported until you first create an instance of that type.
 
 ```typescript
-import { getAvailableRerankerTypes } from '@juspay/neurolink';
+import { getAvailableRerankerTypes } from '@juspay/neurolink/rag';
 
 const types = await getAvailableRerankerTypes();
 // ['simple', 'llm', 'cross-encoder', 'cohere', 'batch']
@@ -89,7 +89,7 @@ Where `positionScore = 1 - (index / totalResults)`. Results at the top of the in
 ### Code
 
 ```typescript
-import { createReranker } from '@juspay/neurolink';
+import { createReranker } from '@juspay/neurolink/rag';
 
 const reranker = await createReranker('simple', {
   topK: 5,
@@ -144,7 +144,7 @@ export function simpleRerank(
 
 ### When to Use
 
-Use simple reranking when latency is your top constraint (sub-10ms reranking), when you are operating offline without model access, or as a fallback when other rerankers are unavailable. NeuroLink's resilience layer uses simple reranking as the automatic fallback when the configured reranker's circuit breaker opens.
+Use simple reranking when latency is your top constraint (sub-10ms reranking), when you are operating offline without model access, or as a fallback when other rerankers are unavailable. It is also a natural manual fallback to wire in yourself: catch the error when another reranker's circuit breaker opens (see Resilience and Fallback below) and call `simpleRerank` directly so requests keep returning results.
 
 ## Strategy 2: LLM-Based Reranking
 
@@ -171,7 +171,7 @@ The LLM prompt is intentionally minimal. It truncates each document to 1,000 cha
 ### Code
 
 ```typescript
-import { createReranker, rerankerFactory } from '@juspay/neurolink';
+import { createReranker, rerankerFactory } from '@juspay/neurolink/rag';
 
 // Set the model provider for LLM-based rerankers
 rerankerFactory.setModelProvider(myAIProvider);
@@ -227,7 +227,7 @@ The batch reranker constructs a numbered list of document excerpts (truncated to
 ### Code
 
 ```typescript
-import { createReranker, rerankerFactory } from '@juspay/neurolink';
+import { createReranker, rerankerFactory } from '@juspay/neurolink/rag';
 
 rerankerFactory.setModelProvider(myAIProvider);
 
@@ -290,7 +290,7 @@ NeuroLink's cross-encoder reranker wraps models like `ms-marco-MiniLM-L-6-v2` fr
 ### Code
 
 ```typescript
-import { createReranker } from '@juspay/neurolink';
+import { createReranker } from '@juspay/neurolink/rag';
 
 const reranker = await createReranker('cross-encoder', {
   topK: 5,
@@ -353,7 +353,7 @@ Cohere's Rerank API is a managed service purpose-built for relevance scoring. It
 ### Code
 
 ```typescript
-import { createReranker } from '@juspay/neurolink';
+import { createReranker } from '@juspay/neurolink/rag';
 
 const reranker = await createReranker('cohere', {
   topK: 5,
@@ -474,37 +474,24 @@ flowchart TD
 
 Reranking quality depends heavily on what the retrieval stage produces. If your chunks are poorly constructed -- splitting mid-sentence, mixing unrelated topics, losing structural context -- no amount of reranking can recover the signal. The chunking strategy and the reranking strategy must work together.
 
-Here is a production configuration that pairs semantic chunking with batch reranking:
+Here is a production configuration that enables NeuroLink's built-in hybrid search and reranking on top of semantic chunking:
 
 ```typescript
-import { RAGPipeline, rerankerFactory } from '@juspay/neurolink';
-
-rerankerFactory.setModelProvider(myAIProvider);
+import { RAGPipeline } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  searchStrategy: 'hybrid',
-  hybridOptions: {
-    vectorWeight: 0.6,
-    bm25Weight: 0.4,
-    fusionMethod: 'rrf',
-    rrf: { k: 60 },
-  },
-  reranker: {
-    type: 'batch',
-    topK: 5,
-    weights: { semantic: 0.4, vector: 0.4, position: 0.2 },
-  },
-  resilience: {
-    circuitBreaker: { failureThreshold: 5, resetTimeout: 30000 },
-    retry: { maxAttempts: 3, backoffMultiplier: 2 },
-  },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4' },
+  enableHybridSearch: true,
+  enableReranking: true,
+  rerankingModel: { provider: 'openai', modelName: 'gpt-5.4' },
 });
 
 await pipeline.ingest(['./docs/*.md']);
 const response = await pipeline.query('How to configure rate limiting?');
 ```
+
+`enableReranking` wires up NeuroLink's built-in LLM-based reranker -- the same scoring approach as the standalone `rerank()` function. If you need a specific strategy instead, such as Cohere or a cross-encoder as the pairing table above recommends for semantic chunks, apply it directly to the pipeline's retrieved chunks (`response.sources`) with the reranker factory shown earlier in this post, since `RAGPipeline` itself does not expose a strategy selector.
 
 The chunking-reranking pairing matters more than either component in isolation:
 
@@ -528,7 +515,7 @@ import {
   rerankerRegistry,
   getAvailableRerankerTypes,
   getRerankerMetadata,
-} from '@juspay/neurolink';
+} from '@juspay/neurolink/rag';
 
 // Discover available types
 const types = await getAvailableRerankerTypes();
@@ -576,7 +563,7 @@ breaker.on('stateChange', ({ oldState, newState, reason }) => {
 });
 ```
 
-When the circuit opens after five failures, the pipeline automatically falls back to simple reranking. This ensures your users always get an answer, even if quality is temporarily reduced.
+When the circuit opens after five failures, `execute()` throws a `RAGCircuitBreakerError` instead of calling the reranker. Catch that error and fall back to `simpleRerank`, so your users still get an answer even when quality is temporarily reduced.
 
 ### Monitoring Reranker Performance
 

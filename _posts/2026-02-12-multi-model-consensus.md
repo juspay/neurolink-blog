@@ -26,9 +26,9 @@ image:
 
 We designed the multi-model consensus system for high-stakes decisions where no single model's output should be trusted alone. This deep dive examines how we query multiple providers in parallel, implement voting and weighted agreement algorithms, detect and handle model disagreement, and determine when human escalation is required.
 
-The consensus pattern is straightforward: query multiple models with the same input, compare their answers, and act only when they agree. When models disagree, escalate to human review. This transforms AI from a single point of failure into a cross-validated decision system.
+The consensus pattern is straightforward: query multiple models with the same input, compare their answers, and escalate disagreements to human review. Agreement is useful evidence, not independent validation -- models can share the same blind spots -- so high-stakes actions still need domain-appropriate safeguards.
 
-NeuroLink's provider-agnostic architecture makes this pattern trivial to implement. The same `generate()` API works across every provider, so querying three different models requires changing two configuration fields, not rewriting your integration code.
+NeuroLink's provider-agnostic architecture keeps the fan-out implementation consistent across providers. The same `generate()` call shape works across providers, so each request varies mainly by its `provider` and `model` fields.
 
 This post covers the complete multi-model consensus pattern: architecture, voting strategies, disagreement analysis, cost optimization, quality verification, and production deployment.
 
@@ -41,7 +41,7 @@ flowchart TB
     INPUT(["Decision Input"]) --> FAN["Fan-Out<br/>Same prompt to N models"]
 
     FAN --> M1["Model 1<br/>Claude Sonnet"]
-    FAN --> M2["Model 2<br/>GPT-4o"]
+    FAN --> M2["Model 2<br/>GPT-5.4"]
     FAN --> M3["Model 3<br/>Gemini Pro"]
 
     M1 & M2 & M3 --> AGG["Aggregator<br/>Compare responses"]
@@ -55,7 +55,7 @@ flowchart TB
     style ESCALATE fill:#ef4444,stroke:#dc2626,color:#fff
 ```
 
-The key insight is that different models have different failure modes. Claude might hallucinate on numerical reasoning while excelling at nuanced text analysis. GPT-4o might miss edge cases that Gemini catches. By combining their outputs, you get coverage across failure modes.
+The key insight is that different models can have different failure modes. Querying models from separate provider families can expose disagreements that a single-model pipeline would never surface. This is not proof of correctness -- correlated errors are still possible -- but it gives the application an explicit signal for review.
 
 ![Multi-Model Consensus](/assets/img/posts/multi-model-consensus/consensus-pipeline.gif)
 
@@ -65,36 +65,43 @@ The foundation of consensus is querying multiple models with the same structured
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
+import { z } from 'zod';
 
 const neurolink = new NeuroLink();
+const decisionSchema = z.object({
+  decision: z.enum(['yes', 'no']),
+  confidence: z.number().min(0).max(100),
+  reasoning: z.string(),
+});
 
 async function multiModelQuery(prompt: string) {
   const models = [
-    { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-    { provider: 'openai', model: 'gpt-4o' },
+    { provider: 'anthropic', model: 'claude-sonnet-5' },
+    { provider: 'openai', model: 'gpt-5.4' },
     { provider: 'google-ai', model: 'gemini-2.5-pro' },
   ];
 
-  const results = await Promise.all(
-    models.map(config =>
-      neurolink.generate({
+  return Promise.all(
+    models.map(async config => {
+      const result = await neurolink.generate({
         input: { text: prompt },
         provider: config.provider,
         model: config.model,
-        systemPrompt: 'Respond with a structured JSON object: { "decision": "yes|no", "confidence": 0-100, "reasoning": "..." }',
-      })
-    )
-  );
+        schema: decisionSchema,
+        systemPrompt: 'Decide yes or no, report confidence from 0 to 100, and explain the reasoning.',
+      });
 
-  return results.map((r, i) => ({
-    model: `${models[i].provider}/${models[i].model}`,
-    response: JSON.parse(r.content),
-    usage: r.usage,
-  }));
+      return {
+        model: `${config.provider}/${config.model}`,
+        response: decisionSchema.parse(result.structuredData),
+        usage: result.usage,
+      };
+    })
+  );
 }
 ```
 
-The structured JSON response format is critical. Without it, comparing free-text responses across models becomes an ambiguous natural language comparison problem. By constraining the output to `decision`, `confidence`, and `reasoning` fields, you can programmatically compare responses.
+The structured response schema is critical. Without it, comparing free-text responses across models becomes an ambiguous natural language comparison problem. NeuroLink returns the parsed object in `structuredData`; validating it with the same Zod schema avoids hand-parsing model text before comparison.
 
 > **Note:** Always include a `reasoning` field in the response schema. When models disagree, the reasoning helps human reviewers understand why -- and it helps you debug and improve your prompts over time.
 {: .prompt-info }
@@ -110,8 +117,8 @@ The simplest strategy: the decision with the most votes wins. If 2 out of 3 mode
 ```typescript
 interface ModelResponse {
   model: string;
-  response: { decision: string; confidence: number; reasoning: string };
-  usage: { total: number; input: number; output: number };
+  response: { decision: 'yes' | 'no'; confidence: number; reasoning: string };
+  usage?: { total: number; input: number; output: number };
 }
 
 interface ConsensusResult {
@@ -122,6 +129,7 @@ interface ConsensusResult {
 }
 
 function majorityVote(responses: ModelResponse[]): ConsensusResult {
+  if (responses.length === 0) throw new Error('At least one response is required');
   const decisions = responses.map(r => r.response.decision);
   const yesCount = decisions.filter(d => d === 'yes').length;
   const noCount = decisions.filter(d => d === 'no').length;
@@ -143,6 +151,7 @@ Weight each model's vote by its self-reported confidence. A model that says "yes
 
 ```typescript
 function weightedVote(responses: ModelResponse[]): ConsensusResult {
+  if (responses.length === 0) throw new Error('At least one response is required');
   const weightedScores: Record<string, number> = {};
 
   for (const r of responses) {
@@ -155,7 +164,9 @@ function weightedVote(responses: ModelResponse[]): ConsensusResult {
   const sortedDecisions = Object.entries(weightedScores)
     .sort(([, a], [, b]) => b - a);
 
-  const [topDecision, topWeight] = sortedDecisions[0];
+  const winner = sortedDecisions[0];
+  if (!winner) throw new Error('No weighted decision available');
+  const [topDecision, topWeight] = winner;
 
   return {
     decision: topDecision,
@@ -174,11 +185,13 @@ The most conservative strategy: all models must agree for the decision to procee
 
 ```typescript
 function unanimousVote(responses: ModelResponse[]): ConsensusResult {
+  const [firstResponse] = responses;
+  if (!firstResponse) throw new Error('At least one response is required');
   const decisions = new Set(responses.map(r => r.response.decision));
   const isUnanimous = decisions.size === 1;
 
   return {
-    decision: isUnanimous ? responses[0].response.decision : 'escalate',
+    decision: isUnanimous ? firstResponse.response.decision : 'escalate',
     agreement: isUnanimous ? 1.0 : 0,
     unanimous: isUnanimous,
     responses,
@@ -186,9 +199,9 @@ function unanimousVote(responses: ModelResponse[]): ConsensusResult {
 }
 ```
 
-Unanimous consensus provides the highest safety but the lowest throughput. Use it for decisions where false positives or false negatives carry severe consequences -- regulatory compliance, safety-critical systems, and irreversible actions.
+Unanimous consensus is more conservative than majority voting, but it does not prove correctness: models can share training-data gaps and make correlated errors. Use it only as one signal in workflows where false positives or false negatives carry severe consequences.
 
-> **Note:** Choose your voting strategy based on the cost of being wrong. Medical diagnoses need unanimous consensus. Content moderation can use majority voting. Marketing copy classification might not need consensus at all.
+> **Note:** Choose your voting strategy based on the cost of being wrong. Medical and other safety-critical decisions still require qualified human review regardless of model agreement. Lower-stakes classification may use majority voting, while marketing copy classification might not need consensus at all.
 {: .prompt-warning }
 
 ## Disagreement Analysis
@@ -268,61 +281,70 @@ This flow adds two gates beyond simple voting:
 
 ## Cost Analysis: Is Multi-Model Worth It?
 
-Querying three models instead of one triples your API costs. Is it worth it? That depends on the cost of being wrong.
+A three-model consensus path makes three billable inference calls before any judge or retry calls. The actual multiplier depends on each model's input/output pricing, response length, cached-token treatment, and how often the workflow escalates.
 
-| Scenario | Single Model Cost (1K decisions) | 3-Model Consensus (1K decisions) | Cost of One Error |
-|---|---|---|---|
-| Content Moderation | $5 | $15 | $100 (brand damage) |
-| Medical Triage | $10 | $30 | $100,000+ (liability) |
-| Financial Trading | $8 | $24 | $50,000+ (bad trade) |
-| Code Review | $6 | $18 | $500 (bug fix) |
+Estimate the cost from your own traffic rather than relying on a generic table:
 
-For high-stakes decisions, the $10-20 premium per thousand decisions is trivial compared to the cost of a single error. For low-stakes decisions, stick with a single model and invest the savings elsewhere.
+```text
+consensus cost = sum(model call costs) + evaluation calls + retries + human-review overhead
+```
+
+For high-stakes decisions, compare that measured cost with the expected cost and frequency of an incorrect automated action. For low-stakes decisions, a single model with targeted evaluation may be the better trade-off.
 
 ### Cost Optimization Strategy
 
-Use two cheap models plus one premium model for cost-effective consensus:
+Mixing model tiers can reduce cost relative to using only flagship models:
 
 ```typescript
-// Cost-optimized model combination
 const models = [
-  { provider: 'openai', model: 'gpt-4o-mini' },       // ~$0.15/1M tokens
-  { provider: 'google-ai', model: 'gemini-2.5-pro' },  // ~$1.25/1M tokens
-  { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' }, // ~$3.00/1M tokens
+  { provider: 'openai', model: 'gpt-5.4-mini' },
+  { provider: 'google-ai', model: 'gemini-2.5-pro' },
+  { provider: 'anthropic', model: 'claude-sonnet-5' },
 ];
 
-// Weight the premium model higher in voting
+// Example weights: replace these with values calibrated on labeled data.
 const weights = {
-  'openai/gpt-4o-mini': 0.8,
+  'openai/gpt-5.4-mini': 0.8,
   'google-ai/gemini-2.5-pro': 1.0,
-  'anthropic/claude-sonnet-4-5-20250929': 1.5,
+  'anthropic/claude-sonnet-5': 1.5,
 };
 ```
+
+Do not assign a larger weight merely because a model is more expensive. Derive weights from measured accuracy and calibration on your domain's labeled validation set.
 
 ## Quality Verification with Auto-Evaluation
 
 Before including a model's response in the vote, verify its quality using NeuroLink's auto-evaluation middleware:
 
 ```typescript
-const neurolink = new NeuroLink();
+import type { EvaluationData } from '@juspay/neurolink';
 
-// Auto-evaluation middleware is configured separately through the MiddlewareFactory:
-const evalMiddleware = new MiddlewareFactory({
-  middlewareConfig: {
-    autoEvaluation: {
-      enabled: true,
-      config: {
-        threshold: 8, // Higher threshold for high-stakes
-        blocking: true,
+let evaluation: EvaluationData | undefined;
+const result = await neurolink.generate({
+  input: { text: prompt },
+  provider: 'openai',
+  model: 'gpt-5.4',
+  middleware: {
+    enabledMiddleware: ['autoEvaluation'],
+    middlewareConfig: {
+      autoEvaluation: {
+        enabled: true,
+        config: {
+          threshold: 8,
+          blocking: true,
+          onEvaluationComplete: data => {
+            evaluation = data;
+          },
+        },
       },
     },
   },
 });
 
-// Only include responses that pass quality evaluation in the vote
+const includeInVote = evaluation !== undefined && evaluation.overall >= 8;
 ```
 
-Setting a threshold of 8 (out of 10) for high-stakes decisions ensures that only well-reasoned, factual responses contribute to the consensus. Responses scoring below 8 are excluded from the vote, and if too few responses pass, the entire decision is escalated.
+The middleware runs evaluation before the call returns in blocking mode and reports scores through `onEvaluationComplete`. The application still decides whether to include `result` in the vote; configuring a threshold does not by itself remove a response from your candidate array.
 
 ## HITL Integration for Disagreements
 
@@ -350,9 +372,9 @@ const neurolink = new NeuroLink({
 });
 ```
 
-The custom rule triggers human review whenever the agreement score falls below 1.0 (i.e., models are not unanimous). The `auditLogging` flag ensures every decision -- both auto-approved and human-reviewed -- is recorded for compliance.
+The `dangerousActions: ['final_decision']` entry alone requires confirmation on every `final_decision` call, regardless of arguments. The custom rule is a separate check -- for any tool call whose arguments include an `agreement` value below 1.0, not only `final_decision`. `auditLogging` records HITL confirmation activity; log the model responses, vote tally, and final application decision separately if your audit requirements call for a complete decision record.
 
-> **Note:** For regulated industries like healthcare and finance, audit logging is not optional. Every consensus decision should be logged with the individual model responses, vote tallies, and final determination.
+> **Note:** Regulated workflows have domain-specific recordkeeping and review requirements. Treat NeuroLink's HITL audit log as one input to your compliance design, not as a certification or a complete compliance solution.
 {: .prompt-warning }
 
 ## Real-World Applications
@@ -380,19 +402,22 @@ User content is evaluated by multiple models for policy violations. Unanimous ag
 Run all model queries in parallel, not sequentially. The total latency equals the slowest model, not the sum of all models:
 
 ```typescript
-// Good: parallel execution (~3s total, time of slowest model)
-const results = await Promise.all(models.map(m => neurolink.generate({ ... })));
-
-// Bad: sequential execution (~9s total, sum of all models)
-const results = [];
-for (const m of models) {
-  results.push(await neurolink.generate({ ... }));
-}
+const parallelResults = await Promise.all(
+  models.map(({ provider, model }) =>
+    neurolink.generate({
+      input: { text: prompt },
+      provider,
+      model,
+    })
+  )
+);
 ```
+
+Parallel fan-out normally completes near the latency of the slowest successful request rather than the sum of every request's latency. Add timeouts or cancellation so one stalled provider cannot hold the whole consensus open indefinitely.
 
 ### Fallback Providers
 
-If one model is unavailable, degrade gracefully by running consensus with the remaining models. Two-model consensus is better than a single-model response:
+If one provider is unavailable, `Promise.allSettled()` lets you preserve the successful responses. Enforce a quorum before aggregation, and remember that two models can disagree without a majority:
 
 ```typescript
 const results = await Promise.allSettled(
@@ -401,14 +426,16 @@ const results = await Promise.allSettled(
   )
 );
 
-const successfulResults = results
-  .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-  .map(r => r.value);
+const successfulResults = results.flatMap(result =>
+  result.status === 'fulfilled' ? [result.value] : []
+);
 
 if (successfulResults.length < 2) {
-  throw new Error('Insufficient models for consensus');
+  throw new Error('Insufficient models for the configured quorum');
 }
 ```
+
+When only two responses remain, require agreement or route the decision to review; do not silently treat one of two responses as a majority.
 
 ### Monitoring Consensus Rates
 

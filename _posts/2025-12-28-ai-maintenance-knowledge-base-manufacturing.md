@@ -27,6 +27,8 @@ image:
 
 In this guide, you will build an AI-powered maintenance knowledge base for manufacturing environments using NeuroLink's RAG capabilities. You will implement document ingestion for equipment manuals, semantic search across maintenance procedures, and a conversational interface that technicians can query on the factory floor.
 
+Manufacturing maintenance runs on scattered knowledge: equipment manuals in PDFs, troubleshooting steps in a technician's memory, and maintenance history in a separate CMMS system. When an alarm fires, the technician has to reconcile all three -- often standing at the equipment, without a laptop nearby -- before touching anything. Searching a manual for the right procedure, checking whether current sensor readings match a known fault pattern, and picking up a multi-hour troubleshooting session where it left off are each solvable on their own, but few systems solve them together.
+
 An AI-powered knowledge base changes this entirely. It answers maintenance questions instantly, pulls live sensor data for context, guides step-by-step repairs with conversation memory, and tracks troubleshooting sessions across shifts. The technician asks a question, and the system responds with the exact procedure, the current sensor readings, and the maintenance history for that equipment.
 
 NeuroLink provides the building blocks: multi-provider orchestration for routing queries to the right model, MCP tools for SCADA and CMMS access, conversation memory for multi-step troubleshooting sessions, and evaluation for answer quality in safety-critical scenarios.
@@ -46,7 +48,7 @@ flowchart TB
 
     Router -->|Lookup| FastAgent[Fast Lookup<br/>Gemini Flash<br/>Error codes, specs]
     Router -->|Diagnostic| DiagAgent[Diagnostic Agent<br/>Claude Opus<br/>Troubleshooting]
-    Router -->|Sensor Data| DataAgent[Data Agent<br/>GPT-4o + Tools<br/>Live readings]
+    Router -->|Sensor Data| DataAgent[Data Agent<br/>GPT-5.4 + Tools<br/>Live readings]
 
     FastAgent --> KB[Knowledge Base<br/>Vector Search]
     DiagAgent --> KB
@@ -80,40 +82,38 @@ The knowledge base is backed by vector search with equipment manuals, maintenanc
 Each agent type uses a different AI provider, chosen for its strengths.
 
 ```typescript
-import { AIProviderFactory, ModelConfigurationManager } from '@juspay/neurolink';
-
-const modelConfig = ModelConfigurationManager.getInstance();
+import { AIProviderFactory } from '@juspay/neurolink';
 
 // Fast lookup - for specs, error codes, part numbers
 const lookupAgent = await AIProviderFactory.createProvider(
   "google-ai",
-  modelConfig.getModelForTier("google-ai", "fast") // gemini-2.5-flash
+  "gemini-2.5-flash"
 );
 
 // Diagnostic agent - for complex troubleshooting
 const diagnosticAgent = await AIProviderFactory.createProvider(
   "bedrock",
-  modelConfig.getModelForTier("bedrock", "quality") // claude-3-opus
+  "anthropic.claude-opus-4-6-v1"
 );
 
 // Data agent - with tool calling for live sensor access
 const dataAgent = await AIProviderFactory.createProvider(
   "openai",
-  modelConfig.getModelForTier("openai", "quality") // gpt-4o
+  "gpt-5.4"
 );
 
 // Fallback for offline/disconnected scenarios
 const offlineAgent = await AIProviderFactory.createProvider(
   "ollama",
-  modelConfig.getModelForTier("ollama", "balanced") // llama3.1:8b
+  "llama3.1:8b"
 );
 ```
 
-**Why Gemini Flash for lookups?** Simple factual queries do not need deep reasoning. Flash provides sub-second responses for error code lookups and part number queries, keeping the technician moving.
+**Why Gemini Flash for lookups?** Simple factual queries do not need deep reasoning. Flash prioritizes low-latency responses for error code lookups and part number queries, keeping the technician moving.
 
 **Why Claude Opus for diagnostics?** Complex troubleshooting requires multi-step reasoning, cross-referencing maintenance history, and generating step-by-step procedures. Opus excels at these reasoning-heavy tasks.
 
-**Why GPT-4o for sensor data?** Tool calling with live SCADA data requires reliable function execution and the ability to interpret numerical readings in context. GPT-4o's tool calling is robust and well-tested.
+**Why GPT-5.4 for sensor data?** Tool calling with live SCADA data requires function execution and the ability to interpret numerical readings in context. GPT-5.4 supports the tool-calling workflow used by this agent.
 
 **Why Ollama for offline?** Factory floors often have unreliable internet connectivity. Ollama runs locally with no API dependency (`requiredEnvVars: []`), providing basic AI capabilities even when disconnected from the cloud.
 
@@ -124,31 +124,27 @@ const offlineAgent = await AIProviderFactory.createProvider(
 NeuroLink's MCP integration connects the AI directly to plant systems -- SCADA for live sensor readings and CMMS for maintenance records.
 
 ```typescript
-import { MCPRegistry } from '@juspay/neurolink';
+import { NeuroLink } from '@juspay/neurolink';
 import { tool } from "ai";
 import { z } from "zod";
 
-const plantRegistry = new MCPRegistry();
+const neurolink = new NeuroLink();
 
-// Register SCADA/IoT data server
-await plantRegistry.registerServer("scada-connector", {
+// The SCADA server exposes getSensorReading, getAlarmHistory,
+// and getEquipmentStatus; NeuroLink discovers them after connecting.
+await neurolink.addExternalMCPServer("scada-connector", {
+  transport: "stdio",
+  command: "node",
+  args: ["./mcp-servers/scada-server.js"],
   description: "SCADA system for live sensor readings",
-  tools: {
-    getSensorReading: {},
-    getAlarmHistory: {},
-    getEquipmentStatus: {},
-  },
 });
 
-// Register CMMS server
-await plantRegistry.registerServer("cmms-connector", {
+// The CMMS server exposes work-order, history, and inventory tools.
+await neurolink.addExternalMCPServer("cmms-connector", {
+  transport: "stdio",
+  command: "node",
+  args: ["./mcp-servers/cmms-server.js"],
   description: "Computerized Maintenance Management System",
-  tools: {
-    getWorkOrders: {},
-    createWorkOrder: {},
-    getMaintenanceHistory: {},
-    getPartInventory: {},
-  },
 });
 ```
 
@@ -250,21 +246,39 @@ Long sessions (50+ turns) trigger automatic summarization to stay within context
 In manufacturing, incorrect maintenance guidance can cause equipment damage, environmental incidents, or injuries. Every AI response needs quality evaluation with safety-appropriate thresholds.
 
 ```typescript
-import { generateEvaluation } from '@juspay/neurolink';
+import { NeuroLink } from '@juspay/neurolink';
 
-const evaluation = await generateEvaluation({
-  userQuery: `How to troubleshoot high vibration alarm on ${equipmentId}?`,
-  aiResponse: diagnosticResponse,
-  primaryDomain: "manufacturing",
-  toolUsage: [
-    { toolName: "getSensorReading", result: sensorData },
-    { toolName: "getMaintenanceHistory", result: historyData },
-  ],
-  conversationHistory: troubleshootingSession,
+const neurolink = new NeuroLink();
+const query = `How to troubleshoot high vibration alarm on ${equipmentId}?`;
+const diagnosticResult = await diagnosticAgent.generate({
+  input: { text: query },
 });
 
-// Safety-critical: high thresholds for manufacturing
-if (evaluation.accuracy < 8) {
+if (!diagnosticResult) {
+  throw new Error("Diagnostic model returned no result");
+}
+
+let diagnosticResponse = diagnosticResult.content;
+const evaluation = await neurolink.evaluate(
+  {
+    query,
+    response: diagnosticResponse,
+    context: [
+      `Sensor data: ${JSON.stringify(sensorData)}`,
+      `Maintenance history: ${JSON.stringify(historyData)}`,
+    ],
+    generationResult: diagnosticResult,
+    conversationHistory: troubleshootingSession,
+    custom: { domain: "manufacturing" },
+  },
+  {
+    scorers: ["answer-relevancy", "faithfulness", "hallucination"],
+    passThreshold: 0.8,
+  },
+);
+
+// Lower-confidence guidance carries an explicit safety reminder
+if (!evaluation.passed) {
   diagnosticResponse += "\n\nIMPORTANT: This is AI-generated guidance. " +
     "Always follow lockout/tagout procedures and consult equipment manual " +
     "before performing maintenance.";
@@ -277,19 +291,14 @@ if (query.toLowerCase().includes('lockout') ||
     query.toLowerCase().includes('confined space')) {
   diagnosticResponse += '\n\n⚠️ MANDATORY: This procedure requires verification by a qualified maintenance supervisor before execution. Do not proceed without supervisor sign-off.';
 }
-
-// Evaluate tool usage quality
-if (evaluation.toolEffectiveness && evaluation.toolEffectiveness < 6) {
-  // Re-query with additional tool data
-}
 ```
 
 ### Evaluation parameters
 
-- **`primaryDomain: "manufacturing"`** enables domain-specific scoring criteria appropriate for industrial environments
-- **`toolUsage`** evaluates whether sensor and maintenance history data was used effectively in the response
-- **`toolEffectiveness`** score indicates if tools contributed meaningfully to the diagnosis
-- Safety disclaimers are automatically added for lower-confidence responses, reminding technicians to follow standard safety procedures
+- **`context`** gives faithfulness and hallucination scorers the sensor and maintenance records used to ground the answer
+- **`generationResult`** supplies the original model metadata and tool execution details when available
+- **`conversationHistory`** preserves the active troubleshooting session for multi-turn evaluation
+- **`passThreshold: 0.8`** sets a higher pass bar for this safety-sensitive workflow; the application adds a disclaimer when the evaluation fails
 
 > **Safety Critical:** AI-generated maintenance procedures must never be followed without verification by qualified personnel for safety-critical tasks (lockout/tagout, electrical work, confined space entry). OSHA 29 CFR 1910.147 requires documented procedures and authorized personnel. This system provides guidance only — it does not replace required safety protocols.
 {: .prompt-danger }
@@ -342,17 +351,32 @@ Ollama's configuration makes it ideal for offline scenarios:
 Plant operations demand high availability. Downtime during a critical maintenance event is not acceptable. NeuroLink's resilience primitives are configured with manufacturing-appropriate parameters.
 
 ```typescript
-import { CircuitBreaker, withRetry, RateLimiter } from '@juspay/neurolink';
+import {
+  CircuitBreakerManager,
+  HTTPRateLimiter,
+  withRetry,
+} from '@juspay/neurolink';
 
-const plantBreaker = new CircuitBreaker(3, 15000); // Fast recovery for plant floor
-const apiLimiter = new RateLimiter(30, 60000); // 30 queries/min per technician
+const breakerManager = new CircuitBreakerManager();
+const plantBreaker = breakerManager.getBreaker("diagnostic-agent", {
+  failureThreshold: 3,
+  resetTimeout: 15000,
+  operationTimeout: 10000,
+});
+const apiLimiter = new HTTPRateLimiter({
+  requestsPerWindow: 30,
+  windowMs: 60000,
+  useTokenBucket: true,
+  refillRate: 0.5,
+  maxBurst: 5,
+});
 
 async function queryKnowledgeBase(query: string) {
   await apiLimiter.acquire();
   return plantBreaker.execute(() =>
     withRetry(
       () => diagnosticAgent.generate({ input: { text: query } }),
-      { maxAttempts: 2, initialDelay: 500, maxDelay: 5000 }
+      { maxRetries: 2, baseDelayMs: 500, maxDelayMs: 5000 }
     )
   );
 }

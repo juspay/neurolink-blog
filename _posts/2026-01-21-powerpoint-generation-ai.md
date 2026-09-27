@@ -91,7 +91,7 @@ const result = await neurolink.generate({
     ppt: {
       pages: 10,
       theme: "modern",
-      audience: "executive",
+      audience: "business",
       tone: "professional",
       generateAIImages: true,
       aspectRatio: "16:9",
@@ -122,7 +122,7 @@ The AI returns a `ContentPlan` object with a clear structure:
 {
   title: "AI in Healthcare: Transforming Patient Care",
   totalSlides: 10,
-  audience: "executive",
+  audience: "business",
   tone: "professional",
   theme: "modern",
   slides: [
@@ -146,7 +146,7 @@ Each `SlideSchema` contains the slide number, type, layout, title, content objec
 
 The AI's output goes through a rigorous validation pipeline in `validateContentPlan()`:
 
-- **Type validation**: Each slide type is checked against 34 valid types including `title`, `content`, `bullets`, `timeline`, `chart-bar`, `dashboard`, and more.
+- **Type validation**: Each slide type is checked against 35 valid types including `title`, `content`, `bullets`, `timeline`, `chart-bar`, `dashboard`, and more.
 - **Layout validation**: Layouts are validated against 36 valid options such as `title-centered`, `two-column-equal`, `chart-full`, and others.
 - **Bullet normalization**: The pipeline normalizes bullet content from various AI output formats into a consistent structure.
 - **Smart inference**: `normalizeSlideWithInference()` can infer the slide type from title keywords. A slide titled "Our Timeline" would automatically get the `timeline` type if the AI did not specify one.
@@ -168,7 +168,7 @@ NeuroLink supports a comprehensive library of slide types organized into logical
 | **Special** | quote, timeline, process-flow, comparison, features, team, icons | Domain-specific layouts |
 | **Composite** | dashboard, mixed-content, stats-grid, icon-grid | Multi-zone layouts |
 
-With 34 slide types mapped to 36 layout variants, the automatic layout selection function `getLayoutForType()` picks the best layout for each type. Each type has a dedicated renderer function that handles the precise positioning of text, images, and decorative elements.
+With 35 slide types mapped to 36 layout variants, the automatic layout selection function `getLayoutForType()` picks the best layout for each type. Each type has a dedicated renderer function that handles the precise positioning of text, images, and decorative elements.
 
 > **Note:** You do not need to specify slide types manually. The AI content planner selects appropriate types based on your topic and audience. However, you can influence the outcome by being specific in your prompt, such as "include a timeline slide showing the project phases."
 {: .prompt-info }
@@ -239,26 +239,20 @@ const result = await neurolink.generate({
     ppt: {
       theme: "corporate",
       aspectRatio: "16:9",
-      logo: {
-        data: logoBuffer,
-        position: "bottom-right",
-        width: 1.2,
-        height: 0.5,
-        showOn: "all-slides",
-      },
+      logoPath: logoBuffer,
     },
   },
   provider: "google-ai",
 });
 ```
 
-Three aspect ratios are supported: `"16:9"` (widescreen, default), `"4:3"` (classic), and `"16:10"` (wide). Each ratio has corresponding `SLIDE_DIMENSIONS` that govern element positioning.
+Two aspect ratios are supported: `"16:9"` (widescreen, default) and `"4:3"` (classic). Each ratio has corresponding `SLIDE_DIMENSIONS` that govern element positioning.
 
-The `LogoConfig` lets you place a logo in any corner (`top-left`, `top-right`, `bottom-left`, `bottom-right`) and control where it appears: on all slides, only on the title slide, or on both the title and closing slides.
+`logoPath` accepts a `Buffer`, a data URI or base64 string, a readable local file path, or an `{ data, altText }` object whose `data` uses one of those forms. It does not fetch remote URLs. The logo is rendered in the bottom-right corner on every slide.
 
 ### Audience and Tone Guidelines
 
-The pipeline includes `AUDIENCE_GUIDELINES` and `TONE_GUIDELINES` that shape content density and language. An "executive" audience gets higher-level summaries with business impact framing, while a "technical" audience gets detailed specifications and code examples. A "professional" tone yields formal language, while a "casual" tone produces conversational phrasing.
+The pipeline includes `AUDIENCE_GUIDELINES` and `TONE_GUIDELINES` that shape content density and language. A "business" audience gets higher-level summaries with ROI and strategic framing, while a "technical" audience gets detailed specifications and code examples. A "professional" tone yields formal language, while a "casual" tone produces conversational phrasing.
 
 ## Error Handling
 
@@ -299,17 +293,11 @@ async function generateMarketingDeck() {
       ppt: {
         pages: 12,
         theme: "modern",
-        audience: "executive",
+        audience: "business",
         tone: "professional",
         generateAIImages: true,
         aspectRatio: "16:9",
-        logo: {
-          data: logoBuffer,
-          position: "bottom-right",
-          width: 1.0,
-          height: 0.4,
-          showOn: "all-slides",
-        },
+        logoPath: logoBuffer,
       },
     },
     provider: "google-ai",
@@ -327,7 +315,7 @@ async function generateMarketingDeck() {
 generateMarketingDeck().catch(console.error);
 ```
 
-This example produces a polished 12-slide executive deck with AI-generated images, a company logo on every slide, and speaker notes for each section. The AI content planner structures the deck to flow logically from market opportunity through pricing and timeline, with appropriate slide types chosen for each section.
+This example produces a polished 12-slide business deck with AI-generated images, a company logo on every slide, and speaker notes for each section. The AI content planner structures the deck to flow logically from market opportunity through pricing and timeline, with appropriate slide types chosen for each section.
 
 ## What's Next
 

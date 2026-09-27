@@ -14,8 +14,8 @@ tags:
   - dependency-injection
 author: neurolink
 description: >-
-  NeuroLink uses a Factory + Registry pattern with dynamic imports to support 13
-  AI providers without circular dependencies. Learn the pattern.
+  NeuroLink uses a Factory + Registry pattern with dynamic imports to support a
+  growing roster of AI providers without circular dependencies. Learn the pattern.
 toc: true
 mermaid: true
 pin: false
@@ -24,13 +24,13 @@ image:
   alt: 'The Factory + Registry Pattern: How NeuroLink Breaks Circular Dependencies'
 ---
 
-We designed the factory-registry pattern to solve a specific architectural constraint: thirteen providers that all need to be instantiated through a single interface, with circular dependencies threatening the entire module graph. This architecture separates **what can be created** from **what is registered**, and the trade-off -- deferred dynamic imports over static resolution -- is what makes the pipeline scale.
+We designed the factory-registry pattern to solve a specific architectural constraint: a fast-growing roster of providers that all need to be instantiated through a single interface, with circular dependencies threatening the entire module graph. This architecture separates **what can be created** from **what is registered**, and the trade-off -- deferred dynamic imports over static resolution -- is what makes the pipeline scale.
 
-Thirteen providers. A factory that creates any of them. Providers that need types from the factory module. The circular dependency was inevitable -- and it crashed the TypeScript compiler the moment we tried to add provider number four.
+A growing list of providers. A factory that creates any of them. Providers that need types from the factory module. The circular dependency was inevitable -- and it crashed the TypeScript compiler the moment we tried to add provider number four.
 
 The naive fix was `require()` calls and barrel export reordering. That scaled to about six providers before the import graph became unmaintainable. The real fix had to be architectural: separate **what can be created** (the Factory) from **what is registered** (the Registry), and use dynamic `import()` to defer module loading until the moment of instantiation.
 
-The result: zero circular dependencies, zero unused provider loading, and adding provider number fourteen requires changing exactly one file. This post traces the pattern from the problem through the production code in NeuroLink's `providerFactory.ts` and `providerRegistry.ts`.
+The result: zero circular dependencies, zero unused provider loading, and adding a new provider still requires changing exactly one file. This post traces the pattern from the problem through the production code in NeuroLink's `providerFactory.ts` and `providerRegistry.ts`.
 
 ## The circular dependency problem
 
@@ -138,11 +138,11 @@ export class ProviderRegistry {
         const { AnthropicProvider } = await import("../providers/anthropic.js");
         return new AnthropicProvider(modelName, sdk as NeuroLink | undefined);
       },
-      AnthropicModels.CLAUDE_SONNET_4_0,
+      AnthropicModels.CLAUDE_SONNET_4_6,
       ["claude", "anthropic"],
     );
 
-    // ... 11 more providers registered the same way
+    // ... many more providers registered the same way
 
     this.registered = true;
   }
@@ -223,7 +223,7 @@ graph TB
         D2["import AnthropicProvider"]
         D3["import GoogleVertexProvider"]
         D4["import AmazonBedrockProvider"]
-        D5["import 9 more..."]
+        D5["import many more..."]
     end
 
     APP -->|"createProvider('openai')"| AIF
@@ -245,11 +245,11 @@ The dependency arrows all flow downward. No module imports the module that impor
 
 ## Why this pattern works at scale
 
-After a year in production with 13 providers and counting, here is why the Factory + Registry pattern has proven durable.
+After more than a year in production, with the provider count still climbing, here is why the Factory + Registry pattern has proven durable.
 
 ### Adding a Provider is a One-File Change
 
-To add a fourteenth provider, you add a single registration block in `providerRegistry.ts`. The factory, the application code, the CLI, the server adapter -- none of them change. The new provider is immediately available via `neurolink.generate({ provider: "new-provider" })`.
+To add a new provider, you add a single registration block in `providerRegistry.ts`. The factory, the application code, the CLI, the server adapter -- none of them change. The new provider is immediately available via `neurolink.generate({ provider: "new-provider" })`.
 
 ### Unused Providers Are Never Loaded
 

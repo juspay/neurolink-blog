@@ -1,11 +1,14 @@
 ---
 layout: post
-title: "Text-to-Speech Integration: Build Voice-Enabled AI Apps with NeuroLink"
+title: 'Text-to-Speech Integration: Build Voice-Enabled AI Apps with NeuroLink'
 date: 2025-12-20 10:00:00 +0530
 categories: [Tutorials, Features]
 tags: [tts, text-to-speech, voice, audio, google-cloud-tts]
 author: neurolink
-description: "Add natural text-to-speech to your AI applications using NeuroLink's built-in TTS integration with Google Cloud voices."
+description: >-
+  Add text-to-speech to NeuroLink applications with six built-in providers,
+  direct or AI-response synthesis, CLI workflows, provider-specific voices,
+  and production-safe audio handling.
 image:
   path: /assets/img/posts/tts-integration-guide/hero.png
   alt: TTS Integration Guide
@@ -14,10 +17,10 @@ mermaid: true
 pin: false
 ---
 
-> **Note:** This guide covers the built-in TTS integration available in NeuroLink SDK. TTS uses Google Cloud Text-to-Speech under the hood.
+> **Note:** NeuroLink ships six TTS provider integrations: Google Cloud (`google-ai`/`vertex`), OpenAI TTS, ElevenLabs, Azure TTS, Fish Audio, and Cartesia. The examples start with Google Cloud, then show where to select a different TTS provider.
 {: .prompt-info }
 
-In this guide, you will add text-to-speech to your NeuroLink applications. You will configure Google Cloud TTS, generate audio from AI responses, select the right voice tier for your use case, build multi-speaker podcast episodes, and create conversational voice assistants. By the end, you will produce both text and audio output from a single `generate()` call with a few lines of TypeScript.
+In this guide, you will add text-to-speech to your NeuroLink applications. You will configure Google Cloud TTS, choose a TTS provider explicitly, generate audio from either input text or an AI response, build multi-speaker audio, and create conversational voice assistants. By the end, you will produce both text and audio from a single `generate()` call and know when to use direct synthesis instead.
 
 ```mermaid
 flowchart LR
@@ -30,8 +33,8 @@ flowchart LR
         GEN["generate()"]
 
         subgraph Processing["Processing Pipeline"]
-            LLM["LLM Provider (OpenAI, Anthropic, etc.)"]
-            TTS["Google Cloud TTS"]
+            LLM["LLM Provider"]
+            TTS["Selected TTS Provider"]
         end
     end
 
@@ -43,7 +46,7 @@ flowchart LR
 
     subgraph Output["Output"]
         RESP["Text Response - Welcome to our platform..."]
-        AUDIO["Audio Buffer (MP3/WAV/OGG/OPUS)"]
+        AUDIO["Audio Buffer - MP3/WAV/OGG/OPUS"]
     end
 
     TXT --> GEN
@@ -51,8 +54,8 @@ flowchart LR
     TTSConfig -.->|"options"| TTS
 
     GEN --> LLM
-    LLM -->|"Generated Text"| TTS
-    TTS --> RESP
+    LLM -->|"Generated Text"| RESP
+    RESP --> TTS
     TTS --> AUDIO
 
     style TXT fill:#3b82f6,stroke:#2563eb,color:#fff
@@ -86,11 +89,11 @@ Voice creates emotional connection. A well-chosen voice with appropriate pacing 
 
 NeuroLink integrates TTS directly into the generation pipeline. You get:
 
-- **Unified API** - Same `generate()` call produces text and audio
-- **Google Cloud Voices** - Access to Neural2, WaveNet, Standard, and Chirp voices
-- **Format Options** - MP3, WAV (LINEAR16), and OGG Opus output
-- **Voice Control** - Speaking rate, pitch, and volume adjustment
-- **Two Modes** - Synthesize input text directly OR synthesize AI-generated responses
+- **Unified API** - The same `generate()` call can produce text and audio
+- **Six TTS providers** - Google Cloud, OpenAI TTS, ElevenLabs, Azure TTS, Fish Audio, and Cartesia
+- **Format options** - MP3, WAV, OGG, Opus, M4A, FLAC, WebM, MP4, MPEG, MPGA, and raw PCM16 where supported
+- **Voice control** - Speaking rate, pitch, volume, output quality, and provider-specific voice IDs
+- **Two modes** - Synthesize `input.text` directly, or synthesize an AI-generated response with `useAiResponse: true`
 
 **Related:** [API Reference](https://docs.neurolink.ink/docs/sdk/api-reference)
 
@@ -128,7 +131,7 @@ npm install @juspay/neurolink
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import fs from "fs";
+import { writeFileSync } from "node:fs";
 
 async function main() {
   const ai = new NeuroLink();
@@ -143,9 +146,10 @@ async function main() {
     },
     systemPrompt: "You are a helpful assistant with a warm tone",
     provider: "google-ai", // or any other provider
-    model: 'gemini-2.0-flash-001',
+    model: 'gemini-2.5-flash',
     tts: {
       enabled: true,
+      provider: "google-ai",
       useAiResponse: true, // Synthesize the AI response (not the input)
       voice: "en-US-Neural2-C", // Neural2 voice
       format: "mp3",
@@ -154,7 +158,7 @@ async function main() {
 
   // Save the audio file
   if (result.audio?.buffer) {
-    fs.writeFileSync("welcome.mp3", result.audio.buffer);
+    writeFileSync("welcome.mp3", result.audio.buffer);
     console.log("Audio saved to welcome.mp3");
   }
 
@@ -174,6 +178,8 @@ That's it. One `generate()` call produces both text and audio. The TTS option in
 ```bash
 # Generate with TTS output
 npx @juspay/neurolink generate "Write a welcome message" \
+  --tts \
+  --tts-provider google-ai \
   --tts-voice "en-US-Neural2-C" \
   --ttsOutput welcome.mp3
 ```
@@ -207,18 +213,20 @@ Google Cloud TTS offers multiple voice tiers with different quality levels and p
 
 ### Voice Quality Tiers
 
+Google publishes voice availability and pricing independently of NeuroLink. Check the live Google Cloud TTS pages before choosing a tier; prices and regional availability change.
+
 ```mermaid
 graph TD
     subgraph Voices["Google Cloud TTS Voice Options"]
-        STD["Standard Voices - $4/1M chars - Good quality"]
-        WAV["WaveNet Voices - $16/1M chars - High quality"]
-        NEU["Neural2 Voices - $16/1M chars - Natural speech"]
-        CHIRP["Chirp Voices - Newest, most natural"]
+        STD["Standard Voices"]
+        WAV["WaveNet Voices"]
+        NEU["Neural2 Voices"]
+        CHIRP["Chirp Voices"]
     end
 
     DEV["Development"] --> STD
-    PROD["Production (Standard)"] --> NEU
-    PREM["Production (Premium)"] --> CHIRP
+    PROD["Production - Standard"] --> NEU
+    PREM["Production - Premium"] --> CHIRP
 
     style STD fill:#94a3b8,stroke:#64748b
     style WAV fill:#60a5fa,stroke:#3b82f6
@@ -226,12 +234,12 @@ graph TD
     style CHIRP fill:#fbbf24,stroke:#f59e0b
 ```
 
-| Voice Type | Quality | Use Case | Cost per 1M chars |
-|------------|---------|----------|-------------------|
-| Chirp | Premium | Most natural, newest | Varies |
-| Neural2 | High | Standard production apps | ~$16 |
-| WaveNet | High | Natural-sounding speech | ~$16 |
-| Standard | Good | Development, testing | ~$4 |
+| Voice Type | Typical Use Case | Selection Note |
+|------------|------------------|----------------|
+| Chirp | Highest-fidelity conversational speech | Verify the requested locale and synthesis mode |
+| Neural2 | General production narration | Balance naturalness and availability |
+| WaveNet | Natural-sounding speech | Useful where the desired locale lacks Neural2/Chirp |
+| Standard | Development and high-volume utility audio | Validate quality with representative content |
 
 ### Available Voice Names
 
@@ -260,7 +268,7 @@ Google Cloud TTS voice names follow a pattern: `{language}-{region}-{type}-{vari
 - `en-US-Standard-C` - Female
 - `en-US-Standard-D` - Male
 
-> **Full Voice List:** See [Google Cloud TTS Supported Voices](https://cloud.google.com/text-to-speech/docs/voices) for the complete list of 400+ voices across 50+ languages.
+> **Full Voice List:** See [Google Cloud TTS Supported Voices](https://cloud.google.com/text-to-speech/docs/voices) for the current voice and language catalog.
 {: .prompt-info }
 
 ### Voice Selection Recommendations
@@ -282,7 +290,7 @@ You can use TTS to convert any text to speech directly, without generating conte
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import fs from "fs";
+import { writeFileSync } from "node:fs";
 
 async function synthesizeText() {
   const ai = new NeuroLink();
@@ -294,9 +302,10 @@ async function synthesizeText() {
       text: "Welcome to our platform. We're excited to have you here!",
     },
     provider: "google-ai",
-    model: 'gemini-2.0-flash-001',
+    model: 'gemini-2.5-flash',
     tts: {
       enabled: true,
+      provider: "google-ai",
       // useAiResponse: false is the default - synthesizes input.text directly
       voice: "en-US-Neural2-C",
       format: "mp3",
@@ -305,7 +314,7 @@ async function synthesizeText() {
   });
 
   if (result.audio?.buffer) {
-    fs.writeFileSync("narration.mp3", result.audio.buffer);
+    writeFileSync("narration.mp3", result.audio.buffer);
     console.log(`Audio saved: ${result.audio.size} bytes`);
     console.log(`Format: ${result.audio.format}`);
   }
@@ -329,61 +338,43 @@ Generate multi-speaker podcast episodes with different voices for each speaker:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import fs from "fs";
+import { writeFileSync } from "node:fs";
 
 interface PodcastSection {
   speaker: "host" | "guest";
   text: string;
 }
 
-// Helper function to concatenate audio buffers
-function concatenateAudioBuffers(buffers: Buffer[]): Buffer {
-  return Buffer.concat(buffers);
-}
-
-async function generatePodcastEpisode(script: PodcastSection[]) {
+async function generatePodcastSegments(
+  script: PodcastSection[]
+): Promise<Buffer[]> {
   const ai = new NeuroLink();
-  const audioSegments: Buffer[] = [];
 
-  console.log("Generating Podcast Episode\n");
-  console.log("=".repeat(60));
+  return Promise.all(
+    script.map(async (section) => {
+      // useAiResponse is omitted, so the existing script text is synthesized directly
+      const result = await ai.generate({
+        input: { text: section.text },
+        provider: "google-ai",
+        model: "gemini-2.5-flash",
+        tts: {
+          enabled: true,
+          provider: "google-ai",
+          voice:
+            section.speaker === "host"
+              ? "en-US-Neural2-D"
+              : "en-US-Neural2-C",
+          speed: 0.95,
+          format: "mp3",
+        },
+      });
 
-  for (let i = 0; i < script.length; i++) {
-    const section = script[i];
-    console.log(
-      `\nProcessing section ${i + 1}/${script.length} (${section.speaker})...`
-    );
-
-    // Generate speech for each section
-    // Using useAiResponse: false to synthesize the script directly
-    const result = await ai.generate({
-      input: {
-        text: section.text,
-      },
-      provider: "google-ai",
-      model: 'gemini-2.0-flash-001',
-      tts: {
-        enabled: true,
-        // useAiResponse: false - synthesize the script text directly
-        voice:
-          section.speaker === "host"
-            ? "en-US-Neural2-D" // Male host voice
-            : "en-US-Neural2-C", // Female guest voice
-        speed: 0.95, // Slightly slower for clarity
-        format: "mp3",
-      },
-    });
-
-    if (result.audio?.buffer) {
-      audioSegments.push(result.audio.buffer);
-      console.log(`  Generated ${result.audio.buffer.length} bytes of audio`);
-    }
-  }
-
-  console.log("\n" + "-".repeat(60));
-  console.log(`\nConcatenating ${audioSegments.length} audio segments...`);
-
-  return concatenateAudioBuffers(audioSegments);
+      if (!result.audio?.buffer) {
+        throw new Error(`No audio returned for ${section.speaker} segment`);
+      }
+      return result.audio.buffer;
+    })
+  );
 }
 
 async function main() {
@@ -411,7 +402,7 @@ async function main() {
     },
     {
       speaker: "guest",
-      text: "Absolutely. At our company, we require human review for any customer-facing AI responses. It's added about 8 minutes to our average response time, but the quality improvement is worth it.",
+      text: "For example, a team might require human review for high-stakes customer-facing responses, accepting extra review time in exchange for stronger oversight.",
     },
     {
       speaker: "host",
@@ -420,14 +411,15 @@ async function main() {
   ];
 
   try {
-    const podcastAudio = await generatePodcastEpisode(podcastScript);
+    const segments = await generatePodcastSegments(podcastScript);
 
-    // Save the podcast episode
-    const outputPath = "podcast-episode.mp3";
-    fs.writeFileSync(outputPath, podcastAudio);
+    // MP3 buffers are separate bitstreams. Write each segment, then concatenate
+    // them with an audio-aware tool such as FFmpeg so headers/timestamps are valid.
+    segments.forEach((segment, index) => {
+      writeFileSync(`podcast-segment-${index + 1}.mp3`, segment);
+    });
 
-    console.log(`\nPodcast episode saved to ${outputPath}`);
-    console.log(`Total file size: ${(podcastAudio.length / 1024).toFixed(2)} KB`);
+    console.log(`Saved ${segments.length} podcast segments for final mixing`);
   } catch (error) {
     console.error("Error generating podcast:", error);
   }
@@ -436,7 +428,7 @@ async function main() {
 main().catch(console.error);
 ```
 
-This pattern works for any multi-speaker content: interviews, dialogues, audiobooks with character voices, or educational content with instructor and student roles.
+This pattern works for interviews, dialogues, audiobooks with character voices, or educational content. Keep each returned audio buffer as a complete segment and join segments with an audio-aware encoder/muxer; `Buffer.concat()` does not produce a valid combined MP3/WAV file in general.
 
 ### Voice Assistant Integration
 
@@ -444,7 +436,7 @@ Build conversational voice assistants that generate AI responses with audio:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import fs from "fs";
+import { writeFileSync } from "node:fs";
 
 // Voice assistant that generates AI responses with TTS
 async function runVoiceAssistantDemo() {
@@ -467,10 +459,11 @@ async function runVoiceAssistantDemo() {
     const result = await ai.generate({
       input: { text: query },
       provider: "google-ai",
-      model: 'gemini-2.0-flash-001',
+      model: 'gemini-2.5-flash',
       systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational.",
       tts: {
         enabled: true,
+        provider: "google-ai",
         useAiResponse: true, // Synthesize the AI's response
         voice: "en-US-Neural2-C",
         format: "mp3",
@@ -513,11 +506,12 @@ async function conditionalTTSDemo() {
     const result = await ai.generate({
       input: { text: query.text },
       provider: "google-ai",
-      model: 'gemini-2.0-flash-001',
+      model: 'gemini-2.5-flash',
       systemPrompt: "You are a helpful assistant. Keep responses concise.",
       tts: query.wantsTTS
         ? {
             enabled: true,
+            provider: "google-ai",
             useAiResponse: true,
             voice: "en-US-Neural2-C",
             format: "mp3",
@@ -546,17 +540,23 @@ The NeuroLink CLI provides quick access to TTS features for testing and prototyp
 ```bash
 # Basic TTS generation - synthesizes the AI response
 npx @juspay/neurolink generate "Welcome to our platform!" \
+  --tts \
+  --tts-provider google-ai \
   --tts-voice "en-US-Neural2-C" \
   --ttsOutput welcome.mp3
 
 # With specific provider
 npx @juspay/neurolink generate "Your order has shipped" \
+  --tts \
+  --tts-provider google-ai \
   --tts-voice "en-US-Neural2-D" \
   --provider google-ai \
   --ttsOutput notification.mp3
 
 # Adjust voice settings
 npx @juspay/neurolink generate "Important announcement" \
+  --tts \
+  --tts-provider google-ai \
   --tts-voice "en-US-Neural2-C" \
   --ttsSpeed 0.9 \
   --ttsFormat mp3 \
@@ -567,13 +567,16 @@ npx @juspay/neurolink generate "Important announcement" \
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--tts-voice` | Voice ID to enable TTS (e.g., "en-US-Neural2-C") | - |
-| `--ttsFormat` | Audio format: mp3, wav, ogg, opus | mp3 |
+| `--tts` | Enable text-to-speech for the generated response | `false` |
+| `--tts-provider` | TTS provider; independent of the text-generation `--provider` | text provider fallback |
+| `--tts-voice` | Provider-specific voice ID (e.g., "en-US-Neural2-C") | provider default |
+| `--ttsFormat` | Audio format: mp3, wav, ogg, opus, m4a, flac, webm, mp4, mpeg, mpga | mp3 |
 | `--ttsSpeed` | Speaking rate 0.25-4.0 | 1.0 |
+| `--ttsQuality` | Audio quality: standard, hd | standard |
 | `--ttsOutput` | Output file path for audio | - |
 | `--ttsPlay` | Play audio immediately after generation | false |
 
-> **Note:** CLI streaming TTS support may be available - check `neurolink stream --help` for current capabilities.
+> **Note:** `neurolink stream` accepts the same `--tts*` flags and always synthesizes the completed streamed response (equivalent to `useAiResponse: true`); it does not synthesize your raw input text.
 {: .prompt-info }
 
 ---
@@ -586,11 +589,12 @@ Fine-tune audio output with these configuration options:
 const ttsOptions = {
   tts: {
     enabled: true,
+    provider: "google-ai", // or openai-tts, elevenlabs, azure-tts, fish-audio, cartesia
     useAiResponse: true, // true = synthesize AI response, false = synthesize input text
     voice: "en-US-Neural2-C",
 
     // Audio format options
-    format: "mp3",         // Options: mp3, wav, ogg, opus
+    format: "mp3",         // Options: mp3, wav, ogg, opus, m4a, flac, webm, mp4, mpeg, mpga, pcm16
 
     // Voice modulation
     speed: 1.0,            // Range: 0.25 to 4.0 (1.0 = normal)
@@ -673,7 +677,7 @@ You have added text-to-speech to your NeuroLink applications. Here is what you b
 
 - Generated audio output with a single `tts` option in `generate()`
 - Chose between synthesizing input text directly (`useAiResponse: false`) or AI-generated responses (`useAiResponse: true`)
-- Selected Google Cloud voice tiers matched to your use case and budget
+- Selected a TTS provider and provider-specific voice for your use case
 - Built multi-speaker podcast episodes with distinct host and guest voices
 - Created conversational voice assistants with TTS output
 - Used CLI workflows for rapid TTS prototyping
@@ -704,7 +708,7 @@ flowchart LR
         PROC["TTS Processing"]
     end
 
-    subgraph Google["Google Cloud TTS"]
+    subgraph Provider["Selected TTS Provider"]
         SYNTH["Speech Synthesis"]
     end
 
@@ -728,4 +732,4 @@ flowchart LR
     style OGG fill:#ec4899,stroke:#db2777,color:#fff
 ```
 
-**One SDK. Google Cloud Voices. Natural Speech.**
+**One SDK. Multiple TTS Providers. Natural Speech.**

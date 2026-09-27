@@ -45,14 +45,14 @@ Before jumping into multi-model patterns, let us acknowledge what each model fam
 | **Creative writing** | More natural, nuanced tone | More structured, formatted output |
 | **Instruction following** | Excellent at complex instructions | Excellent at structured output |
 | **Reasoning** | Adaptive thinking (effort parameter) on flagship tiers | Reasoning levels (none→xhigh) on GPT-5.x series |
-| **Long context** | 1M tokens (flagships); 200K (Haiku 4.5) | 1M tokens (GPT-5.5/5.4); 400K (GPT-5.4 mini) |
+| **Long context** | 1M tokens (flagships); 200K (Haiku 4.5) | 1M tokens (GPT-5.4); 400K (GPT-5.4 mini) |
 | **Multimodal** | Vision, PDF processing | Vision, image generation, realtime voice |
 | **Tool calling** | Reliable tool use | Parallel tool calling, computer use built-in |
 | **Cost** | Competitive (Haiku 4.5 for low cost) | Tiered (nano/mini/full) |
 
-NeuroLink supports Claude Opus 4.6, Claude Sonnet 4.6, Claude Haiku 4.5, and legacy 4.5/4.1/4.0 variants. These are defined in the `AnthropicModels` enum in the SDK constants. (Claude Fable 5, Opus 4.8, and Sonnet 5 are current Anthropic API models; NeuroLink enum support for those tiers is in progress.)
+NeuroLink supports the full Claude lineup: Claude Opus 5, Claude Sonnet 5, Claude Fable 5, Claude Opus 4.8/4.7/4.6, Claude Sonnet 4.6, Claude Haiku 4.5, and legacy 4.5/4.1/4.0 variants. These are defined in the `AnthropicModels` enum in the SDK constants.
 
-NeuroLink also supports the current GPT lineup: GPT-5.4, GPT-5.4 mini, GPT-5.4 nano, GPT-5.2, and earlier series (GPT-4.1, GPT-4o). These are defined in the `OpenAIModels` enum.
+NeuroLink also supports the current GPT lineup: GPT-5.4, GPT-5.4 mini, GPT-5.4 nano, GPT-5.4 Pro, and the GPT-5.3 coding-specialized codex model, plus earlier GPT-5.2, GPT-4.1, and GPT-4o series for compatibility. These are defined in the `OpenAIModels` enum.
 
 > **Warning:** Model capabilities evolve rapidly. This comparison reflects the state as of the "Tested" date above. Both Anthropic and OpenAI release updates frequently. The multi-model approach protects you from being locked to any single model's capabilities at any point in time.
 {: .prompt-warning }
@@ -105,7 +105,7 @@ async function smartGenerate(task: string, input: string) {
 }
 ```
 
-This manual routing works well when your task categories are known ahead of time. For more dynamic routing, NeuroLink provides the `ModelRouter` and `BinaryTaskClassifier` utilities. The task classifier analyzes the input prompt against pattern sets (reasoning patterns, fast patterns) and routes to the appropriate model tier automatically.
+This manual routing works well when your task categories are known ahead of time. NeuroLink's internal request pipeline includes comparable model-routing and task-classification logic — matching the input prompt against pattern sets (reasoning patterns, fast patterns) to pick a model tier automatically — though these are internal implementation classes, not part of the package's public exports, so application code should implement routing explicitly as shown above.
 
 A practical routing strategy for a production application might look like:
 
@@ -171,8 +171,8 @@ Using both models is not just about quality — it is also about cost. Different
 The strategy is straightforward:
 
 - Use Claude Haiku 4.5 ($1/$5 per MTok) or GPT-5.4 mini ($0.75/$4.50 per MTok) for simple queries (classification, extraction, simple Q&A). These cost fractions of a cent per call.
-- Route complex tasks to Claude Sonnet 4.6 or GPT-5.4 ($2.50/$15 per MTok). These cost more but deliver higher quality for tasks that need it. (Anthropic's newer Claude Sonnet 5 at $3/$15, intro $2/$10 through August 2026, is available via direct API key once NeuroLink adds the enum constant.)
-- Reserve the highest tiers (Claude Opus 4.6 or GPT-5.4 Pro at the upper end of the NeuroLink enum) for the highest-stakes tasks. The wider Anthropic lineup now includes Claude Fable 5 ($10/$50 per MTok, fact-checked against Anthropic's models page) and OpenAI offers GPT-5.5 ($5/$30 per MTok) — these are available via direct API keys even where NeuroLink's enum has not yet added a named constant.
+- Route complex tasks to Claude Sonnet 4.6 or GPT-5.4 ($2.50/$15 per MTok). These cost more but deliver higher quality for tasks that need it. Anthropic's newer Claude Sonnet 5, also defined in the `AnthropicModels` enum, is priced at $3/$15 per MTok (intro pricing of $2/$10 through August 2026).
+- Reserve the highest tiers (Claude Opus 5 or GPT-5.4 Pro, both in the NeuroLink enum) for the highest-stakes tasks. The Anthropic lineup also includes Claude Fable 5 for extended agentic workflows, already available through the `AnthropicModels` enum.
 
 NeuroLink's `createBestAIProvider()` auto-selects the best available provider based on your configured API keys, falling back through the provider chain based on availability.
 
@@ -206,7 +206,7 @@ const neurolink = new NeuroLink();
 const result = await smartGenerate('code-review', sourceCode);
 
 // 2. Failover: automatic resilience
-const provider = await createAIProviderWithFallback('anthropic', 'openai');
+const { primary, fallback } = await createAIProviderWithFallback('anthropic', 'openai');
 
 // 3. Consensus: high-stakes decisions
 const decision = await neurolink.generate({

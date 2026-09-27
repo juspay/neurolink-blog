@@ -882,8 +882,6 @@ import {
 } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink({
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
   mcp: {
     cache: {
       enabled: true,
@@ -920,11 +918,15 @@ const neurolink = new NeuroLink({
 // Every generate() and stream() call now goes through the full pipeline:
 // middleware -> cache -> router -> batcher -> server
 const result = await neurolink.generate({
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
   input: { text: 'Look up user 123 and their recent orders' },
 });
 
 // Bypass cache for a specific request when you need fresh data
 const freshResult = await neurolink.generate({
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
   input: { text: 'What is the current server status?' },
   disableToolCache: true,
 });
@@ -1103,7 +1105,7 @@ The enhancement modules add minimal overhead while delivering significant saving
 
 ### Cache Hit Rates
 
-In production at Juspay, with a 5-minute TTL and LRU eviction:
+As a general pattern, with a 5-minute TTL and LRU eviction, hit rates vary by workload shape:
 
 - **Conversational workloads:** 60-80% hit rate (models frequently re-query the same data)
 - **Batch processing:** 30-50% hit rate (more unique queries)

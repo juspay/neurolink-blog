@@ -27,11 +27,11 @@ image:
   alt: 'Advanced RAG: 10 Chunking Strategies, Hybrid Search, and Reranking'
 ---
 
-We designed NeuroLink's RAG subsystem to close the gap between demo-quality retrieval and production-grade retrieval. The core design decision was that chunking, search, and reranking must be content-aware -- generic approaches fail when real documents arrive with tables, nested imports, and cross-references.
+NeuroLink's RAG subsystem provides content-aware choices for chunking, search, and reranking. Those choices matter when documents contain tables, nested structure, and cross-references that a single fixed-size splitter does not preserve well.
 
-The architecture addresses three distinct failure modes in basic RAG: irrelevant chunks from naive splitting (solved by ten content-aware chunking strategies), missed results from pure vector search (solved by hybrid BM25 plus vector retrieval), and noisy rankings that bury the best context (solved by Cohere and cross-encoder reranking). We chose to build Graph RAG and circuit breaker resilience into the same subsystem because knowledge-aware retrieval and operational reliability are not optional features -- they are production requirements.
+The architecture targets three common failure modes in basic RAG: irrelevant chunks from naive splitting, missed results from pure vector search, and noisy rankings that bury useful context. Ten chunking strategies, hybrid BM25 plus vector retrieval, and LLM-based multi-factor reranking address those stages; Graph RAG and standalone resilience helpers support relationship-aware retrieval and failure handling when an application needs them.
 
-This deep dive covers each component, the trade-offs behind each design decision, and benchmarks from production deployments.
+This deep dive covers each component, the trade-offs behind each design decision, and how to configure each one.
 
 ## The RAG Pipeline Architecture
 
@@ -41,8 +41,8 @@ NeuroLink's RAG pipeline is divided into three stages: ingestion, retrieval, and
 flowchart TB
     subgraph Ingestion["Ingestion Pipeline"]
         DOC["Documents"] --> DETECT["MIME Detection"]
-        DETECT --> FACTORY["ChunkerFactory<br/>getRecommendedStrategy()"]
-        FACTORY --> CHUNK["Chunking<br/>10 strategies"]
+        DETECT --> SELECT["Strategy Selection<br/>config or getRecommendedStrategy()"]
+        SELECT --> CHUNK["Chunking<br/>10 strategies"]
         CHUNK --> META["Metadata Extraction<br/>LLM-powered"]
         META --> EMBED["Embedding<br/>Vector generation"]
         EMBED --> STORE["Vector Store<br/>+ BM25 Index"]
@@ -59,7 +59,7 @@ flowchart TB
 
         HYBRID --> VEC & BM25
         VEC & BM25 --> FUSE
-        FUSE --> RERANK["Reranking<br/>Cohere / Cross-encoder"]
+        FUSE --> RERANK["Reranking<br/>LLM multi-factor scoring"]
         RERANK --> CONTEXT["Top-K Context"]
     end
 
@@ -69,16 +69,15 @@ flowchart TB
         LLM --> ANSWER["Answer + Citations"]
     end
 
-    subgraph Resilience["Resilience Layer"]
+    subgraph Resilience["Resilience Helpers"]
         CB["Circuit Breaker"]
         RETRY["Retry Handler"]
-        P95["P95 Latency Tracking"]
     end
 
-    Retrieval <--> Resilience
+    Retrieval <-.->|"caller wraps calls"| Resilience
 ```
 
-The pipeline flows left to right: documents enter the ingestion pipeline where they are detected, chunked, enriched with metadata, embedded, and stored. When a user queries, the retrieval pipeline performs hybrid search, fuses results, reranks them, and produces a focused context window. The generation stage assembles that context and produces a cited answer. The resilience layer wraps the entire retrieval pipeline with circuit breakers, retry handlers, and latency tracking.
+The diagram shows the optional stages together. Documents are loaded, chunked, optionally enriched with metadata, embedded, and stored. A query can use vector, hybrid, or graph retrieval and can optionally rerank the results before context assembly and generation. The circuit breaker and retry handler are standalone helpers you wrap around pipeline calls yourself -- they are not automatically applied.
 
 ![Advanced RAG Pipeline](/assets/img/posts/advanced-rag/advanced-rag-pipeline.gif)
 
@@ -91,15 +90,15 @@ Chunking is where most RAG pipelines fail. A one-size-fits-all approach simply c
 | # | Strategy | Best For | How It Works |
 |---|----------|----------|-------------|
 | 1 | **Character** | Simple text | Splits at character count with overlap |
-| 2 | **Token** | Token-budget-aware | Splits at token boundaries |
-| 3 | **Sentence** | Natural language | Splits at sentence boundaries (NLP) |
+| 2 | **Token** | Approximate token budgets | Groups words using estimated token counts |
+| 3 | **Sentence** | Natural language | Splits with configurable punctuation boundaries |
 | 4 | **Recursive** | General documents | Hierarchical splitting (paragraphs then sentences then words) |
 | 5 | **Markdown** | Documentation, READMEs | Splits at headers and sections |
 | 6 | **Semantic** | Mixed-topic documents | Splits where meaning changes (embedding similarity) |
 | 7 | **HTML** | Web pages | Splits at DOM structure (tags, sections) |
 | 8 | **JSON** | API responses, configs | Splits at JSON structure (objects, arrays) |
 | 9 | **LaTeX** | Academic papers | Splits at LaTeX structure (sections, equations) |
-| 10 | **Code** | Source code | Splits at functions, classes, imports |
+| 10 | **Semantic-Markdown** | Markdown sections | Splits at headers, then size-merges adjacent sections |
 
 ### Using Chunking Strategies
 
@@ -116,7 +115,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Summarize the key points from this document' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./docs/guide.md'],
     strategy: 'recursive',
@@ -129,7 +128,7 @@ const result = await neurolink.generate({
 const mdResult = await neurolink.generate({
   input: { text: 'What are the main sections?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./README.md'],
     strategy: 'markdown',
@@ -153,36 +152,38 @@ const strategies = ChunkerRegistry.getAvailableStrategies();
 console.log('Available strategies:', strategies);
 ```
 
-> **Note:** For documentation workloads, start with the `markdown` strategy. For code repositories, use the `code` strategy. For general-purpose text where you are unsure, `recursive` is the safest default. The `semantic` strategy gives the best quality but is slower due to the embedding calls required for boundary detection.
+> **Note:** For documentation workloads, start with the `markdown` strategy. For general-purpose text where you are unsure, `recursive` is a practical default. The `semantic` strategy is slower because it makes embedding calls to detect boundaries; evaluate whether that improves retrieval on your corpus.
 {: .prompt-info }
 
-### The ChunkerFactory: Auto-Selection
+### Strategy Recommendation
 
-The `ChunkerRegistry` can recommend the best strategy based on your content type, eliminating guesswork:
+The `ChunkerRegistry` can recommend a strategy based on a content-type string. Call the helper explicitly, then pass its result to `ingest()` or `doc.chunk()`:
 
 ```typescript
-import { ChunkerRegistry } from '@juspay/neurolink';
+import {
+  ChunkerRegistry,
+  RAGPipeline,
+  getRecommendedStrategy,
+} from '@juspay/neurolink';
 
-// ChunkerRegistry lists available chunking strategies
+const pipeline = new RAGPipeline({
+  embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4-mini' },
+});
+
+// ChunkerRegistry lists available chunking strategies.
 const strategies = ChunkerRegistry.getAvailableStrategies();
-// Returns: ['character', 'token', 'sentence', 'recursive', 'markdown',
-//           'semantic', 'html', 'json', 'latex', 'code']
+// Returns: ['character', 'recursive', 'sentence', 'token', 'markdown',
+//           'html', 'json', 'latex', 'semantic', 'semantic-markdown']
 
-// Use the rag option in generate() and let NeuroLink handle strategy selection
-const result = await neurolink.generate({
-  input: { text: 'What are the key findings?' },
-  provider: 'openai',
-  model: 'gpt-4o',
-  rag: {
-    files: ['./docs/report.md'],
-    strategy: 'markdown', // Explicitly specify strategy based on content type
-    chunkSize: 1000,
-    topK: 5,
-  },
+const strategy = getRecommendedStrategy('text/markdown'); // 'markdown'
+await pipeline.ingest(['./docs/report.md'], {
+  strategy,
+  chunkSize: 1000,
 });
 ```
 
-The registry uses a factory pattern with lazy loading. Each chunker is loaded only when first used, keeping the initial bundle small. The registry also supports aliases: `'md'` resolves to `'markdown'`, `'tex'` to `'latex'`, and `'langchain-default'` to `'recursive'`.
+The registry creates a chunker when requested. Pass one of the ten exact strategy names shown above -- `ChunkerRegistry.get()` throws on anything else.
 
 ### When to Use Each Strategy
 
@@ -192,19 +193,19 @@ The registry uses a factory pattern with lazy loading. Each chunker is loaded on
 
 **Sentence chunking** splits at sentence boundaries (periods, question marks, exclamation marks) and groups sentences to fill the chunk size. It is ideal for Q&A applications where each chunk should contain complete thoughts.
 
-**Token chunking** splits by token count using model-specific tokenizers. Use it when you need exact token budgets, such as when your embedding model has a strict 512-token limit.
+**Token chunking** estimates token counts from words and a configurable characters-per-token ratio (`cl100k_base` defaults to four characters per token). Use it for approximate token-aware budgets; it does not run an exact model tokenizer.
 
-**Markdown chunking** splits at heading boundaries, preserving the heading hierarchy as metadata. For documentation workflows, this is almost always the right choice.
+**Markdown chunking** splits at configured heading levels and records each chunk's heading text and level in metadata. It is a strong starting point for documentation workflows.
 
 **Semantic chunking** uses embedding similarity to detect where the topic changes within a document. It is the highest-quality strategy for documents where structural markers do not align with topic boundaries, but it is slower due to the embedding calls.
 
-**HTML chunking** splits at semantic HTML tags (`<article>`, `<section>`, `<p>`, `<h1>`-`<h6>`). Essential for web content scraping where DOM structure carries meaning.
+**HTML chunking** uses structural-tag patterns to split content; its default tags include `<div>`, `<p>`, `<section>`, `<article>`, and `<header>`, among others (13 in total, including list and table tags), and you can supply a custom `splitTags` list. It is useful for web content where markup structure carries meaning.
 
-**JSON chunking** splits at object boundaries, respecting nesting depth. It ensures that no chunk contains an invalid JSON fragment.
+**JSON chunking** parses the input and splits arrays, objects, and selected keys while tracking JSON paths. Each emitted chunk is serialized independently as JSON, with fallback handling when a value exceeds the configured size.
 
-**LaTeX chunking** splits at `\section`, `\subsection`, `\begin{environment}`, and math blocks. Critical for academic papers where equations and proofs must stay intact.
+**LaTeX chunking** splits at configurable sectioning commands such as `\section` and `\subsection`. By default it protects common display-math environments and `\[...\]` blocks while splitting oversized section content.
 
-**Code chunking** splits at function, class, and import boundaries. It keeps complete code units together so that retrieved chunks are syntactically valid.
+**Semantic-Markdown chunking** first splits at markdown headings, then merges adjacent small sections while their combined size remains within `maxSize`. Despite the strategy name, the current implementation does not calculate embedding similarity during that merge.
 
 ## Hybrid search: BM25 + Vector
 
@@ -212,9 +213,9 @@ The registry uses a factory pattern with lazy loading. Each chunker is loaded on
 
 Vector search excels at semantic similarity. It can match "authentication workflow" with "login process" because the embeddings are close in vector space. But it struggles with exact keyword matches. Searching for "NeuroLink" as a specific term might not surface documents that mention it by name if the embedding model does not weight that token highly.
 
-BM25 (the algorithm behind Elasticsearch and other full-text search engines) is the opposite. It catches exact terms with precision but misses semantic equivalence entirely. Searching for "React hooks" with BM25 will never match "component lifecycle patterns" even though they are conceptually related.
+BM25 (the algorithm behind Elasticsearch and other full-text search engines) emphasizes lexical overlap instead. It can rank exact terms effectively but does not directly model semantic equivalence, so a query for "React hooks" may not surface a passage that only says "component lifecycle patterns."
 
-Hybrid search combines both for the best recall. In our benchmarks, hybrid search improves recall@5 by 8-12% over pure vector search across all chunking strategies.
+Hybrid search combines both signals: vector search can catch paraphrases and synonyms, while BM25 favors exact identifiers and jargon. Evaluate the fused ranking against vector-only and BM25-only baselines on your own queries.
 
 ### Reciprocal Rank Fusion (RRF)
 
@@ -230,50 +231,70 @@ flowchart LR
 RRF is a rank-based fusion method that does not depend on the absolute scores from each search system. It combines rankings using the formula: `score = 1/(k + rank_vector) + 1/(k + rank_bm25)` where `k` is a constant (typically 60). This makes it robust across different scoring scales.
 
 ```typescript
-// Hybrid search is configured via the RAGPipeline class
+// The simplest path: enable hybrid search on RAGPipeline and request it per query.
+// RAGPipeline fuses vector and BM25 results with RRF at an equal 0.5/0.5 weighting.
 import { RAGPipeline } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  searchStrategy: 'hybrid',
-  hybridOptions: {
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4-mini' },
+  enableHybridSearch: true,
+});
+
+await pipeline.ingest(['./docs/architecture.md', './docs/setup.md']);
+const response = await pipeline.query('How to implement rate limiting in Express', {
+  hybrid: true,
+});
+console.log(response.answer);
+```
+
+To control the vector/BM25 weighting or the RRF constant directly, call the standalone `createHybridSearch()` function instead of going through `RAGPipeline`:
+
+```typescript
+import { createHybridSearch, InMemoryBM25Index, InMemoryVectorStore } from '@juspay/neurolink';
+
+const vectorStore = new InMemoryVectorStore();
+const bm25Index = new InMemoryBM25Index();
+
+// Populate both indexes with the same document chunks before searching.
+const hybridSearch = createHybridSearch({
+  vectorStore,
+  bm25Index,
+  indexName: 'docs',
+  embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
+  defaultConfig: {
     vectorWeight: 0.6,   // Weight for semantic similarity
     bm25Weight: 0.4,     // Weight for keyword matching
     fusionMethod: 'rrf', // 'rrf' or 'linear'
-    rrf: {
-      k: 60, // RRF constant (higher = more weight to lower ranks)
-    },
+    rrfK: 60,            // RRF constant (higher = more weight to lower ranks)
   },
 });
 
-await pipeline.ingest(['./docs/*.md']);
-const response = await pipeline.query('How to implement rate limiting in Express');
-console.log(response.answer);
+const results = await hybridSearch('How to implement rate limiting in Express', { topK: 10 });
 ```
 
 ### Linear Combination
 
-If you prefer a simpler fusion method, linear combination directly blends the normalized scores:
+If you prefer a simpler fusion method, linear combination directly blends the normalized scores. Pass `fusionMethod: 'linear'` to the same `createHybridSearch()` config:
 
 ```typescript
-// Alternative: linear combination of scores via RAGPipeline
-const pipeline = new RAGPipeline({
+// Reuse the populated vectorStore and bm25Index from the RRF example.
+const linearHybridSearch = createHybridSearch({
+  vectorStore,
+  bm25Index,
+  indexName: 'docs',
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  searchStrategy: 'hybrid',
-  hybridOptions: {
+  defaultConfig: {
     vectorWeight: 0.7,
     bm25Weight: 0.3,
     fusionMethod: 'linear',
   },
 });
 
-await pipeline.ingest(['./docs/*.md']);
-const response = await pipeline.query('React hooks best practices');
+const results = await linearHybridSearch('React hooks best practices', { topK: 10 });
 ```
 
-Linear combination is simpler to reason about but requires that both search systems produce scores on comparable scales. RRF is generally more robust and is the recommended default.
+Linear combination is simpler to reason about but depends on score normalization. RRF is rank-based and avoids comparing the raw scales directly; test both methods against your evaluation set.
 
 ## Reranking: The Quality Filter
 
@@ -281,74 +302,43 @@ Linear combination is simpler to reason about but requires that both search syst
 
 Initial retrieval (vector + BM25) is optimized for speed. It scans thousands of chunks in milliseconds to produce a rough top-K. But fast retrieval is approximate. It often includes chunks that are topically related but not directly answering the question.
 
-Reranking applies a more sophisticated (but slower) model to the top candidates. Instead of comparing the query to each chunk independently, a cross-encoder model evaluates the query-chunk pair together, producing a much more accurate relevance score. The trade-off is latency, which is why reranking is applied only to the top candidates rather than the full index.
+Reranking applies a more sophisticated (but slower) model to the top candidates. NeuroLink's built-in `rerank()` function combines an LLM-based semantic relevance score with the original vector similarity and result position into a single multi-factor score. The trade-off is latency, which is why reranking is applied only to the top candidates rather than the full index.
 
-In practice, reranking dramatically improves precision at the top positions. The answer you want moves from position 5 to position 1.
+When the semantic scorer distinguishes a directly relevant chunk from merely topical ones, reranking can move that chunk toward the top. Measure the effect on your own query set because the result depends on the retrieval candidates and scoring model.
 
-### Cohere Reranking
+> **Note:** NeuroLink also exports `RerankerType` values for `cohere` and `cross-encoder` through the reranker factory, but the underlying `CohereRelevanceScorer` and `CrossEncoderReranker` classes are stubs that throw at call time until you wire up your own Cohere API key or cross-encoder model -- they are not drop-in working backends. The `llm` reranker (the `rerank()` function below) is the one that works out of the box.
+{: .prompt-warning }
+
+### LLM-Based Multi-Factor Reranking
 
 ```typescript
-// Reranking is configured via the RAGPipeline class
-const pipeline = new RAGPipeline({
-  embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  searchStrategy: 'hybrid',
-  reranker: {
-    type: 'cohere',
-    model: 'rerank-english-v3.0',
-    topN: 5,
-  },
-});
+import { rerank, ProviderFactory } from '@juspay/neurolink';
 
-await pipeline.ingest(['./docs/*.md']);
-const response = await pipeline.query('Kubernetes pod autoscaling configuration');
+const rerankModel = await ProviderFactory.createProvider('openai', 'gpt-5.4-mini');
+
+const reranked = await rerank(results, 'Kubernetes pod autoscaling configuration', rerankModel, {
+  topK: 5,
+});
 ```
 
-Cohere's reranking model is purpose-built for relevance scoring. It evaluates query-document pairs holistically, considering word order, negation, and contextual meaning that bi-encoder models miss.
+The `rerank()` function scores each result on three factors -- semantic relevance (an LLM call), the original vector similarity, and rank position -- then combines them into one score. Pass a `weights` object (`{ semantic, vector, position }`, must sum to 1.0) to shift the balance; the default is `{ semantic: 0.4, vector: 0.4, position: 0.2 }`.
 
-### Cross-Encoder Reranking
+### Custom Weighting
 
-```typescript
-const pipeline = new RAGPipeline({
-  embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  reranker: {
-    type: 'cross-encoder',
-    model: 'cross-encoder/ms-marco-MiniLM-L-12-v2',
-    topN: 5,
-  },
-});
-
-await pipeline.ingest(['./docs/*.md']);
-const response = await pipeline.query('How to handle database migrations');
-```
-
-### Custom Reranking
-
-For domain-specific scoring needs, you can provide a custom reranking function:
+For domain-specific tuning, adjust the scoring weights rather than writing a separate reranking function:
 
 ```typescript
-// Custom reranking via the reranker factory registry
-const pipeline = new RAGPipeline({
-  embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  reranker: {
-    type: 'custom',
-    rerankerFn: async (query, documents) => {
-      // Your custom scoring logic
-      return documents
-        .map(doc => ({
-          ...doc,
-          score: customScoringFunction(query, doc.content),
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5);
-    },
+const reranked = await rerank(results, query, rerankModel, {
+  topK: 5,
+  weights: {
+    semantic: 0.6, // Lean harder on LLM relevance judgment
+    vector: 0.3,
+    position: 0.1,
   },
 });
 ```
 
-Custom rerankers are useful when you have domain-specific relevance signals that general models miss, such as recency, authority, or regulatory importance.
+Weighting the semantic factor higher favors LLM judgment over raw vector similarity; weighting position higher keeps the original retrieval order more intact. There is no separate custom-function hook -- `rerank()`'s three factors and their weights are the available levers.
 
 ## Graph RAG: Knowledge-Aware Retrieval
 
@@ -375,149 +365,145 @@ Graph RAG is particularly effective for queries that span multiple topics or req
 
 ## Metadata extraction
 
-LLM-powered metadata extraction enriches each chunk with structured information: title, summary, keywords, and auto-generated Q&A pairs. This metadata serves two purposes: it enables faceted filtering (narrow results by topic before vector search) and it improves retrieval quality by providing additional search signals.
+LLM-powered metadata extraction enriches each chunk with a title, summary, and keywords. Applications can display these fields or pass supported metadata filters to their vector-store adapter; measure whether they improve retrieval for your corpus.
 
 ```typescript
-// Metadata extraction is handled within the RAGPipeline during ingestion
+// Pass extractMetadata: true to ingest() -- title, summary, and keywords
+// are extracted for every chunk automatically.
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  metadataExtraction: {
-    enabled: true,
-    extractFields: ['title', 'summary', 'keywords', 'questions'],
-    model: 'gpt-4o-mini', // Use cheap model for metadata extraction
-  },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4-mini' },
 });
 
-await pipeline.ingest(['./docs/*.md']);
+await pipeline.ingest(['./docs/architecture.md', './docs/setup.md'], {
+  extractMetadata: true,
+});
 
 // Query with metadata-enriched retrieval
 const response = await pipeline.query('authentication best practices');
 console.log(response.answer);
 ```
 
-The `questions` field is especially powerful. During ingestion, the LLM generates hypothetical questions that each chunk could answer. At query time, the system can match the user's question against these generated questions for more accurate retrieval. This technique — generating hypothetical questions during ingestion — consistently improves retrieval quality by enabling question-to-question matching at query time. Note: this is distinct from HyDE (Hypothetical Document Embeddings), which instead generates a hypothetical answer at query time and uses its embedding for retrieval.
+`extractMetadata: true` requests title, summary, and keywords for each chunk; the extracted fields are fixed, not configurable per `ingest()` call. These fields are attached to chunk metadata. In the current implementation the metadata extractor uses its own default provider and model rather than the pipeline's `generationModel`, so configure credentials for that path and verify its model choice for your deployment.
 
-> **Note:** Use `gpt-4o-mini` or a similarly inexpensive model for metadata extraction. The quality difference between extraction models is minimal, but the cost difference is significant when processing thousands of chunks.
+> **Note:** Metadata extraction can make several LLM calls per chunk because title, summary, and keywords are extracted separately (with document-title caching). Account for that latency and cost during ingestion.
 {: .prompt-info }
 
 ## RAG Resilience: Circuit Breakers and Retry
 
 A production RAG pipeline depends on multiple external services: embedding APIs, vector databases, reranking services, and LLM providers. Any of these can fail, and your pipeline needs to handle failures gracefully.
 
+Resilience is not a `RAGPipeline` constructor option -- `RAGPipeline` itself has no circuit-breaker or retry config. Instead, wrap pipeline calls with the standalone `executeWithCircuitBreaker` function and `RAGRetryHandler` class:
+
 ```typescript
-// Built-in resilience configuration is part of the RAGPipeline
-import { RAGPipeline } from '@juspay/neurolink';
+import { RAGPipeline, RAGRetryHandler, executeWithCircuitBreaker } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  resilience: {
-    circuitBreaker: {
-      failureThreshold: 5,
-      resetTimeout: 30000,
-    },
-    retry: {
-      maxAttempts: 3,
-      backoffMultiplier: 2,
-    },
-    monitoring: {
-      trackP95: true,
-      alertThresholdMs: 500,
-    },
-  },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4' },
 });
+
+const retryHandler = new RAGRetryHandler({ maxRetries: 3, backoffMultiplier: 2 });
+
+const response = await executeWithCircuitBreaker(
+  'rag-query',
+  () => retryHandler.executeWithRetry(() => pipeline.query('user question')),
+  'query',
+  { failureThreshold: 5, resetTimeout: 30000 },
+);
 ```
 
-The circuit breaker monitors failure rates for each external service. After five consecutive failures, it opens the circuit and stops sending requests for 30 seconds. This prevents cascading failures and gives the service time to recover.
+The circuit breaker tracks calls for the named operation (`'rag-query'` here). Once at least ten calls have been recorded (the default `minimumCallsBeforeCalculation`), it opens when failures in the five-minute statistics window reach `failureThreshold` (five here), then stops sending requests for 30 seconds (`resetTimeout`). This prevents cascading failures and gives the service time to recover.
 
-The retry handler applies exponential backoff for transient errors. With a backoff multiplier of 2, retries happen at 1s, 2s, and 4s intervals, giving temporary issues time to resolve.
+`RAGRetryHandler` wraps an operation with exponential backoff and jitter. With `maxRetries: 3`, a backoff multiplier of 2, and the default 1000ms initial delay, it can make the initial attempt plus three retries delayed by roughly 1s, 2s, and 4s (plus jitter), giving transient issues time to resolve.
 
-P95 latency tracking monitors the 95th percentile response time. When retrieval latency exceeds the alert threshold (500ms), the system can trigger alerts or automatically degrade to a faster but less accurate retrieval mode (for example, falling back to BM25-only search if the vector store is slow).
-
-> **Note:** Graceful degradation is a key design principle. If the vector database is down, the pipeline falls back to BM25-only search. If the reranker is unavailable, it skips reranking and returns the initial retrieval results. The system always returns an answer, even if the quality is reduced.
+> **Note:** There is no built-in P95 latency tracking or automatic degrade-to-BM25 behavior in `RAGPipeline` -- if you need latency monitoring or fallback search modes, implement them around the wrapped call shown above using your own observability stack.
 {: .prompt-info }
 
-## Evaluation with RAGAS Metrics
+## Evaluate Retrieval Quality
 
-Building a RAG pipeline is only half the battle. Measuring its quality is equally important. RAGAS (Retrieval-Augmented Generation Assessment) provides standardized metrics for evaluating RAG systems:
+Building a RAG pipeline is only half the work; measure it against a representative query set. NeuroLink's RAG module does not currently export built-in RAGAS scorers, so connect an evaluation library or implement application-level checks for metrics such as:
 
-- **Faithfulness** -- Does the answer stick to the retrieved context, or does it hallucinate?
-- **Answer Relevance** -- Is the answer relevant to the question?
-- **Context Relevance** -- Are the retrieved chunks relevant to the question?
+- **Faithfulness** -- Does the answer stay supported by the retrieved context?
+- **Answer relevance** -- Does the answer address the question?
+- **Context relevance** -- Are the retrieved chunks relevant to the question?
 
-Automated evaluation lets you run regression tests whenever you change chunking strategies, reranking models, or retrieval parameters. You can set quality thresholds and block deployments that degrade RAG quality below your baseline.
+Run the same evaluation set whenever you change chunking strategies, reranking models, or retrieval parameters. Establish baselines before setting deployment thresholds.
 
 ## Putting it all together
 
-Here is a complete advanced RAG pipeline combining auto-detected chunking, hybrid search, Cohere reranking, metadata extraction, and circuit breaker resilience:
+Here is an advanced RAG pipeline combining recursive chunking, hybrid search, metadata extraction, and circuit-breaker resilience, followed by an optional LLM-based reranking pass over the returned sources:
 
 ```typescript
-import { RAGPipeline, NeuroLink } from '@juspay/neurolink';
+import {
+  RAGPipeline,
+  RAGRetryHandler,
+  executeWithCircuitBreaker,
+  rerank,
+  ProviderFactory,
+} from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  searchStrategy: 'hybrid',
-  hybridOptions: {
-    vectorWeight: 0.6,
-    bm25Weight: 0.4,
-    fusionMethod: 'rrf',
-  },
-  reranker: {
-    type: 'cohere',
-    model: 'rerank-english-v3.0',
-    topN: 5,
-  },
-  metadataExtraction: {
-    enabled: true,
-    extractFields: ['title', 'summary', 'keywords'],
-    model: 'gpt-4o-mini',
-  },
-  resilience: {
-    circuitBreaker: { failureThreshold: 5, resetTimeout: 30000 },
-    retry: { maxAttempts: 3, backoffMultiplier: 2 },
-    monitoring: { trackP95: true, alertThresholdMs: 500 },
-  },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4' },
+  enableHybridSearch: true,
 });
 
-// Ingest your documentation
-await pipeline.ingest(['./docs/*.md', './docs/*.txt']);
+// Ingest your documentation with metadata extraction turned on
+await pipeline.ingest(['./docs/architecture.md', './docs/setup.md'], {
+  extractMetadata: true,
+});
 
-// Query with full advanced pipeline
-const response = await pipeline.query(
-  'How do I configure streaming with error handling?'
+const retryHandler = new RAGRetryHandler({ maxRetries: 3, backoffMultiplier: 2 });
+
+// Query through hybrid search, wrapped in retry + circuit breaker
+const response = await executeWithCircuitBreaker(
+  'rag-query',
+  () =>
+    retryHandler.executeWithRetry(() =>
+      pipeline.query('How do I configure streaming with error handling?', {
+        hybrid: true,
+      }),
+    ),
+  'query',
+  { failureThreshold: 5, resetTimeout: 30000 },
 );
 
 console.log(response.answer);
 console.log(`Sources: ${response.sources.length}`);
+
+// Optionally rerank the sources with the multi-factor LLM reranker before
+// using them elsewhere (e.g. for a citation UI)
+const rerankModel = await ProviderFactory.createProvider('openai', 'gpt-5.4-mini');
+const rerankedSources = await rerank(
+  response.sources,
+  'How do I configure streaming with error handling?',
+  rerankModel,
+  { topK: 5 },
+);
 ```
 
 ## Comparison: Basic RAG vs Advanced RAG
 
 | Dimension | Basic RAG | Advanced RAG |
 |-----------|-----------|-------------|
-| Chunking | Fixed-size character splits | Strategy auto-selected by content type |
+| Chunking | Fixed-size character splits | Content-appropriate strategy selected by the application |
 | Search | Vector-only | Hybrid (BM25 + Vector + RRF) |
 | Ranking | Single score | Multi-stage: initial + reranking |
-| Metadata | None | LLM-extracted (title, keywords, Q&A) |
+| Metadata | None | LLM-extracted (title, summary, keywords) |
 | Graph | None | Knowledge graph traversal |
-| Resilience | None | Circuit breaker + retry + P95 tracking |
-| Quality | Variable | RAGAS-evaluated |
+| Resilience | None | Circuit breaker + retry (wrapped around calls) |
+| Quality | Unevaluated by default | Application-supplied evaluation set |
 
-The jump from basic to advanced RAG is significant. In our internal benchmarks across 500 documents and 500 queries, advanced RAG with hybrid search and reranking achieved 92-94% recall@5 on documentation workloads, compared to 71-78% for basic RAG with character splitting and vector-only search.
+Advanced RAG adds more retrieval signals and tuning points: hybrid search can recover exact-keyword matches that vector-only search misses, while reranking can reorder candidates using semantic, vector, and position scores. Run your own evaluation against the actual document set and query distribution before treating any quality claim as representative.
 
 ## Design decisions and Trade-offs
 
-We chose content-aware chunking over universal strategies because the data shows that document structure matters more than chunk size for retrieval quality. The trade-off is configuration complexity -- ten strategies require selection logic -- which we addressed with `getRecommendedStrategy()` based on MIME type detection.
+Content-aware chunking trades simplicity for quality: document structure (headings, code blocks, table boundaries) carries retrieval-relevant signal that a fixed-size splitter throws away, but ten strategies also mean selection logic. `getRecommendedStrategy(contentType)` maps a MIME type or document-type string to a sensible default when you call it; `RAGPipeline.ingest()` otherwise uses the pipeline's configured `defaultChunkingStrategy` (default `recursive`).
 
-The hybrid search design (BM25 plus vector with RRF fusion) adds latency compared to vector-only search. We accepted this trade-off because hybrid search consistently outperforms vector-only on real-world queries that mix technical terms with semantic concepts.
+The hybrid search design (BM25 plus vector with RRF fusion) adds latency compared to vector-only search, since it runs two retrieval passes and fuses them. That cost is worth paying when queries mix exact technical terms (function names, error codes, config keys) with semantic concepts that a keyword search alone would miss.
 
-For related architecture decisions:
-
-- [Building RAG Applications](/posts/rag-application-typescript-tutorial/) for the foundational pipeline if you are new to RAG
-- Vector Database Guide for choosing the right production vector store
-- Embeddings and Vector Operations for embedding models and similarity metrics
+If you are new to RAG, start with [Building RAG Applications](/posts/rag-application-typescript-tutorial/) for the foundational pipeline before layering on the chunking, hybrid search, and reranking strategies covered here.
 
 ---
 

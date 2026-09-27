@@ -88,7 +88,7 @@ Unit tests verify your application logic without hitting any AI provider APIs. T
 NeuroLink provides `ProcessorRegistry.resetInstance()` to reset singleton state between tests, preventing test pollution.
 
 ```typescript
-import { ProcessorRegistry } from '@juspay/neurolink';
+import { ProcessorRegistry } from '@juspay/neurolink/processors';
 
 // Reset singleton between tests
 beforeEach(() => {
@@ -137,7 +137,7 @@ test('generates content with OpenAI', async () => {
   const result = await neurolink.generate({
     input: { text: 'Say "hello world" and nothing else.' },
     provider: 'openai',
-    model: 'gpt-4o-mini', // Use cheapest model for CI
+    model: 'gpt-5.4-mini', // Use cheapest model for CI
   });
 
   expect(result.content).toBeTruthy();
@@ -148,7 +148,7 @@ test('generates content with OpenAI', async () => {
 
 ### Integration testing best practices
 
-- **Use the cheapest model tier for CI tests.** `gpt-4o-mini` instead of `gpt-4o`, `claude-haiku` instead of `claude-sonnet`. The goal is to verify the integration works, not the model quality.
+- **Use the cheapest model tier for CI tests.** `gpt-5.4-mini` instead of `gpt-5.4`, `claude-haiku-4-5-20251001` instead of `claude-sonnet-5`. The goal is to verify the integration works, not the model quality.
 - **Set strict timeouts.** AI API calls can hang during outages. Use `withTimeout(operation, 30000, error)` to fail fast.
 - **Test provider failover.** Temporarily disable one provider (remove the API key) and verify that the fallback provider handles the request.
 - **Budget management.** Track CI test costs separately. Tag API calls with a CI identifier so you can monitor and cap spending.
@@ -160,32 +160,19 @@ test('generates content with OpenAI', async () => {
 This is the layer that makes AI CI/CD unique. Instead of asserting exact values, you evaluate the quality of AI responses against configurable thresholds.
 
 ```typescript
-// Quality gate: auto-evaluation must pass
+// Quality gate: response quality must clear the threshold
 test('report generation meets quality threshold', async () => {
   const neurolink = new NeuroLink();
-
-  // Configure middleware separately
-  const middleware = new MiddlewareFactory({
-    middlewareConfig: {
-      autoEvaluation: {
-        enabled: true,
-        config: {
-          threshold: 7,
-          blocking: true,
-        },
-      },
-    },
-  });
 
   const result = await neurolink.generate({
     input: { text: 'Generate a quarterly sales analysis report.' },
     provider: 'anthropic',
     model: 'claude-sonnet-4-5-20250929',
+    enableEvaluation: true,
   });
 
-  // Check evaluation scores
-  expect(result.evaluationResult?.finalScore).toBeGreaterThanOrEqual(7);
-  expect(result.evaluationResult?.isPassing).toBe(true);
+  // Check the quality score NeuroLink attaches to the response
+  expect(result.evaluation?.overall).toBeGreaterThanOrEqual(7);
 });
 ```
 
@@ -212,6 +199,7 @@ Log evaluation scores for each CI run. Plot them over time. A declining trend in
 Separate environment configurations ensure NeuroLink behaves appropriately in each deployment stage.
 
 ```bash
+# .env.ci
 NEUROLINK_TELEMETRY_ENABLED=false
 OPENAI_API_KEY=${CI_OPENAI_API_KEY}  # From CI secrets
 ANTHROPIC_API_KEY=${CI_ANTHROPIC_API_KEY}
@@ -249,7 +237,7 @@ neurolink serve --framework hono --port 3000 --cors --rate-limit 100
 
 # Health check endpoint for load balancer
 curl http://localhost:3000/api/health
-curl http://localhost:3000/api/ready
+curl http://localhost:3000/api/health/ready
 
 # Status endpoint for monitoring
 neurolink serve status --format json
@@ -272,7 +260,7 @@ CMD ["node", "node_modules/.bin/neurolink", "serve", "--framework", "hono", "--p
 ### Kubernetes health probes
 
 - **Liveness probe:** `GET /api/health` -- Returns 200 if the server is running. Failure triggers a pod restart.
-- **Readiness probe:** `GET /api/ready` -- Returns 200 if the tool registry is loaded and providers are available. Failure removes the pod from the service endpoint.
+- **Readiness probe:** `GET /api/health/ready` -- Returns 200 if the tool registry has tools loaded, or there is no external MCP server manager, or all external servers are connected. Failure removes the pod from the service endpoint.
 
 Rolling updates deploy new pods that must pass both health checks before old pods are terminated. This ensures zero-downtime deployments.
 
@@ -349,7 +337,7 @@ Use this checklist when setting up CI/CD for your AI application:
 - [ ] Quality evaluation gates, not just pass/fail assertions
 - [ ] Cost tracking per CI run (tag API calls with CI identifiers)
 - [ ] Model version pinning in production (avoid surprise model updates)
-- [ ] Health checks on every deployment (`/api/health`, `/api/ready`)
+- [ ] Health checks on every deployment (`/api/health`, `/api/health/ready`)
 - [ ] Telemetry enabled in staging and production
 - [ ] Secrets management for API keys (never commit keys to source control)
 - [ ] Timeout configuration for all AI calls (prevent hanging tests)

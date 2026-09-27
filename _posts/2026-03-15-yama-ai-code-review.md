@@ -75,22 +75,25 @@ pnpm yama review --pr 1234
 
 The CLI instantiates a NeuroLink instance configured with the LiteLLM provider, which routes to our private model deployment. It then uses the Bitbucket Server MCP to fetch the PR diff, reads the project memory bank for context, and performs a file-by-file analysis. Each finding gets posted back to Bitbucket as an inline comment with the exact file path and line number.
 
-The NeuroLink instantiation is minimal:
+The NeuroLink call is minimal:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
 
-const neurolink = new NeuroLink({
-  defaultProvider: "litellm",
-  defaultModel: "private-large",
+const neurolink = new NeuroLink();
+
+const result = await neurolink.generate({
+  input: { text: reviewPrompt },
+  provider: "litellm",
+  model: "private-large",
 });
 ```
 
-The LiteLLM provider gives us access to our private model deployment behind NeuroLink's standard `generate()` and `stream()` interface. The model choice is configurable per project -- some repositories use a larger model for more nuanced analysis, while others use a faster model for quicker turnaround.
+The LiteLLM provider gives us access to our private model deployment behind NeuroLink's standard `generate()` and `stream()` interface. `provider` and `model` are set per call, which is what makes the model choice configurable per project -- some repositories use a larger model for more nuanced analysis, while others use a faster model for quicker turnaround.
 
 ## The Four Focus Areas
 
-Every Yama review is structured around four focus areas. This is not arbitrary. We analyzed six months of production incidents at Juspay and categorized the root causes. The four focus areas map directly to the four most common categories of bugs that escaped code review.
+Every Yama review is structured around four focus areas. This is not arbitrary. The four focus areas were chosen because they map to the most common categories of bugs that escape code review.
 
 | Focus Area | Priority | What It Checks |
 |---|---|---|
@@ -368,7 +371,7 @@ The cost control system works on two levels:
 - **Warning at $1.50.** The review continues, but a cost warning is logged.
 - **Hard stop at $2.00.** The review terminates, posts whatever findings it has accumulated so far, and logs the cost overage.
 
-In practice, the median review costs $0.40. A large PR (50+ files) costs around $1.20. Only pathological diffs -- typically generated code or large refactors -- hit the $2.00 limit.
+In practice, typical reviews cost well under the $2.00 hard limit. Only pathological diffs -- typically generated code or large refactors -- get anywhere close to it.
 
 Token usage, tool calls, and cost data are exported to `.yama/analytics/` as JSON after every review. This gives teams visibility into review costs over time and helps identify repositories where the review configuration needs tuning.
 
@@ -417,7 +420,7 @@ This summarized context gets included in future reviews, making Yama progressive
 
 ## Lessons Learned
 
-After six months of running Yama in production across multiple Juspay repositories, we have a clear picture of what AI code review does well and where it struggles.
+Having run Yama across multiple Juspay repositories, we have a clear picture of what AI code review does well and where it struggles.
 
 **What AI code review gets right:**
 
@@ -457,7 +460,7 @@ An engineer describes a task in a Slack thread. Tara implements it and creates a
 
 This is not a fully autonomous loop. The engineer is always in the decision seat. But the repetitive work -- implementation, systematic review, iteration -- is handled by the agents. The engineer's time is spent on judgment calls: is this the right approach, does the implementation match the requirement, are Yama's findings valid.
 
-In practice, we have seen this loop reduce the time from task description to merged PR by forty to sixty percent. The engineer is not faster at typing. The agents are handling the parts that used to require context switching, queue waiting, and repetitive analysis.
+In practice, we have seen this loop meaningfully speed up the time from task description to merged PR. The engineer is not faster at typing. The agents are handling the parts that used to require context switching, queue waiting, and repetitive analysis.
 
 ## Getting Started
 

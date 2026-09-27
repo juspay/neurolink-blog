@@ -26,7 +26,7 @@ image:
   alt: 'Building a Slack Bot with AI: Complete Guide'
 ---
 
-You will build a production-ready AI Slack bot using the Slack Bolt SDK and NeuroLink. By the end of this tutorial, your bot will respond to mentions and direct messages with AI-generated answers, call tools to search your knowledge base and query business metrics, summarize threads on demand via slash commands, stream long responses with progressive message updates, and maintain conversation context per thread.
+You will build an AI Slack bot using the Slack Bolt SDK and NeuroLink. By the end of this tutorial, your bot will respond to mentions and direct messages with AI-generated answers, call tools to search your knowledge base and query business metrics, summarize a linked thread on demand via a slash command, stream long responses with progressive message updates, and maintain conversation context per thread.
 
 The stack is straightforward: Slack Bolt SDK for the integration layer and NeuroLink SDK for AI generation, tool orchestration, and conversation memory. Now you will set up the architecture and build your first message handler.
 
@@ -106,7 +106,11 @@ app.event("app_mention", async ({ event, say }) => {
   const result = await neurolink.generate({
     input: { text: event.text },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
+    context: {
+      sessionId: event.thread_ts || event.ts,
+      userId: event.user,
+    },
     systemPrompt: `You are a helpful team assistant in a Slack workspace.
       Be concise and use Slack formatting (bold, code blocks, bullet lists).
       Current channel: <#${event.channel}>`,
@@ -126,7 +130,11 @@ app.event("message", async ({ event, say }) => {
   const result = await neurolink.generate({
     input: { text: event.text || "" },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
+    context: {
+      sessionId: `dm:${event.channel}:${event.user}`,
+      userId: event.user,
+    },
   });
 
   await say(result.content);
@@ -138,7 +146,7 @@ app.event("message", async ({ event, say }) => {
 })();
 ```
 
-A few important details in this code. The `conversationMemory: { enabled: true }` setting in the NeuroLink constructor enables automatic conversation tracking. Each subsequent call to `generate()` builds on previous interactions, so the bot remembers what was said earlier in a thread. The `thread_ts` parameter ensures replies go into the correct Slack thread rather than the main channel.
+A few important details in this code. The `conversationMemory: { enabled: true }` setting enables conversation storage, while each `context.sessionId` selects the history for one Slack conversation. Mentions use the thread timestamp (or the event timestamp for a new thread), and DMs use a stable channel-and-user key, so later calls build on the correct history without mixing unrelated conversations. The `thread_ts` parameter ensures mention replies go into the correct Slack thread rather than the main channel.
 
 The system prompt instructs the AI to use Slack-compatible formatting. Bold text uses asterisks, code blocks use triple backticks, and bullet lists use dashes -- all standard Slack markdown.
 
@@ -156,7 +164,7 @@ import { z } from "zod";
 export const botTools = {
   searchDocs: tool({
     description: "Search the team knowledge base for answers to questions",
-    parameters: z.object({
+    inputSchema: z.object({
       query: z.string().describe("Search query"),
     }),
     execute: async ({ query }) => {
@@ -171,7 +179,7 @@ export const botTools = {
 
   queryMetrics: tool({
     description: "Query business metrics from the analytics database",
-    parameters: z.object({
+    inputSchema: z.object({
       metric: z.string().describe("Metric name (e.g., revenue, signups, churn)"),
       period: z.enum(["today", "this_week", "this_month", "this_quarter"]),
     }),
@@ -186,7 +194,7 @@ export const botTools = {
 
   createTicket: tool({
     description: "Create a support ticket in the ticketing system",
-    parameters: z.object({
+    inputSchema: z.object({
       title: z.string().describe("Ticket title"),
       description: z.string().describe("Ticket description"),
       priority: z.enum(["low", "medium", "high", "critical"]),
@@ -206,7 +214,7 @@ Now update your bot to use these tools. The AI will automatically decide when to
 const result = await neurolink.generate({
   input: { text: event.text },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tools: botTools,
   systemPrompt: `You are a team assistant with access to tools.
     Use searchDocs to answer knowledge questions.
@@ -224,7 +232,7 @@ With this setup, a user can say "@bot what were our signups this month?" and the
 
 Slash commands give users quick access to specific bot capabilities. Unlike mentions, slash commands are explicit and structured, making them ideal for common actions.
 
-Register two slash commands in your Slack app settings: `/ask` for quick questions and `/summarize` for thread summarization.
+Register two slash commands in your Slack app settings: `/ask` for quick questions and `/summarize` for thread summarization. Because Slack does not pass the current thread timestamp to a slash command, `/summarize` accepts a message link (or raw Slack timestamp) for the thread to summarize.
 
 ```typescript
 // /ask command for quick questions
@@ -234,7 +242,7 @@ app.command("/ask", async ({ command, ack, respond }) => {
   const result = await neurolink.generate({
     input: { text: command.text },
     provider: "openai",
-    model: "gpt-4o-mini", // Faster for slash commands
+    model: "gpt-5.4-mini", // Faster for slash commands
     tools: botTools,
   });
 
@@ -244,14 +252,28 @@ app.command("/ask", async ({ command, ack, respond }) => {
   });
 });
 
-// /summarize command for thread summarization
+// /summarize <message-link-or-thread-timestamp>
 app.command("/summarize", async ({ command, ack, respond, client }) => {
   await ack();
 
-  // Fetch thread messages
+  const argument = command.text.trim();
+  const linkMatch = argument.match(/\/archives\/([A-Z0-9]+)\/p(\d{10})(\d{6})/i);
+  const rawTimestamp = /^\d{10}\.\d{6}$/.test(argument) ? argument : undefined;
+  const channel = linkMatch?.[1] || command.channel_id;
+  const threadTs = linkMatch
+    ? `${linkMatch[2]}.${linkMatch[3]}`
+    : rawTimestamp;
+
+  if (!threadTs) {
+    await respond(
+      "Usage: `/summarize <Slack message link or thread timestamp>`"
+    );
+    return;
+  }
+
   const thread = await client.conversations.replies({
-    channel: command.channel_id,
-    ts: command.text, // Thread timestamp
+    channel,
+    ts: threadTs,
   });
 
   const messages = thread.messages
@@ -261,7 +283,11 @@ app.command("/summarize", async ({ command, ack, respond, client }) => {
   const result = await neurolink.generate({
     input: { text: `Summarize this Slack thread:\n\n${messages}` },
     provider: "openai",
-    model: "gpt-4o-mini",
+    model: "gpt-5.4-mini",
+    context: {
+      sessionId: `summary:${channel}:${threadTs}`,
+      userId: command.user_id,
+    },
   });
 
   await respond({
@@ -271,7 +297,7 @@ app.command("/summarize", async ({ command, ack, respond, client }) => {
 });
 ```
 
-Notice the model choice: `gpt-4o-mini` for slash commands. Slash commands have a 3-second acknowledgment deadline from Slack, so speed matters. The smaller model responds faster while still producing quality summaries. The `/summarize` response uses `response_type: "ephemeral"` so only the requesting user sees the summary, avoiding noise in the channel.
+Notice the model choice: `gpt-5.4-mini` for slash commands. Calling `ack()` immediately satisfies Slack's 3-second acknowledgment deadline; the smaller model reduces the user's post-ack wait and generation cost while still producing useful summaries. The `/summarize` response uses `response_type: "ephemeral"` so only the requesting user sees the summary, avoiding noise in the channel.
 
 ## Step 5 -- Streaming Responses
 
@@ -289,7 +315,7 @@ app.event("app_mention", async ({ event, client }) => {
   const result = await neurolink.stream({
     input: { text: event.text },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
     tools: botTools,
   });
 
@@ -323,14 +349,14 @@ app.event("app_mention", async ({ event, client }) => {
 
 The throttling is critical. Slack enforces rate limits of approximately one API call per second per channel. Without throttling, a fast-streaming model could trigger rate limit errors. The 2-second interval provides a smooth visual update cadence while staying well within Slack's limits.
 
-> **Note:** Use `result.stream` (not `result.textStream`) when iterating over NeuroLink streaming responses. Each chunk includes a `type` field that lets you differentiate between text chunks and tool call events.
+> **Note:** Use `result.stream` (not `result.textStream`) when iterating over NeuroLink streaming responses. Text chunks carry a `content` field (checked above with `"content" in chunk`); audio and image chunks carry their own `type` discriminator instead.
 {: .prompt-info }
 
 ## Step 6 -- Conversation Memory per Thread
 
 One of the most powerful features for a Slack bot is thread-aware memory. When a user starts a conversation in a thread, the bot should remember everything discussed in that thread without mixing it up with other threads.
 
-NeuroLink handles this automatically when `conversationMemory` is enabled in the constructor. Each call to `generate()` maintains conversation history, so follow-up questions in a thread work naturally.
+NeuroLink loads and stores conversation history when `conversationMemory` is enabled and each `generate()` call supplies a non-empty `context.sessionId`. Reuse the same Slack-derived session ID for every message in a thread, and follow-up questions work naturally without leaking context across threads.
 
 ```typescript
 // Conversation memory is enabled at the NeuroLink constructor level
@@ -338,12 +364,15 @@ const neurolink = new NeuroLink({
   conversationMemory: { enabled: true },
 });
 
-// Each generate call automatically maintains conversation history
+// Reuse a stable Slack-derived session ID for every turn in the thread
 const result = await neurolink.generate({
   input: { text: event.text },
   provider: "openai",
-  model: "gpt-4o",
-  // Conversation history is automatically tracked when conversationMemory is enabled
+  model: "gpt-5.4",
+  context: {
+    sessionId: event.thread_ts || event.ts,
+    userId: event.user,
+  },
 });
 ```
 
@@ -362,21 +391,35 @@ For development, Socket Mode works well because it does not require a public URL
 
 Key deployment considerations:
 
-1. **Switch to Events API:** Configure your Slack app's Event Subscriptions with your production URL (e.g., `https://bot.yourcompany.com/slack/events`). Disable Socket Mode.
+1. **Switch to Events API:** Configure your Slack app's Event Subscriptions with your production URL (e.g., `https://bot.yourcompany.com/slack/events`). Disable Socket Mode and construct Bolt with an `ExpressReceiver`:
+
+   ```typescript
+   import { App, ExpressReceiver } from "@slack/bolt";
+
+   const receiver = new ExpressReceiver({
+     signingSecret: process.env.SLACK_SIGNING_SECRET!,
+     endpoints: "/slack/events",
+   });
+
+   const app = new App({
+     token: process.env.SLACK_BOT_TOKEN,
+     receiver,
+   });
+   ```
 
 2. **Deploy to a hosting platform:** Railway, Render, or AWS ECS all work well. The bot is a standard Node.js HTTP server once you switch from Socket Mode.
 
-3. **Health checks:** Add a `/health` endpoint for your load balancer:
+3. **Health checks:** Register a `/health` endpoint on that receiver for your load balancer:
 
-```typescript
-app.receiver.router.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", uptime: process.uptime() });
-});
-```
+   ```typescript
+   receiver.router.get("/health", (_req, res) => {
+     res.status(200).json({ status: "ok", uptime: process.uptime() });
+   });
+   ```
 
-1. **Rate limiting:** Slack rate limits API calls to approximately 1 request per second per channel. Batch updates and use throttling for streaming responses.
+4. **Rate limiting:** Slack rate limits API calls to approximately 1 request per second per channel. Batch updates and use throttling for streaming responses.
 
-2. **Monitoring:** Track response times, error rates, and token usage. NeuroLink's analytics provide per-request token counts and provider information for cost attribution.
+5. **Monitoring:** Track response times, error rates, and token usage. NeuroLink's analytics provide per-request token counts and provider information for cost attribution.
 
 ## Security Considerations
 
@@ -388,7 +431,7 @@ Building an AI bot that lives in your Slack workspace means it has access to tea
 
 **Limit tool permissions:** The `queryMetrics` tool should use read-only database connections. The `createTicket` tool should only create, never delete. Design tools with the principle of least privilege.
 
-**Use HITL for destructive actions:** For operations that cannot be undone (deleting data, sending emails, modifying configurations), enable Human-in-the-Loop approval:
+**Configure HITL policy for destructive actions:** For operations that cannot be undone (deleting data, sending emails, modifying configurations), configure which tool names require Human-in-the-Loop confirmation:
 
 ```typescript
 const neurolink = new NeuroLink({
@@ -400,14 +443,14 @@ const neurolink = new NeuroLink({
 });
 ```
 
-The `dangerousActions` array specifies which tool names require human approval before execution. When the AI tries to call one of these tools, NeuroLink pauses execution and requests approval.
+The `dangerousActions` array specifies which tool names require confirmation before execution. When the AI tries to call one of these tools, NeuroLink pauses execution and emits a `hitl:confirmation-request`. This snippet defines the policy only; a complete Slack approval workflow must present that request to an authorized user, preserve its `confirmationId`, and emit the matching `hitl:confirmation-response` on the same live NeuroLink instance before the request times out.
 
 > **Note:** Always scope database connections for bot tools to read-only access where possible. A compromised prompt should not be able to modify production data.
 {: .prompt-warning }
 
 ## What You Built
 
-You built a fully functional AI Slack bot with tool calling for querying metrics and creating tickets, slash commands for on-demand interactions, streaming responses that update in real-time, conversation memory backed by Redis, and HITL approval for destructive actions. To extend it further:
+You built an AI Slack bot with tool calling for querying metrics and creating tickets, slash commands for on-demand interactions, streaming responses that update in real-time, and conversation memory keyed by Slack thread. You also configured HITL policy for destructive actions; completing the approval UI and confirmation-response wiring is a separate production step. To extend it further:
 
 - **Add a knowledge base** using RAG to give the bot deep knowledge of your company's documentation. See our [RAG implementation guide](/posts/rag-implementation/) for details.
 - **Build custom tools** using the MCP standard for complex integrations that span multiple services.

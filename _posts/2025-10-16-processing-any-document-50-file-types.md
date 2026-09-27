@@ -26,11 +26,11 @@ image:
 ---
 
 
-You will process over 50 file types through a single API using NeuroLink's `ProcessorRegistry`. By the end of this tutorial, you will have automatic file type detection with confidence scoring, priority-based processor selection, batch processing for multiple documents, and custom processor registration for proprietary formats.
+You will process files through NeuroLink's two complementary paths: the unified file API for PDF, CSV, images, and PPTX, and `ProcessorRegistry` for its 16 registered `BaseFileProcessor` implementations. By the end of this tutorial, you will have automatic file type detection, confidence-scored registry selection, batch processing for registered formats, and custom processor registration for proprietary formats.
 
 Without a unified processing layer, you write a new parser for every format -- a PDF library here, a CSV parser there, a docx extractor somewhere else. The integration code grows faster than the feature code.
 
-Next, you will learn the `ProcessorRegistry` architecture, process single files and batches, see the complete inventory of supported types, register custom processors, and build document-aware AI pipelines that handle anything your users upload.
+Next, you will learn how FileDetector and `NeuroLink.generate({ input: { files } })` handle legacy/static routes, how `ProcessorRegistry` handles its registered subset, and how to build document-aware AI pipelines without confusing those two APIs.
 
 ## Architecture: The ProcessorRegistry
 
@@ -38,69 +38,83 @@ The `ProcessorRegistry` is the core of NeuroLink's file processing system. It ma
 
 ```mermaid
 flowchart TB
-    FILE(["Uploaded File"]) --> DETECT["Auto-Detect<br/>MIME type + extension"]
-    DETECT --> REGISTRY["ProcessorRegistry<br/>(Singleton)"]
-    REGISTRY --> MATCH{"Find Best<br/>Processor"}
-
-    MATCH --> DOC["Document Processors<br/>PDF, Word, Excel, RTF, ODT"]
-    MATCH --> DATA["Data Processors<br/>JSON, XML, YAML, CSV"]
-    MATCH --> MARKUP["Markup Processors<br/>HTML, Markdown, SVG, Text"]
-    MATCH --> CODE["Code Processors<br/>40+ languages"]
-    MATCH --> CONFIG["Config Processors<br/>env, ini, toml, etc."]
-    MATCH --> IMG["Image Processors<br/>JPEG, PNG, WebP, GIF"]
-
-    DOC & DATA & MARKUP & CODE & CONFIG & IMG --> RESULT(["Processed Content<br/>Ready for LLM"])
+    FILE["Uploaded File"] --> API{"Choose API"}
+    API -->|"Unified generation"| DETECTOR["FileDetector"]
+    API -->|"Registered processor access"| REGISTRY["ProcessorRegistry singleton"]
+    DETECTOR --> LEGACY["PDF, CSV, images, PPTX"]
+    REGISTRY --> MATCH{"Priority + confidence match"}
+    MATCH --> DOC["Excel, Word, RTF, OpenDocument"]
+    MATCH --> DATA["JSON, XML, YAML"]
+    MATCH --> MARKUP["HTML, Markdown, SVG, text"]
+    MATCH --> CODE["Source code and config"]
+    MATCH --> MEDIA["Audio, video, archives"]
+    LEGACY & DOC & DATA & MARKUP & CODE & MEDIA --> RESULT["Prompt-ready content"]
 ```
 
-The `ProcessorRegistry` is implemented as a singleton to ensure a single source of truth across your application. When a file arrives, the registry:
+The `ProcessorRegistry` is implemented as a singleton to ensure a single source of truth across your application. On first access, it registers 16 `BaseFileProcessor` implementations. When a registry-supported file arrives, the registry:
 
-1. Examines both the MIME type and file extension for detection
+1. Examines both the MIME type and file extension
 2. Queries all registered processors for support
 3. Scores each match by confidence (exact MIME match: 100, category match: 80, extension match: 60, generic: 40)
-4. Selects the processor with the highest confidence, using priority as a tiebreaker (lower number = higher priority)
+4. Sorts matches by priority first (lower number wins), then confidence within equal priorities
 
-This two-factor selection (confidence plus priority) ensures that a specialized SVG processor (priority 5) is preferred over a generic image processor (priority 10) for SVG files, even though both can handle the format.
+PDF, CSV, images, and PPTX use FileDetector's static routes instead of `ProcessorRegistry`. Use `NeuroLink.generate({ input: { files } })` when you want one public handoff that covers both systems.
 
-## Supported file types: The Complete Inventory
+## Supported file types: Two complementary inventories
 
-NeuroLink ships with processors covering six categories and over 50 file types:
+NeuroLink supports 260+ extensions overall. `ProcessorRegistry` covers the BaseFileProcessor-backed subset below; FileDetector handles several legacy/static routes separately.
 
-**Images (AI Vision):** .jpg, .jpeg, .png, .gif, .webp (5 types, priority 10). Image files are processed through the provider's vision capabilities, generating text descriptions of image content.
+**FileDetector routes:** PDF, CSV/tabular files, provider-ready images, and PPTX. These do not appear in `getSupportedFileTypes()` and cannot be processed by `registry.processFile()` unless you register a custom adapter.
 
-**Documents:** .pdf, .docx, .doc, .xlsx, .xls, .pptx, .ppt, .odt, .ods, .odp, .rtf (11 types, priority 20-30). Full text extraction from office documents, maintaining structure where possible (tables from Excel, paragraphs from Word, slides from PowerPoint).
+**Registered documents:** .xlsx and .xls route to Excel at priority 90, .docx and .doc route to Word at 100, .rtf routes to RTF at 140, and .odt/.ods/.odp route to OpenDocument at 150. The current Excel and Word implementations parse ZIP-based `.xlsx` and `.docx`; legacy `.xls` and `.doc` routing does not make those binary formats parseable.
 
-**Data Formats:** .json, .xml, .csv, .yaml, .yml (5 types, priority 40-50). Structured data is preserved in its original format, making it directly usable in LLM prompts for analysis or transformation.
+**Registered data:** .json, .jsonl, .geojson, .xml, .xsd, .xsl, .yaml, and .yml at priorities 50-70. CSV stays on the FileDetector path.
 
-**Markup and Text:** .html, .htm, .xhtml, .md, .markdown, .mdown, .mkd, .svg, .txt, .css, .log (11 types, priority 5-70). SVG gets the highest priority (5) because it requires specialized processing that a generic text handler would not provide.
+**Registered markup and text:** SVG at priority 5, Markdown at 40, HTML at 80, and plain text/log files at 110. CSS is handled by the source-code processor at 120, not the markup range.
 
-**Source Code:** .js, .jsx, .ts, .tsx, .py, .java, .go, .rs, .c, .cpp, .rb, .php, .swift, .kt, and 30+ more (40+ types, priority 100-120). Code files are processed with language-aware formatting that preserves syntax structure and comments.
+**Registered code and configuration:** Source code across 50+ languages at priority 120, plus configuration formats such as .env, .ini, .toml, and .cfg at 130.
 
-**Config Files:** .env, .ini, .toml, .cfg, .conf, .properties, .editorconfig, .gitignore, and more (15 types, priority 130). Configuration files are processed with key-value awareness, making them suitable for LLM-based configuration analysis.
+**Registered media and archives:** Video at priority 160, audio at 170, and archives such as .zip, .tar, .gz, and .tgz at 180.
 
 ## Processing a Single File
 
-The simplest use case is processing a single uploaded file. The registry auto-detects the type and selects the appropriate processor:
+For PDF, CSV, images, and PPTX, use the unified generation API. FileDetector recognizes the file and converts it to prompt-ready input before generation:
 
 ```typescript
-import { getProcessorRegistry } from '@juspay/neurolink';
+import { NeuroLink } from '@juspay/neurolink';
 
-const registry = getProcessorRegistry();
+const neurolink = new NeuroLink();
+const result = await neurolink.generate({
+  input: {
+    text: 'Summarize this quarterly report',
+    files: ['quarterly-report.pdf'],
+  },
+});
 
-// Auto-detect and process any file
+console.log(result.content);
+```
+
+For a registered format such as `.docx`, access `ProcessorRegistry` directly when you need the processor-specific payload:
+
+```typescript
+import { getProcessorRegistry } from '@juspay/neurolink/processors';
+import fs from 'node:fs';
+
+const registry = await getProcessorRegistry();
 const result = await registry.processFile({
   id: 'doc-001',
-  name: 'quarterly-report.pdf',
-  mimetype: 'application/pdf',
-  size: 2048000,
-  url: 'https://storage.example.com/quarterly-report.pdf',
+  name: 'contract.docx',
+  mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  size: fs.statSync('contract.docx').size,
+  buffer: fs.readFileSync('contract.docx'),
 });
 
 if (result?.success) {
-  console.log('Processed content:', result.data);
+  console.log('Processed payload:', result.data);
 }
 ```
 
-The `FileInfo` object accepts either a `url` (for remote files) or `content` (for in-memory buffers). The `mimetype` and `name` fields are used together for processor selection -- the MIME type provides the primary signal, and the file extension provides a fallback when the MIME type is generic (like `application/octet-stream`).
+The `FileInfo` object accepts either a `url` or `buffer`. The registry uses `mimetype` and `name` together for selection, but it only sees registered formats; the unified file API is the correct entry point for FileDetector-only formats.
 
 ## Processing with Detailed Error Handling
 
@@ -113,7 +127,7 @@ const result = await registry.processWithResult({
   name: 'data.xlsx',
   mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   size: 512000,
-  content: excelBuffer,
+  buffer: excelBuffer,
 });
 
 if (result.error) {
@@ -129,16 +143,34 @@ The error object includes a `suggestion` field that tells the caller what to do 
 
 ## Batch processing: Handling Entire Directories
 
-When processing document collections -- an entire contract folder, a codebase, a batch of uploaded resumes -- the batch processor handles parallel processing with concurrency limits and aggregated results.
+For registered formats, `processBatchWithRegistry()` processes files sequentially and aggregates the outcomes. Each file must provide a `buffer` or `url`:
 
 ```typescript
-import { processBatchWithRegistry } from '@juspay/neurolink';
+import { processBatchWithRegistry } from '@juspay/neurolink/processors';
+import fs from 'node:fs';
 
 const files = [
-  { id: '1', name: 'report.pdf', mimetype: 'application/pdf', size: 1024000 },
-  { id: '2', name: 'data.csv', mimetype: 'text/csv', size: 50000 },
-  { id: '3', name: 'app.ts', mimetype: 'text/typescript', size: 8000 },
-  { id: '4', name: 'unknown.xyz', mimetype: 'application/octet-stream', size: 100 },
+  {
+    id: '1',
+    name: 'contract.docx',
+    mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    size: fs.statSync('contract.docx').size,
+    buffer: fs.readFileSync('contract.docx'),
+  },
+  {
+    id: '2',
+    name: 'app.ts',
+    mimetype: 'text/typescript',
+    size: fs.statSync('app.ts').size,
+    buffer: fs.readFileSync('app.ts'),
+  },
+  {
+    id: '3',
+    name: 'unknown.xyz',
+    mimetype: 'application/octet-stream',
+    size: fs.statSync('unknown.xyz').size,
+    buffer: fs.readFileSync('unknown.xyz'),
+  },
 ];
 
 const result = await processBatchWithRegistry(files, {
@@ -153,11 +185,11 @@ console.log(`Skipped: ${result.skipped.length}`);
 
 The batch processor categorizes each file into one of three buckets:
 
-- **Successful:** Processed without errors. The result includes the extracted content.
-- **Failed:** A processor was found but processing failed (corrupted file, timeout, etc.).
-- **Skipped:** No processor was found for the file type.
+- **Successful:** Processed without errors. Each entry contains `{ fileInfo, processorName, result }`.
+- **Failed:** A processor was found but processing failed (corrupted file, per-file timeout, etc.).
+- **Skipped:** No registered processor was found, or the file exceeded `maxFiles`.
 
-The `maxFiles` option prevents runaway processing of unexpectedly large directories. The `timeout` sets a per-batch time limit, ensuring that a single slow file does not block the entire batch.
+The `maxFiles` option bounds the collection. The `timeout` is applied independently to each file, and files run sequentially. If you need bounded concurrency, implement it outside this helper and account for memory use and downstream rate limits.
 
 ## Discovery: Checking Support Before Upload
 
@@ -168,38 +200,38 @@ import {
   isFileTypeSupported,
   getProcessorForFile,
   getSupportedFileTypes,
-} from '@juspay/neurolink';
+} from '@juspay/neurolink/processors';
 
-// Validate before upload
-if (isFileTypeSupported('application/pdf', 'document.pdf')) {
-  console.log('PDF files are supported');
+// Validate a ProcessorRegistry-backed format before upload
+if (await isFileTypeSupported('application/json', 'data.json')) {
+  console.log('JSON files are supported by ProcessorRegistry');
 }
 
-// Get processor details
-const match = getProcessorForFile('image/jpeg', 'photo.jpg');
+// Get registered processor details
+const match = await getProcessorForFile('text/typescript', 'app.ts');
 if (match) {
   console.log(`Processor: ${match.name}, Priority: ${match.priority}, Confidence: ${match.confidence}%`);
 }
 
 // List all supported types
-const types = getSupportedFileTypes();
+const types = await getSupportedFileTypes();
 for (const { name, mimeTypes, extensions, priority } of types) {
   console.log(`${name} (priority: ${priority}): ${extensions.join(', ')}`);
 }
 ```
 
-The `isFileTypeSupported()` function is a quick boolean check suitable for upload validation endpoints. The `getProcessorForFile()` function returns full details including the processor name, priority, and confidence score -- useful for debugging when you need to understand which processor will handle a specific file.
+The `isFileTypeSupported()` function is a quick check for the registry subset. The `getProcessorForFile()` function returns the registered processor name, priority, and confidence score. Both return negative results for FileDetector-only PDF, CSV, image, and PPTX routes even though the unified file API supports those formats.
 
-The `getSupportedFileTypes()` function returns the complete registry inventory, which you can use to generate upload guidelines, populate file type filter dropdowns, or document your application's capabilities.
+The `getSupportedFileTypes()` function returns the complete ProcessorRegistry inventory, not the complete SDK-wide extension catalog. Use it for registry-specific upload guidelines and diagnostics.
 
 ## Registering custom processors
 
 When your application needs to handle file types that NeuroLink does not support out of the box, you can register custom processors that plug into the same priority and confidence system.
 
 ```typescript
-import { getProcessorRegistry, PROCESSOR_PRIORITIES } from '@juspay/neurolink';
+import { getProcessorRegistry, PROCESSOR_PRIORITIES } from '@juspay/neurolink/processors';
 
-const registry = getProcessorRegistry();
+const registry = await getProcessorRegistry();
 
 registry.register({
   name: 'dicom',
@@ -214,48 +246,55 @@ registry.register({
 
 Custom processors must implement the processor interface with a `processFile` method that accepts a `FileInfo` object and returns a `FileProcessingResult`. The `isSupported` function defines the matching logic -- it receives both the MIME type and filename and returns a boolean.
 
-Priority determines processing order when multiple processors claim support for the same file. Set your custom processor's priority relative to the built-in priorities: SVG is 5, Image is 10, PDF is 20, CSV is 30, and so on up to Config at 130. A DICOM processor at priority 25 would be checked before the generic document processor but after the SVG processor.
+Priority determines processing order when multiple registered processors claim support for the same file. Compare a custom priority with actual registry entries: SVG is 5, Markdown 40, JSON 50, Excel 90, Word 100, source code 120, RTF 140, OpenDocument 150, video 160, audio 170, and archive 180. The image, PDF, and CSV constants belong to FileDetector routes and are not default registry registrations. A DICOM processor at priority 25 would run after SVG but before the remaining registered defaults.
 
 > **Note:** Custom processors are registered at the singleton registry level. Once registered, they are available to all `processFile` and `processBatchWithRegistry` calls in the application. Register custom processors during application initialization, not per-request.
 {: .prompt-info }
 
 ## Feeding processed documents to LLMs
 
-The entire point of document processing is to prepare content for AI analysis. Here is how to connect the processing pipeline to NeuroLink's generation system:
+When you only need analysis, prefer the unified file API. It already runs FileDetector and converts each supported file into prompt text:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
-
-// Process file, then send to LLM
-const processed = await registry.processFile(fileInfo);
-
 const result = await neurolink.generate({
-  input: { text: `Analyze this document:\n\n${processed?.data?.content}` },
+  input: {
+    text: 'Analyze this document',
+    files: ['contract.docx'],
+  },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-5',
 });
 ```
 
-This two-step pattern -- process then generate -- keeps concerns separated. The processor handles format-specific extraction (PDF rendering, Excel cell extraction, code formatting), and the LLM handles analysis and understanding. This separation means you can upgrade processors independently of your LLM pipeline, and you can reuse processed content across multiple LLM calls without re-processing.
-
-For complex document analysis workflows, you might process multiple documents and combine their content:
+Use `ProcessorRegistry` directly when your application needs structured processor-specific data before generation. `result.data` is a union, so narrow by `processorName` rather than assuming a universal `content` field:
 
 ```typescript
 const files = [contract, amendment, termSheet];
 const batchResult = await processBatchWithRegistry(files, { timeout: 30000 });
 
 const combinedContent = batchResult.successful
-  .map(r => `## ${r.name}\n\n${r.data.content}`)
+  .map(({ fileInfo, processorName, result }) => {
+    if (processorName === 'word' && 'markdownContent' in result.data) {
+      return `## ${fileInfo.name}\n\n${result.data.markdownContent}`;
+    }
+    if (processorName === 'source_code' && 'content' in result.data) {
+      return `## ${fileInfo.name}\n\n${result.data.content}`;
+    }
+    throw new Error(`Add a formatter for ${processorName}`);
+  })
   .join('\n\n---\n\n');
 
 const analysis = await neurolink.generate({
   input: { text: `Compare these documents and identify discrepancies:\n\n${combinedContent}` },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-5',
 });
 ```
+
+Word results expose `textContent` and `markdownContent`; source, text, Markdown, JSON, XML, YAML, and config processors expose `content`; Excel exposes `worksheets`; and several media/document processors expose `textContent`. Explicit narrowing keeps the handoff aligned with the public result types.
 
 ## Production tips
 
@@ -263,7 +302,7 @@ Running document processing in production brings additional considerations:
 
 **Size limits:** Configure per-processor size limits to prevent memory exhaustion. A 500MB video file should not be processed the same way as a 50KB text file. NeuroLink's processor configuration supports size limits that can be tuned per processor type.
 
-**Timeouts:** Always set timeouts for URL-based file fetching. A slow or unresponsive file server should not block your processing pipeline indefinitely. The batch processor's `timeout` option applies globally; individual file timeouts can be set in processor configurations.
+**Timeouts:** Always set timeouts for URL-based file fetching. A slow or unresponsive file server should not block your processing pipeline indefinitely. The batch helper passes its `timeout` to each file independently; processor configurations can enforce their own format-specific limits too.
 
 **Memory management:** Stream large files rather than loading them entirely into memory. For files over 10MB, consider processing them in chunks or using a queue-based architecture where processing happens asynchronously.
 
@@ -272,7 +311,7 @@ Running document processing in production brings additional considerations:
 **Monitoring:** Log the processor name, confidence score, and processing time for each file. This data is invaluable for identifying slow processors, files that are being handled by incorrect processors (low confidence scores), and processing failures that need attention.
 
 ```typescript
-const match = getProcessorForFile(file.mimetype, file.name);
+const match = await getProcessorForFile(file.mimetype, file.name);
 const startTime = Date.now();
 const result = await registry.processFile(file);
 const duration = Date.now() - startTime;
@@ -288,7 +327,7 @@ logger.info('File processed', {
 
 ## What you built
 
-You built a unified file processing system that handles 50+ file types through a single API using the `ProcessorRegistry` pattern. You configured MIME-type-based processor routing with confidence scoring, set up batch processing for handling multiple files in parallel, implemented size limits and timeouts for production safety, and added monitoring with processor name, confidence score, and processing time logging.
+You built a file processing system that uses the unified file API for FileDetector routes and `ProcessorRegistry` for its 16 registered processor categories. You configured MIME- and extension-based registry routing with confidence scoring, set up sequential batch processing with per-file timeouts, narrowed processor-specific payloads before LLM handoff, and added processor diagnostics.
 
 To build on these capabilities:
 

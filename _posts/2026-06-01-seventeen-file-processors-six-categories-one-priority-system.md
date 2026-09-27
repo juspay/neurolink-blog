@@ -9,7 +9,8 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Seventeen file processors, six categories, one priority system — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  How NeuroLink's BaseFileProcessor lifecycle and priority-based ProcessorRegistry route
+  seventeen file processors across document, data, markup, code, media, and archive formats.
 toc: true
 mermaid: true
 pin: false
@@ -18,11 +19,11 @@ image:
   alt: 'Seventeen file processors, six categories, one priority system'
 ---
 
-We designed NeuroLink's file processing framework because inconsistent file handling was silently breaking our AI agent workflows. An agent could extract text from a `.docx` file uploaded by a user, but the same workflow would fail on an `.rtf` file containing the exact same information. A `.zip` archive created on macOS would fail to unpack where a Windows-generated one succeeded. These subtle inconsistencies meant that any AI agent relying on user-provided files, whether for RAG with a Claude model or for data analysis, was operating on a foundation of sand. We needed a unified, predictable system that could see a file path, identify its contents, and route it to a specialized processor that understood its format, from Microsoft Word documents to FFmpeg-compatible video streams.
+Inconsistent file handling can silently break AI agent pipelines. An agent might extract text cleanly from a `.docx` file but fail on an `.rtf` file containing the exact same information, or unpack a `.zip` archive created on macOS while failing on a Windows-generated one. Any AI agent relying on user-provided files, whether for RAG or for data analysis, needs handling that doesn't depend on how the file happened to be produced. NeuroLink's file processing framework addresses this with a unified, predictable system that can see a file, identify its contents, and route it to a specialized processor that understands its format, from Microsoft Word documents to FFmpeg-compatible video streams.
 
 ## The Core Lifecycle: BaseFileProcessor
 
-Every file processor in NeuroLink inherits from a single abstract class: `BaseFileProcessor`. This class establishes a consistent, three-stage lifecycle for every file we handle, whether we're processing a 10-line YAML file or a video that hits our size limits. The core logic lives in the `processFile` method, which orchestrates the entire flow.
+Most file processors in NeuroLink inherit from a single abstract class: `BaseFileProcessor`. This class establishes a consistent, three-stage lifecycle for every file we handle, whether we're processing a 10-line YAML file or a video that hits our size limits. The core logic lives in the `processFile` method, which orchestrates the entire flow. (`PptxProcessor`, covered below, is the one exception: it's a lightweight static utility that skips this pipeline entirely, since slide-text extraction doesn't need a download/validate/build cycle.)
 
 This shared foundation ensures that every processor, regardless of the file format it handles, adheres to the same contract for downloading, validation, and processing. It's an architecture that parallels how we think about provider integrations; just as every LLM provider has a common interface, every file format gets a common processing pattern. You can learn more about that philosophy in [What You Actually Inherit When You Extend BaseProvider](/posts/what-you-actually-inherit-when-you-extend-baseprovider/).
 
@@ -34,7 +35,7 @@ The lifecycle consists of three main steps managed by `BaseFileProcessor`:
 
 3. **Build**: The abstract `buildProcessedResult` method is where the specialized logic for each processor lives. This is the method that a subclass like `WordProcessor` or `VideoProcessor` must implement to perform its unique parsing and data extraction.
 
-This common structure is what allows the system to be so extensible. Adding support for a new file type means creating a new class that extends `BaseFileProcessor` and implements a single method.
+This common structure is what allows the system to be so extensible. Adding support for a new file type usually means creating a new class that extends `BaseFileProcessor` and implements a single method, though simpler formats can bypass the pipeline entirely, as `PptxProcessor` does.
 
 ```typescript
 export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
@@ -42,29 +43,28 @@ export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
 
   async processFile(
     fileInfo: FileInfo,
-    options?: FileProcessorOptions,
-  ): Promise<Result<T, FileProcessingError>> {
+    options?: ProcessOptions,
+  ): Promise<ProcessorFileProcessingResult<T>> {
     // 1. Download the file with retries
-    const bufferResult = await this.downloadFileWithRetry(fileInfo, options);
-    if (!bufferResult.isSuccess) {
-      return err(bufferResult.error);
+    const downloadResult = await this.downloadFileWithRetry(fileInfo, options);
+    if (!downloadResult.success) {
+      return { success: false, error: downloadResult.error };
     }
 
     // 2. Validate the downloaded file
-    const validationResult = await this.validateDownloadedFileWithResult(fileInfo, bufferResult.value);
-    if (!validationResult.isSuccess) {
-      return err(validationResult.error);
+    const validationResult = await this.validateDownloadedFileWithResult(downloadResult.data, fileInfo);
+    if (!validationResult.success) {
+      return { success: false, error: validationResult.error };
     }
 
     // 3. Build the processed result using subclass-specific logic
-    return this.buildProcessedResultWithResult(bufferResult.value, fileInfo, options);
+    return this.buildProcessedResultWithResult(downloadResult.data, fileInfo);
   }
 
   protected abstract buildProcessedResult(
     buffer: Buffer,
     fileInfo: FileInfo,
-    options?: FileProcessorOptions,
-  ): Promise<Result<T, FileProcessingError>>;
+  ): T | Promise<T>;
 
   // ... other helper methods ...
 }
@@ -81,14 +81,9 @@ This is one of the most common categories of files users upload. Our goal is to 
 - `OpenDocumentProcessor`: Handles the Open Document Format (ODF) files used by LibreOffice and other open-source suites, such as `.odt` for text and `.ods` for spreadsheets.
 
 ```typescript
-// Example check for the WordProcessor
-import { DOCX_MIME_TYPE } from './constants';
-
+// Example check for the WordProcessor — it delegates to the processor instance
 export function isWordFile(mimetype: string, filename: string): boolean {
-  return (
-    mimetype === DOCX_MIME_TYPE ||
-    filename.toLowerCase().endsWith('.docx')
-  );
+  return wordProcessor.isFileSupported(mimetype, filename);
 }
 ```
 
@@ -185,7 +180,7 @@ A single uploaded file can contain an entire project. The `ArchiveProcessor` is 
 private detectFormatFromExtension(filename: string): ArchiveFormat | null {
   const lowerFile = filename.toLowerCase();
   if (lowerFile.endsWith('.zip')) return 'zip';
-  if (lowerFile.endsWith('.tar.gz') || lowerFile.endsWith('.tgz')) return 'targz';
+  if (lowerFile.endsWith('.tar.gz') || lowerFile.endsWith('.tgz')) return 'tar.gz';
   if (lowerFile.endsWith('.tar')) return 'tar';
   if (lowerFile.endsWith('.gz')) return 'gz';
   return null;
@@ -206,9 +201,9 @@ graph TD
         A[File Uploaded: report.docx] --> B{MIME Type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'};
         B --> C["ProcessorRegistry.findProcessor()"];
         C --> D{Priority Check};
-        D -- Priority 10 --> E[TextProcessor? No];
-        D -- Priority 5 --> F[ArchiveProcessor? No];
-        D -- Priority 1 --> G["WordProcessor? Yes!"];
+        D -- Priority 110 --> E[TextProcessor? No];
+        D -- Priority 180 --> F[ArchiveProcessor? No];
+        D -- Priority 100 --> G["WordProcessor? Yes!"];
         G --> H["WordProcessor.processFile()"];
         H --> I[ProcessedResult: Text + Metadata];
     end

@@ -106,7 +106,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Summarize this text: ...' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 ```
 
@@ -125,11 +125,11 @@ Tool calling is the core AI Engineer skill. It turns a language model from a tex
 
 ```typescript
 import { z } from 'zod';
-import { tool } from 'ai';
+import { tool } from '@juspay/neurolink';
 
 const extractTool = tool({
   description: 'Extract structured data from text',
-  parameters: z.object({
+  inputSchema: z.object({
     name: z.string().describe('Person name'),
     email: z.string().email().describe('Email address'),
     role: z.enum(['admin', 'user', 'guest']).describe('User role'),

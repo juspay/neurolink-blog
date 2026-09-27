@@ -1,35 +1,34 @@
 ---
 layout: post
-title: 'OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink'
+title: 'OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink'
 date: '2025-06-27 10:00:00 +0530'
 categories:
   - Tutorial
   - Providers
 tags:
   - openai
-  - gpt-4o
   - gpt-5
-  - o1
-  - o3
+  - gpt-5.4
+  - codex
   - embeddings
   - tool-calling
   - neurolink
 author: neurolink
 description: >-
-  Connect GPT-4o, GPT-5, o1, o3, and all OpenAI models through NeuroLink's
-  unified TypeScript SDK. Complete guide with streaming, tool calling, and
-  embedding examples.
+  Connect GPT-5.4, GPT-5.3-codex, and the rest of the OpenAI models NeuroLink supports through
+  NeuroLink's unified TypeScript SDK. Complete guide with streaming, tool
+  calling, and embedding examples.
 toc: true
 mermaid: true
 pin: false
 image:
   path: /assets/img/posts/openai-integration-guide/hero.png
-  alt: 'OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink'
+  alt: 'OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink'
 ---
 
-By the end of this guide, you'll have OpenAI's full model lineup -- GPT-4o, o1, o3, and beyond -- working through NeuroLink with streaming, tool calling, embeddings, and production-ready error handling.
+By the end of this guide, you'll have NeuroLink's supported OpenAI models -- GPT-5.4, GPT-5.3-codex, and beyond -- working through NeuroLink with streaming, tool calling, embeddings, and production-ready error handling.
 
-You will set up the OpenAI provider, use every major feature through NeuroLink's unified TypeScript API, and understand the architecture that makes provider switching seamless. The same code patterns work with all 13 NeuroLink providers, so everything you learn here transfers directly.
+You will set up the OpenAI provider, use every major feature through NeuroLink's unified TypeScript API, and understand the architecture that makes provider switching seamless. The same code patterns work with NeuroLink's other providers, so everything you learn here transfers directly.
 
 ---
 
@@ -39,18 +38,19 @@ NeuroLink supports the complete OpenAI model lineup through its `OpenAIModels` e
 
 | Model Family | Model IDs | Best For |
 |---|---|---|
-| **GPT-5.2** | `gpt-5.2`, `gpt-5.2-pro` | Latest flagship, highest capability |
-| **GPT-5** | `gpt-5`, `gpt-5-mini`, `gpt-5-nano` | General purpose, cost tiers |
-| **GPT-4.1** | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | Balanced performance |
-| **GPT-4o** | `gpt-4o`, `gpt-4o-mini` | Multimodal, strong default |
-| **O-Series** | `o3`, `o3-mini`, `o3-pro`, `o4-mini`, `o1`, `o1-mini` | Reasoning tasks |
+| **GPT-5.4** (newest in NeuroLink's catalog) | `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.4-pro` | Default choice -- general use, cost-tiered variants, and `-pro` for deep reasoning |
+| **GPT-5.3** | `gpt-5.3-codex` | Coding and agentic dev workflows |
+| **GPT-5.2 / GPT-5.1** | `gpt-5.2`, `gpt-5.2-pro`, `gpt-5.2-codex`, `gpt-5.1`, `gpt-5.1-codex` | Previous flagship generations, still supported |
+| **GPT-5** | `gpt-5`, `gpt-5-mini`, `gpt-5-nano` | Original GPT-5 launch models |
+| **GPT-4.1 / GPT-4o** | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-4o`, `gpt-4o-mini` | Superseded by GPT-5.4 -- kept for existing integrations |
+| **O-Series** | `o3`, `o3-mini`, `o3-pro`, `o4-mini`, `o1` | Earlier reasoning models; prefer `gpt-5.4-pro` for new reasoning work |
 | **Legacy** | `gpt-4-turbo`, `gpt-3.5-turbo` | Backward compatibility |
 
-The default model is `gpt-4o`, configured via `getProviderModel("OPENAI_MODEL", "gpt-4o")`. You can override it per-request or globally via the `OPENAI_MODEL` environment variable.
+NeuroLink's built-in fallback is `gpt-4o` (`getProviderModel("OPENAI_MODEL", "gpt-4o")`) when `OPENAI_MODEL` is left unset -- a legacy default kept for backward compatibility. For new projects, set `OPENAI_MODEL=gpt-5.4` to use the newest OpenAI model in NeuroLink's catalog. OpenAI has since released newer model families that NeuroLink's `OpenAIModels` catalog does not list yet; check [OpenAI's models page](https://developers.openai.com/api/docs/models) for the full current lineup. You can override the model per-request or globally via the `OPENAI_MODEL` environment variable.
 
 The default embedding model is `text-embedding-3-small`, overridable via the `OPENAI_EMBEDDING_MODEL` environment variable.
 
-> **Tip:** For cost-sensitive applications, `gpt-4o-mini` and `gpt-5-nano` offer strong performance at a fraction of the cost. For tasks requiring deep reasoning, the o-series models (`o3`, `o3-pro`) are purpose-built.
+> **Tip:** For cost-sensitive applications, `gpt-5.4-mini` and `gpt-5.4-nano` offer strong performance at a fraction of the cost. For tasks requiring deep reasoning, `gpt-5.4-pro` is purpose-built; for coding and agentic workflows, use `gpt-5.3-codex`.
 {: .prompt-tip }
 > **Note:** Model names and IDs in code examples reflect versions available at time of writing. Model availability, naming conventions, and pricing change frequently. Always verify current model IDs with your provider's documentation before deploying to production.
 {: .prompt-info }
@@ -65,7 +65,7 @@ Getting started with OpenAI through NeuroLink takes two steps: set your API key 
 
 ```bash
 OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-4o          # optional, defaults to gpt-4o
+OPENAI_MODEL=gpt-5.4          # optional; SDK falls back to gpt-4o if unset
 ```
 
 The API key is validated on provider initialization via `validateApiKey(createOpenAIConfig())`. If the key is missing or malformed, you get a clear error immediately rather than a cryptic API failure.
@@ -80,7 +80,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Explain quantum computing' },
   provider: 'openai',
-  model: 'gpt-4o'
+  model: 'gpt-5.4'
 });
 
 console.log(result.content);
@@ -109,7 +109,7 @@ That is all you need for basic usage. The following sections cover each feature 
 
 ## Streaming in Depth
 
-NeuroLink's OpenAI provider uses `streamText()` from the Vercel AI SDK internally, exposing it through the unified `stream()` interface.
+NeuroLink's OpenAI provider talks to the Chat Completions API directly over HTTP -- it does not go through the Vercel AI SDK's `streamText()`. The shared `OpenAIChatCompletionsProvider` base class implements `executeStream()`, and NeuroLink's OpenAI, Azure OpenAI, Ollama, OpenRouter, and other OpenAI-compatible providers all extend it, exposed through the unified `stream()` interface.
 
 ### Stream Configuration
 
@@ -119,7 +119,7 @@ The streaming implementation supports full configuration:
 const result = await neurolink.stream({
   input: { text: 'Write a haiku about TypeScript' },
   provider: 'openai',
-  model: 'gpt-4o-mini',
+  model: 'gpt-5.4-mini',
   temperature: 0.7,
   maxTokens: 500,
   timeout: 30000,
@@ -131,7 +131,7 @@ const result = await neurolink.stream({
 The `executeStream()` method in the OpenAI provider processes the full stream (not just the text stream) to support tool call detection alongside text delivery. The stream emits several chunk types:
 
 - **`text-delta`** -- Partial text content as it is generated
-- **`tool-call-streaming-start`** -- Indicates a tool call is beginning
+- **`tool-input-start`** -- Indicates a tool call is beginning
 - **`error`** -- Stream-level errors
 
 Timeout control is handled via `createTimeoutController` with configurable timeout values, and analytics are collected automatically through the `streamAnalyticsCollector` for observability integration.
@@ -148,17 +148,17 @@ OpenAI's tool calling support is one of its strongest features, and NeuroLink ex
 ### Configuration
 
 - **Tool support:** Always enabled (`supportsTools()` returns `true`)
-- **Maximum tools:** 128 per request (configurable via `OPENAI_MAX_TOOLS` environment variable)
+- **Maximum tools:** NeuroLink defaults to 100 tools per provider (configurable via the `NEUROLINK_MAX_TOOLS_PER_PROVIDER` environment variable or the `maxToolsPerProvider` config field); OpenAI's current function-calling guidance recommends keeping the number of tools available per turn small for accuracy rather than documenting a fixed cap
 - **Multi-step execution:** Controlled by `maxSteps` parameter
 
 ### Tool Validation Pipeline
 
-NeuroLink validates every tool before sending it to OpenAI through `validateAndFilterToolsForOpenAI()`:
+Tools you register with `registerTool()` are validated up front (backed by `validateTool()`). Tools passed per call via `tools:` -- as in the example below -- skip registration and go straight to `buildToolsForOpenAI()`, which converts each Zod schema or JSON Schema into OpenAI's function-calling wire format before the request goes out:
 
-1. Checks for a `description` string (required by OpenAI)
-2. Verifies the `execute` function exists
-3. Supports both Zod schemas and JSON schemas for parameters
-4. Filters out invalid tools with warning logs instead of failing the entire request
+1. `registerTool()` rejects a tool that is missing a `description` or `execute` function
+2. `validateTool()` also checks the tool name against NeuroLink's naming rules
+3. `buildToolsForOpenAI()` accepts both Zod schemas and plain JSON Schema for parameters
+4. The schema is normalized to strip internals (like Zod's `_def`) that OpenAI-compatible endpoints would otherwise reject
 
 ### Example: Weather Tool
 
@@ -198,7 +198,7 @@ The AI model will recognize the user's intent, call the `getWeather` tool with `
 - **Set `maxSteps` for complex workflows:** If your agent needs to call multiple tools in sequence, increase `maxSteps` from the default.
 - **Handle partial failures gracefully:** If one tool fails, the model may retry or use an alternative approach.
 
-> **Warning:** OpenAI has a hard limit of 128 tools per request. If you register more, NeuroLink will validate and filter them. Use the `OPENAI_MAX_TOOLS` environment variable to adjust this limit. Note that tool limits vary by provider -- check each provider's documentation for current limits.
+> **Warning:** Large tool lists reduce tool-selection accuracy; OpenAI's [function-calling guide](https://developers.openai.com/api/docs/guides/function-calling) recommends keeping the tools available per turn small. NeuroLink caps tools at 100 per provider by default; change it with the `NEUROLINK_MAX_TOOLS_PER_PROVIDER` environment variable. Note that tool limits vary by provider -- check each provider's documentation for current limits.
 {: .prompt-warning }
 
 ---
@@ -272,7 +272,7 @@ Here is how NeuroLink's OpenAI integration is structured:
 flowchart LR
     A[Your App] --> B[NeuroLink SDK]
     B --> C[OpenAIProvider]
-    C --> D["createOpenAI(@ai-sdk/openai)"]
+    C --> D["Direct HTTP - no AI SDK"]
     D --> E[OpenAI API]
 
     C --> F[Tool Validation]
@@ -290,8 +290,8 @@ flowchart LR
 
 **Key components:**
 
-- **OpenAIProvider** extends `BaseProvider` and implements the provider interface with OpenAI-specific logic
-- **`@ai-sdk/openai`** is the underlying Vercel AI SDK OpenAI adapter, used for both streaming and generation
+- **OpenAIProvider** extends `OpenAIChatCompletionsProvider` (itself a `BaseProvider` subclass) and adds OpenAI-specific logic like native embeddings and image generation
+- **Direct HTTP** -- NeuroLink's OpenAI provider talks to the Chat Completions API directly; it does not route through the Vercel AI SDK's `@ai-sdk/openai` adapter
 - **Tool validation** ensures all tools meet OpenAI's requirements before any API call
 - **Proxy support** via `createProxyFetch()` allows NeuroLink to work behind corporate proxies
 - **Error classification** maps raw API errors to typed NeuroLink exceptions
@@ -300,14 +300,7 @@ flowchart LR
 
 ## Proxy and Network Configuration
 
-For enterprise environments behind corporate proxies, NeuroLink injects `createProxyFetch()` into the OpenAI client:
-
-```typescript
-const openaiClient = createOpenAI({
-  apiKey: config.apiKey,
-  fetch: createProxyFetch(),
-});
-```
+For enterprise environments behind corporate proxies, NeuroLink's OpenAI provider calls `createProxyFetch()` and uses the returned `fetch` implementation for its requests to the OpenAI API, honoring your standard `HTTP_PROXY`/`HTTPS_PROXY` environment configuration.
 
 This transparently routes all OpenAI API calls through your configured proxy. The timeout is configurable per-request via the `timeout` option in `generate()` and `stream()`.
 
@@ -319,7 +312,7 @@ If you are considering whether to use NeuroLink or the direct `openai` package, 
 
 | Feature | Direct `openai` Package | NeuroLink OpenAI Provider |
 |---|---|---|
-| **API interface** | OpenAI-specific | Unified (works with 13 providers) |
+| **API interface** | OpenAI-specific | Unified (works across NeuroLink's providers) |
 | **Tool handling** | Manual tool loop | Automatic multi-step execution |
 | **Error types** | Generic errors | Classified (`AuthenticationError`, etc.) |
 | **Streaming** | Raw SSE parsing | Normalized async iterator |
@@ -342,7 +335,7 @@ Your next step: pick one feature from this guide and ship it. Then explore anoth
 - **Try another provider:** Google AI Studio & Gemini Integration Guide for Google's free-tier models
 - **Build with tools:** [NeuroLink Quickstart: 10 Things You Can Build Today](/posts/neurolink-quickstart-10-things/) for tool-augmented examples
 - **Add resilience:** [How to Switch AI Providers Without Rewriting Code](/posts/switch-ai-providers-without-rewriting/) for multi-provider failover
-- **Compare providers:** Check the Provider Comparison Matrix for a side-by-side evaluation of all 13 providers
+- **Compare providers:** Check the Provider Comparison Matrix for a side-by-side evaluation of NeuroLink's providers
 
 ---
 

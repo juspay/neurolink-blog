@@ -16,8 +16,8 @@ tags:
   - vertex
 author: neurolink
 description: >-
-  A deep dive into how NeuroLink built multi-provider failover across 13 AI
-  providers with automatic fallback and response normalization.
+  A deep dive into NeuroLink's multi-provider failover primitives, explicit
+  fallback policies, environment-aware selection, and normalized responses.
 toc: true
 mermaid: true
 pin: false
@@ -26,70 +26,66 @@ image:
   alt: 'How We Built Multi-Provider Failover: Never Losing an API Call'
 ---
 
-We designed NeuroLink's multi-provider failover to guarantee that no single provider outage drops an API call. This deep dive examines how we implemented circuit breaking, health checking, weighted routing, and graceful degradation across 13 providers -- and the production incidents that taught us where naive failover breaks down.
+NeuroLink's multi-provider primitives let an application avoid making one vendor its only failure domain. This deep dive examines the implementation of explicit fallback policies, environment-aware selection, retries, and response normalization across a broad provider catalog.
 
-That was the last time.
+No SDK can guarantee that every request succeeds: a fallback can fail too, and validation or authentication errors usually should surface instead of being hidden. The useful goal is narrower -- keep transient provider failures from becoming application outages when another configured provider can serve the request.
 
-NeuroLink now supports 13 AI providers with automatic failover, environment-aware provider selection, and production-tested resilience patterns. But we built it one outage at a time.
-
-This post tells the story of how we went from single-provider to multi-provider failover, the architectural decisions behind `createAIProviderWithFallback` and `createBestAIProvider`, and why the hardest problem is not switching providers -- it is ensuring the response format stays consistent.
+This post explains the roles of `providerFallback`, `createAIProviderWithFallback`, and `createBestAIProvider`, and why switching providers is only half the problem: the application also needs a consistent result shape.
 
 ---
 
 ## The Single-Provider Era
 
-### How we started
+### A common starting point
 
-One provider (Vertex), one model, hardcoded in the application config. Simple, clean, and dangerously fragile.
+Consider an application with one provider (for example, Vertex), one model, and a provider name fixed in configuration. The design is simple, but that provider is also a single failure domain.
 
-### Why it was fine (at first)
+### Why it can be acceptable initially
 
-Google Cloud's SLA is 99.9%. That is 8.7 hours of downtime per year. For internal tools, that is acceptable. Outages are rare, and when they happen, you wait them out.
+For prototypes and non-critical internal tools, waiting out a rare outage may be a reasonable trade-off. The design has fewer credentials, fewer model-behavior differences, and less operational overhead.
 
-### Why it broke
+### Where it breaks down
 
-99.9% is a per-month measurement. In practice, outages cluster. Rate limits hit during traffic spikes. Region-specific issues affect only your deployment. And "downtime" includes degraded performance -- 10x latency that the SLA does not count as an outage but your users definitely notice.
-
-At Juspay, AI features are embedded in payment flows. 47 minutes of downtime translates to measurable revenue impact. The business case for multi-provider support was immediately clear.
+Production failures are not limited to complete provider outages. Rate limits can appear during traffic spikes, credentials or model access can change, regional services can degrade, and latency can rise without a clean availability failure. In a payment-related workflow, even a short interruption can affect users, so a second configured provider can be worth the added operational complexity.
 
 ---
 
-## Failed Attempt #1: Manual Provider Switching
+## Naive Approach #1: Manual Provider Switching
 
 ### The approach
 
-Deploy with Provider A. When it goes down, change an environment variable, restart services, and point to Provider B.
+A team might deploy with Provider A, then change an environment variable and restart services when it fails.
 
-### What broke
+### What breaks
 
-Three problems made this unworkable:
+Three problems make this unsuitable for availability-sensitive paths:
 
-1. **Detection latency.** How long until someone notices the primary is down? At 3 AM, the answer is "too long."
-2. **Restart latency.** Rolling deploys take minutes. That is minutes of continued downtime after you have already detected the problem.
-3. **The 3 AM problem.** Who is awake to push the change? On-call engineers monitoring AI provider status is an expensive use of human attention.
+1. **Detection latency.** The application keeps failing until monitoring or a person notices.
+2. **Restart latency.** A rollout adds more delay after detection.
+3. **Operational load.** Provider incidents become manual on-call procedures.
 
-**Lesson learned:** Failover must be automatic and in-process. No human in the loop, no restart required.
+**Design implication:** If continuity matters, execute the fallback policy in-process rather than requiring a redeploy.
 
 ---
 
-## Failed Attempt #2: Round-Robin Provider Selection
+## Naive Approach #2: Round-Robin Provider Selection
 
 ### The approach
 
-Distribute requests across three providers (Vertex, Bedrock, OpenAI) in rotation. Each request goes to the next provider in the queue.
+Another tempting design is to distribute requests across Vertex, Bedrock, and OpenAI in rotation.
 
-### What broke
+### What breaks
 
-Different providers have different models, different response formats, and different rate limits. Rotating across them produced inconsistent outputs. One request returned GPT-4o style formatting. The next returned Claude style. Users noticed immediately.
+Different providers expose different model families, rate limits, and behavioral characteristics. One request may use GPT-5.4 while the next uses Claude, so output style and capabilities can vary even when the result object has the same fields.
 
-The deeper issue: round-robin treats all providers as interchangeable. They are not. Each provider has different:
+The deeper issue is that round-robin treats all providers as interchangeable. They are not. Each provider has different:
 
 - Token counting behavior
 - Tool calling format
 - Streaming chunking behavior
 - Error response format
 
-**Lesson learned:** Multi-provider requires a primary/fallback model, not a load balancer. Users want consistent behavior from a primary provider, with seamless failover when it is unavailable.
+**Design implication:** Prefer a primary provider with an explicit fallback policy when consistency matters. Load distribution is a separate requirement and should account for model capabilities, not just request count.
 
 ---
 
@@ -99,11 +95,11 @@ The key realization was that the problem is not "how do I call multiple provider
 
 ### The AIProvider interface
 
-Every provider in NeuroLink implements the same contract (source: `src/lib/types/providers.ts`):
+Every text-generation provider in NeuroLink implements the same core contract (source: `src/lib/types/providers.ts`):
 
-- `generate(options: TextGenerationOptions): Promise<EnhancedGenerateResult>`
+- `generate(options: TextGenerationOptions): Promise<EnhancedGenerateResult | null>`
 - `stream(options: StreamOptions): Promise<StreamResult>`
-- `supportsTools(): boolean`
+- `supportsTools?(): boolean`
 
 ### EnhancedGenerateResult
 
@@ -119,11 +115,34 @@ The `EnhancedGenerateResult` normalizes everything the application needs: `conte
 
 ## The Architecture
 
-### createAIProviderWithFallback
+### Automatic per-call fallback with `providerFallback`
 
-Source: `src/lib/index.ts`
+For the high-level `NeuroLink` API, configure a callback that chooses the next provider and model. The callback receives the error and returns `{ provider, model }`, or `null` to let the error bubble. It runs after same-provider retries; a per-call callback overrides the instance-level callback.
 
-This function creates both primary and fallback provider instances at startup and returns `{ primary, fallback }` -- both are `AIProvider` instances.
+```typescript
+import { NeuroLink } from '@juspay/neurolink';
+
+const neurolink = new NeuroLink({
+  providerFallback: async (error: unknown) => {
+    console.warn('Primary provider failed:', error);
+    return { provider: 'vertex', model: 'gemini-2.5-flash' };
+  },
+});
+
+const result = await neurolink.generate({
+  input: { text: 'Explain NeuroLink architecture' },
+  provider: 'openai',
+  model: 'gpt-5.4',
+});
+
+console.log(result.content);
+```
+
+The callback above intentionally falls back on any non-cancellation error. In a production application, return `null` for errors your policy considers non-recoverable.
+
+### Lower-level provider pair
+
+`createAIProviderWithFallback()` (source: `src/lib/index.ts`) constructs both provider instances and returns `{ primary, fallback }`. It does **not** execute the fallback automatically; the application calls the second provider in its catch path.
 
 ```typescript
 import { createAIProviderWithFallback } from '@juspay/neurolink';
@@ -141,7 +160,8 @@ async function generateWithFailover(prompt: string) {
       temperature: 0.7,
     });
   } catch (error) {
-    console.warn(`Primary (bedrock) failed: ${error.message}. Using fallback.`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Primary (bedrock) failed: ${message}. Using fallback.`);
     return await fallback.generate({
       input: { text: prompt },
       temperature: 0.7,
@@ -154,7 +174,7 @@ const result = await generateWithFailover('Explain NeuroLink architecture');
 console.log(`Provider: ${result.provider}, Tokens: ${result.usage?.total}`);
 ```
 
-**Why explicit try/catch over automatic retry?** We chose this design for four reasons:
+**Why use the lower-level pair?** Explicit try/catch is useful when the application needs direct control:
 
 1. Some errors should not be retried (validation errors, bad input)
 2. The application may want to log the failover event
@@ -166,7 +186,7 @@ flowchart TD
     A["Application"] --> B["createAIProviderWithFallback"]
     B --> C["Primary Provider"]
     B --> D["Fallback Provider"]
-    A --> E{"generate(options)"}
+    A --> E{"generate options"}
     E -->|"try"| C
     C -->|"success"| F["EnhancedGenerateResult"]
     C -->|"error"| G["catch"]
@@ -183,7 +203,7 @@ flowchart TD
 
 Source: `src/lib/index.ts`
 
-This function automatically selects the best available provider based on environment variables. It uses the `getBestProvider()` utility (source: `src/lib/utils/providerUtils.ts`) to scan the environment and rank providers.
+This function uses `getBestProvider()` (source: `src/lib/utils/providerUtils.ts`). It honors an explicitly requested provider; otherwise it asks the health checker for a healthy provider, then falls back to configured-provider checks and descriptor priorities. If no configured provider is available, it throws rather than silently choosing an unconfigured default.
 
 ```typescript
 import { createBestAIProvider } from '@juspay/neurolink';
@@ -205,13 +225,13 @@ console.log(result.content);
 
 ## Provider Registration and Discovery
 
-NeuroLink registers 13 providers at startup, each through the `ProviderFactory` (source: `src/lib/factories/providerFactory.ts`).
+NeuroLink v12 exposes 33 named LLM providers (14 native and 19 JSON-catalog providers), plus a generic OpenAI-compatible adapter. Native providers and catalog entries are registered lazily through `ProviderFactory` and `ProviderRegistry` (source: `src/lib/factories/providerFactory.ts` and `src/lib/factories/providerRegistry.ts`).
 
 ```mermaid
 flowchart LR
-    A["ProviderRegistry"] -->|"register 13 providers"| B["ProviderFactory"]
+    A["ProviderRegistry"] -->|"register providers"| B["ProviderFactory"]
     B -->|"stores"| C["Map: name -> factory fn"]
-    D["createProvider(name)"] --> B
+    D["createProvider call"] --> B
     B -->|"resolve aliases"| E["Normalize Name"]
     E -->|"check env vars"| F["Resolve Model"]
     F -->|"call factory fn"| G["Provider Instance"]
@@ -221,21 +241,13 @@ flowchart LR
     style H fill:#00b4d8,stroke:#1b262c,color:#fff
 ```
 
-### The 13 providers
+### Provider groups
 
-1. **bedrock** -- Amazon Bedrock
-2. **openai** -- OpenAI
-3. **vertex** -- Google Vertex AI
-4. **anthropic** -- Anthropic
-5. **azure** -- Azure OpenAI
-6. **google-ai** -- Google AI Studio
-7. **huggingface** -- HuggingFace
-8. **ollama** -- Ollama (local)
-9. **mistral** -- Mistral AI
-10. **litellm** -- LiteLLM proxy
-11. **sagemaker** -- Amazon SageMaker
-12. **openrouter** -- OpenRouter
-13. **openai-compatible** -- Any OpenAI-compatible API
+- **Direct and cloud providers:** OpenAI, Anthropic, Google AI Studio, Vertex AI, Azure OpenAI, Bedrock, SageMaker, and others.
+- **Gateways and local runtimes:** OpenRouter, LiteLLM, Ollama, LM Studio, llama.cpp, and the generic OpenAI-compatible adapter.
+- **Catalog-backed providers:** Mistral, DeepSeek, xAI, Groq, Cerebras, Fireworks, Hugging Face, and other OpenAI-compatible services.
+
+Use `ProviderFactory.getAllDescriptors()` when application code needs the canonical built-in provider catalog; `getAvailableProviders()` also includes registered aliases.
 
 ### Registration details
 
@@ -243,7 +255,7 @@ Each provider registers a primary name and aliases, a factory function (async, f
 
 ### Lazy loading
 
-Provider classes are imported only when first used. The factory stores factory functions, not class instances. This means unused providers add zero startup cost. If you only use OpenAI and Anthropic, the other 11 providers are never loaded.
+Provider classes are imported only when first used. The factory stores factory functions, not class instances. This means unused native provider implementations are not imported at startup. If you only use OpenAI and Anthropic, unrelated provider clients are not loaded.
 
 ```typescript
 import { ProviderFactory } from '@juspay/neurolink';
@@ -278,34 +290,34 @@ The `getBestProvider()` utility scans the environment for API keys and returns t
 
 ```mermaid
 flowchart TD
-    A["createBestAIProvider()"] --> B{"NEUROLINK_PROVIDER set?"}
-    B -->|"Yes"| C["Use specified provider"]
-    B -->|"No"| D{"OPENAI_API_KEY?"}
-    D -->|"Yes"| E["OpenAI"]
-    D -->|"No"| F{"ANTHROPIC_API_KEY?"}
-    F -->|"Yes"| G["Anthropic"]
-    F -->|"No"| H{"VERTEX_PROJECT_ID?"}
-    H -->|"Yes"| I["Vertex"]
-    H -->|"No"| J{"AWS credentials?"}
-    J -->|"Yes"| K["Bedrock"]
-    J -->|"No"| L["Default: Vertex"]
+    A["createBestAIProvider"] --> B{"Provider explicitly requested?"}
+    B -->|"Yes"| C["Honor requested provider"]
+    B -->|"No"| D{"Healthy provider available?"}
+    D -->|"Yes"| E["Use health-check result"]
+    D -->|"No"| F{"Configured default available?"}
+    F -->|"Yes"| G["Use configured default"]
+    F -->|"No"| H{"Configured local provider available?"}
+    H -->|"Yes"| I["Use local provider"]
+    H -->|"No"| J["Check descriptor priority order"]
+    J --> K{"Configured provider found?"}
+    K -->|"Yes"| L["Create provider"]
+    K -->|"No"| M["Throw configuration error"]
     style A fill:#0f4c75,stroke:#1b262c,color:#fff
     style C fill:#00b4d8,stroke:#1b262c,color:#fff
     style E fill:#00b4d8,stroke:#1b262c,color:#fff
     style G fill:#00b4d8,stroke:#1b262c,color:#fff
     style I fill:#00b4d8,stroke:#1b262c,color:#fff
-    style K fill:#00b4d8,stroke:#1b262c,color:#fff
+    style L fill:#00b4d8,stroke:#1b262c,color:#fff
 ```
 
 ### Why this ordering matters
 
-1. **`NEUROLINK_PROVIDER` or `AI_PROVIDER`** -- Explicit configuration always wins
-2. **Explicit API keys** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`) -- These indicate intentional configuration
-3. **Cloud credentials** (`VERTEX_PROJECT_ID`, AWS credentials, `AZURE_OPENAI_API_KEY`) -- May be inherited from the environment (EC2 instance role, GKE workload identity)
-4. **Local providers** -- Ollama running on `localhost:11434` is fallback-only
-5. **Default:** `vertex` -- The original Juspay default
+1. **Explicit request:** A provider passed to `createBestAIProvider()` is honored.
+2. **Health information:** Without an explicit request, the health checker can select a currently healthy provider.
+3. **Configuration:** The legacy fallback checks an available `DEFAULT_PROVIDER`, then a configured local Ollama runtime, then providers ordered by descriptor priority.
+4. **Failure is explicit:** If no provider is configured and available, selection throws a configuration error.
 
-**Use in CI/CD:** Different environments have different providers. `createBestAIProvider()` automatically adapts without code changes. Your staging environment might use OpenAI while production uses Bedrock, and the same code works in both.
+**Use in CI/CD:** Different environments can expose different credentials while application code stays the same. Keep the provider decision observable, because auto-selection is an environment-dependent choice rather than a fixed deployment contract.
 
 ---
 
@@ -317,12 +329,12 @@ Provider A returns `{ text: "...", usage: { promptTokens: 100 } }`. Provider B r
 
 ### The solution
 
-The `GenerationHandler.formatEnhancedResult()` method (source: `src/lib/core/modules/GenerationHandler.ts`) handles the normalization:
+`BaseProvider` and provider-specific clients normalize responses into the shared result types:
 
-- Extracts `content` from `text`, `experimental_output`, or JSON-in-text
-- Normalizes `usage` via `extractTokenUsage()` which handles all provider formats
-- Standardizes `toolCalls` with consistent `toolCallId`, `toolName`, `args` fields
-- Attaches `provider`, `model`, `toolsUsed`, `toolExecutions`, `availableTools`
+- `GenerateResult.content` is the primary text output
+- `usage` uses the common `{ input, output, total }` shape
+- Tool calls use consistent `toolCallId`, `toolName`, and `args` fields
+- Provider and tool metadata are exposed through shared optional result fields
 
 ### Token counting normalization
 
@@ -330,7 +342,7 @@ Different providers count tokens differently. Some include system prompt tokens,
 
 ### Thinking and reasoning tokens
 
-For models with extended thinking (Claude, Gemini), reasoning tokens are tracked separately when available. The `thinkingConfig` option in `GenerationHandler.callGenerateText()` handles provider-specific configuration.
+For models with extended thinking (Claude, Gemini), reasoning tokens are tracked separately when available. The `thinkingConfig` option on `generate()`/`stream()` is translated into provider-specific configuration inside each provider client (e.g., `src/lib/providers/anthropic/client.ts`, `src/lib/providers/googleVertex/client.ts`).
 
 ```typescript
 import { createAIProvider } from '@juspay/neurolink';
@@ -369,7 +381,7 @@ for (const providerName of ['openai', 'anthropic', 'vertex']) {
 
 ### Pattern 2: Cross-family failover with prompt adaptation
 
-- **Primary:** OpenAI (GPT-4o) -- best tool calling
+- **Primary:** OpenAI (GPT-5.4) -- best tool calling
 - **Fallback:** Vertex (Gemini Flash) -- best latency
 - **Trade-off:** Different model families, but NeuroLink's `EnhancedGenerateResult` normalizes the output. Response style may differ slightly.
 
@@ -377,35 +389,24 @@ for (const providerName of ['openai', 'anthropic', 'vertex']) {
 
 - **Primary:** Ollama (local Llama) -- zero API cost
 - **Fallback:** Bedrock (Claude Haiku) -- low cost per token
-- **Emergency:** OpenAI (GPT-4o) -- highest quality, highest cost
+- **Emergency:** OpenAI (GPT-5.4) -- highest quality, highest cost
 - **Benefit:** Application controls the escalation logic. Normal traffic costs nothing. Spikes escalate to paid providers only when necessary.
 
 ---
 
-## Benchmarks
+## What to Measure
 
-### Failover latency
+Failover adds work, so measure it in your own environment rather than relying on generic latency numbers.
 
-| Failure Type | Detection Time | Notes |
-|---|---|---|
-| Network error (immediate) | 120ms | Error detection + fallback latency |
-| Timeout error (30s default) | 30,120ms | Full timeout + error detection + fallback |
-| Rate limit (429) | 85ms | Immediate rejection + fallback latency |
-
-### Provider creation overhead (p50)
-
-| Scenario | Latency |
+| Signal | What it reveals |
 |---|---|
-| Cold start (first call, provider class loaded) | 45ms |
-| Warm start (provider already loaded) | 2ms |
+| Time to classify the primary error | Whether timeout policy dominates recovery time |
+| Same-provider retry time | How much latency is spent before cross-provider fallback |
+| Fallback provider latency and error rate | Whether the backup is actually independent and healthy |
+| Model and provider recorded per result | Which path served each request |
+| Evaluation score before and after fallback | Whether cross-model behavior remains acceptable |
 
-### Response consistency
-
-| Failover Scenario | Semantic Similarity |
-|---|---|
-| Same-model (Bedrock Claude to Anthropic Claude) | 97% |
-| Cross-model (OpenAI GPT-4o to Vertex Gemini) | 89% |
-| Identical EnhancedGenerateResult structure | 100% |
+Run the same prompt set against the primary and fallback models, and set acceptance thresholds for your application. A shared `EnhancedGenerateResult` shape makes response handling consistent, but it does not guarantee semantically identical answers.
 
 ---
 
@@ -413,11 +414,11 @@ for (const providerName of ['openai', 'anthropic', 'vertex']) {
 
 **1. Interface consistency is the foundation.** Without `AIProvider` and `EnhancedGenerateResult`, multi-provider failover would be a patchwork of format-specific handlers. The normalization layer is the most important piece of the system.
 
-**2. Explicit failover beats automatic retry.** The application knows which errors are transient and which are permanent. Let it decide. Automatic retry with the same provider is fine. Automatic failover to a different provider needs application awareness.
+**2. Retry and fallback solve different problems.** NeuroLink retries the same provider before fallback. Use `providerFallback` or an explicit provider pair to make cross-provider policy visible to the application.
 
-**3. Environment detection enables zero-config.** `createBestAIProvider()` eliminates the most common setup friction -- "which provider should I use?" Just set your API key and go.
+**3. Environment detection reduces setup friction.** `createBestAIProvider()` can select among configured providers, but production deployments should log the selected provider and treat missing configuration as an error.
 
-**4. Lazy loading prevents startup bloat.** 13 providers but only the ones you use are loaded. Cold start stays fast regardless of how many providers are registered.
+**4. Lazy registration limits unnecessary loading.** Native provider implementations are dynamically imported when they are needed rather than all at startup.
 
 **5. Same-model failover is the gold standard.** Same model on different infrastructure (Bedrock vs. Anthropic direct) gives the highest consistency with true infrastructure redundancy. Cross-model failover is the backup plan.
 
@@ -425,7 +426,7 @@ for (const providerName of ['openai', 'anthropic', 'vertex']) {
 
 ## What's Next
 
-The architecture decisions we have described represent trade-offs that worked for our scale and constraints. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
+The architecture decisions described here represent trade-offs that should be validated against your scale and constraints. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
 
 ---
 

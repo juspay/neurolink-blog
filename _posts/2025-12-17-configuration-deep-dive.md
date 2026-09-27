@@ -16,9 +16,9 @@ tags:
   - devops
 author: neurolink
 description: >-
-  Master NeuroLink's configuration system: provider setup, performance tuning,
-  cache strategies, analytics, and automatic backup/restore. Complete guide to
-  neurolink.config.ts with code examples.
+  Understand NeuroLink's runtime constructor config and standalone ConfigManager
+  store, including credentials, conversation memory, validation, backups, and
+  the application-owned policy fields in .neurolink.config.
 toc: true
 mermaid: true
 pin: false
@@ -27,40 +27,35 @@ image:
   alt: 'Configuration Deep-Dive: neurolink.config.ts and Environment Hierarchy'
 ---
 
-In this guide, you will master NeuroLink's two-layer configuration system. You will set up provider configurations, tune performance settings, configure caching and fallback strategies, manage backups and restores, and validate configuration changes before they reach production. By the end, you will have a fully configured NeuroLink deployment with safe defaults, automatic backup, and environment-specific overrides.
+In this guide, you will learn NeuroLink's two distinct configuration surfaces. The `NeuroLink` constructor config controls the SDK runtime, while the exported `ConfigManager` utility reads and writes a standalone `.neurolink.config` file with validation and backups. You will use both APIs accurately, keep provider credentials in environment variables or the constructor's `credentials` field, and understand which behavior the SDK applies automatically versus which persistent settings your application must consume itself.
 
-## The Two Configuration Layers
+## The Two Configuration Surfaces
 
-Understanding the distinction between the two configuration layers is fundamental. They serve different purposes and have different lifecycles:
+The two surfaces serve different purposes and have different lifecycles. They are not merged into one effective configuration, and there is no precedence hierarchy between them:
 
 ```mermaid
 graph TD
-    A["Constructor Config<br/>(NeurolinkConstructorConfig)"] --> D[Effective Config]
-    B["File Config<br/>(.neurolink.config)"] --> D
-    C["Environment Variables<br/>(process.env)"] --> D
-    E["DEFAULT_CONFIG<br/>(built-in defaults)"] --> D
+    subgraph Runtime["NeuroLink Runtime"]
+        A["Constructor Config<br/>NeurolinkConstructorConfig type"] --> N["new NeuroLink call"]
+        E["Supported Environment Variables<br/>process.env"] --> N
+    end
 
-    D --> F[NeuroLink Runtime]
-
-    subgraph "Priority (highest to lowest)"
-        A
-        B
-        C
-        E
+    subgraph Persistent["Standalone Persistent Store"]
+        C["ConfigManager"] --> F[".neurolink.config"]
+        D["DEFAULT_CONFIG"] --> C
+        F --> APP["Application reads and applies values"]
     end
 ```
 
-**Precedence order:** Constructor config > File config > Environment variables > Defaults
-
-- **Layer 1: Persistent file-based config** (`NeuroLinkConfig`) -- stored in `.neurolink.config` as a JavaScript module. Covers providers, performance settings, analytics, and tools. Persists across restarts.
-- **Layer 2: Runtime constructor config** (`NeurolinkConstructorConfig`) -- passed when you create a new `NeuroLink` instance. Covers conversation memory, orchestration, HITL, tool registry, and observability. Lives in your application code.
-- **Layer 3: Environment variables** -- secrets (API keys) and deployment-specific overrides. Never committed to version control.
-- **Layer 4: Built-in defaults** -- safe, sensible defaults that apply when nothing else is specified.
+- **Runtime constructor config** (`NeurolinkConstructorConfig`) -- passed when you create a `NeuroLink` instance. Covers credentials, conversation memory, orchestration, HITL, tool policy, fallback, observability, and other SDK behavior. This is what directly configures the runtime.
+- **Persistent file config** (`NeuroLinkConfig`) -- managed by `ConfigManager` and written to `.neurolink.config` as a JavaScript module. It can store provider metadata, performance policy, analytics, and tool settings across restarts, but the `NeuroLink` constructor does not load or merge it automatically. Your application must read the file and apply the values it needs.
+- **Environment variables** -- provider API keys and supported feature-specific defaults, including conversation-memory defaults. Never commit secrets to version control.
+- **`DEFAULT_CONFIG`** -- the default value returned by `ConfigManager` when the persistent file is absent or invalid. It is not the constructor's runtime default configuration.
 
 ```typescript
 // Layer 1: Persistent file-based configuration
 export type NeuroLinkConfig = {
-  providers?: Record<string, ProviderConfig>;
+  providers?: Record<string, ProviderRuntimeConfig>;
   performance?: PerformanceConfig;
   analytics?: AnalyticsConfig;
   tools?: ToolConfig;
@@ -74,14 +69,19 @@ export type NeurolinkConstructorConfig = {
   conversationMemory?: Partial<ConversationMemoryConfig>;
   enableOrchestration?: boolean;
   hitl?: HITLConfig;
+  tools?: ToolConfig;
   toolRegistry?: MCPToolRegistry;
   observability?: ObservabilityConfig;
+  credentials?: NeurolinkCredentials;
+  providerFallback?: ProviderFallbackCallback;
+  modelChain?: string[];
+  // Additional runtime features omitted here for brevity
 };
 ```
 
-The separation is intentional. Provider configuration changes infrequently (when you add a new provider or update pricing) and should persist across deployments. Runtime behavior like conversation memory and HITL policies are application-specific and belong in your code.
+The separation is intentional. A deployment tool can use `ConfigManager` as a durable settings store, while runtime behavior such as credentials, conversation memory, HITL policy, and provider fallback belongs in constructor config. If you want persistent values to influence a `NeuroLink` instance, load them and map them into supported constructor or per-call fields in your own application.
 
-> **Note:** The constructor config (Layer 2) has the highest precedence. If you set a value both in the config file and the constructor, the constructor wins. This lets you override file-based defaults for specific application instances.
+> **Note:** `.neurolink.config` is a standalone store, not an automatic SDK configuration layer. Values under its `performance`, `analytics`, and `tools` sections are typed and persisted by `ConfigManager`, but the manager itself does not install a cache, circuit breaker, retry loop, analytics exporter, or tool policy into `NeuroLink`.
 {: .prompt-info }
 
 ## Configuration Schema Deep-Dive
@@ -119,10 +119,10 @@ graph TD
 
 ### Provider Configuration
 
-Each provider entry is a `ProviderConfig` object with these fields:
+Each provider entry is a `ProviderRuntimeConfig` object with these fields:
 
 ```typescript
-export type ProviderConfig = {
+export type ProviderRuntimeConfig = {
   model?: string;
   available?: boolean;
   lastCheck?: number;
@@ -144,28 +144,32 @@ The extensible `[key: string]: unknown` allows provider-specific settings (like 
 
 ### Cache Configuration
 
-Three caching strategies are available:
+The persistent schema can describe three application-level caching strategies:
 
-- **`memory`**: In-process cache. Fast but lost on restart. Best for development and single-instance deployments.
-- **`writeThrough`**: Writes to both memory and disk. Fast reads with persistence. Best for single-server production.
-- **`cacheAside`**: Application manages cache population. Most flexible. Best for distributed deployments with shared cache.
+- **`memory`**: Your application keeps entries in process memory.
+- **`writeThrough`**: Your application writes entries to both its fast cache and persistent store.
+- **`cacheAside`**: Your application loads and populates the cache on demand.
 
-The `persistToDisk` option (with configurable `diskPath`) enables cache survival across process restarts, useful for expensive LLM responses that you want to reuse.
+`persistToDisk` and `diskPath` are also available as policy fields. `ConfigManager` persists these values; it does not provide the cache implementation. Your application must read the policy and wire it to its own caching layer.
 
 ### Fallback Configuration
 
-The fallback config includes a circuit breaker pattern and graceful degradation:
+The persistent fallback object can record application policy for a circuit breaker and graceful degradation:
 
-- **`circuitBreaker`**: When enabled, the system stops sending requests to a provider that has failed consecutively. This prevents cascading failures where one provider's slowdown causes timeouts across your entire system.
-- **`commonResponses`**: Pre-configured fallback responses for when all providers are down. Your application returns a helpful message instead of an error.
-- **`degradedMode`**: When enabled, the system accepts partial functionality (e.g., text generation without tool calling) rather than failing completely.
+- **`circuitBreaker`**: Whether your application should stop sending requests to a repeatedly failing provider.
+- **`commonResponses`**: Static responses your application can use when providers are unavailable.
+- **`degradedMode`**: Whether your application should accept partial functionality instead of failing completely.
+
+These fields likewise are not connected to `NeuroLink.generate()` by `ConfigManager`. For SDK-level provider failover, use the constructor's `providerFallback` callback (cross-provider) or `modelChain` (same provider, model-access-denied errors only).
 
 ### Retry Configuration
 
-Retry settings control transient failure handling:
+The persistent schema can also record retry policy:
 
-- **`exponentialBackoff`**: When true, delays increase exponentially between retries (1s, 2s, 4s, 8s...). Prevents thundering herd effects when a provider recovers.
-- **`retryConditions`**: Array of specific error types that should trigger retries. Rate limit errors and network timeouts are retriable; authentication errors are not.
+- **`exponentialBackoff`**: Whether your application should increase delays between retry attempts.
+- **`retryConditions`**: Application-defined error categories that should trigger retries.
+
+This is policy data, not a retry engine; implement or map it explicitly in the host application.
 
 ## Default Configuration
 
@@ -216,9 +220,9 @@ export const DEFAULT_CONFIG: NeuroLinkConfig = {
 };
 ```
 
-These defaults are designed to work out of the box: caching is enabled to reduce API costs, analytics are on to track usage, fallbacks are configured with circuit breaking, and all tool capabilities are available. The default provider is Google AI with `gemini-2.5-pro`.
+These are the values `ConfigManager` returns when `.neurolink.config` is missing or invalid. They describe Google AI as available with `gemini-2.5-pro`, alongside sample cache, fallback, analytics, and tool policy. They do not activate those subsystems in a `NeuroLink` instance by themselves.
 
-> **Note:** The default configuration uses Google AI because it requires only a `GOOGLE_AI_API_KEY` environment variable. To use other providers, add their configuration and API keys.
+> **Note:** Provider credentials belong in environment variables or `NeurolinkConstructorConfig.credentials`, not in `.neurolink.config`. Even though `ProviderRuntimeConfig` retains an `apiKey` field for compatibility, storing a literal secret in this persistent file is unsafe.
 {: .prompt-info }
 
 ## The ConfigManager: Loading and Updating
@@ -228,9 +232,9 @@ The `NeuroLinkConfigManager` class handles all config operations: loading, updat
 ### Loading Config
 
 ```typescript
-import { NeuroLinkConfigManager } from '@juspay/neurolink/config';
+import { ConfigManager } from '@juspay/neurolink';
 
-const configManager = new NeuroLinkConfigManager();
+const configManager = new ConfigManager();
 
 // Load current config (creates default if none exists)
 const config = await configManager.loadConfig();
@@ -246,9 +250,8 @@ await configManager.updateConfig(
   {
     providers: {
       openai: {
-        model: "gpt-4o",
+        model: "gpt-5.4",
         available: true,
-        apiKey: process.env.OPENAI_API_KEY,
         features: ["streaming", "functionCalling"],
       },
     },
@@ -285,7 +288,7 @@ Dedicated methods simplify common provider operations:
 ```typescript
 // Update a specific provider
 await configManager.updateProviderStatus("anthropic", {
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-5",
   available: true,
   features: ["streaming", "functionCalling"],
   maxTokens: 8192,
@@ -302,7 +305,7 @@ await configManager.updateProviderStatus("openai", {
 
 ## Backup and Restore System
 
-The backup system is NeuroLink's safety net against configuration mistakes. Every update creates a timestamped backup, and any failed update automatically restores the previous config.
+The backup system is the persistent store's safety net against configuration mistakes. By default, every update creates a timestamped backup. A validation failure stops before writing; a persistence failure triggers restoration from the latest backup.
 
 ```mermaid
 sequenceDiagram
@@ -318,10 +321,12 @@ sequenceDiagram
     Note over Backup: neurolink-config-2025-12-17T10-30-00-000Z.js
     CM->>CM: Merge config (shallow merge)
     CM->>CM: validateConfig()
-    alt Validation passes
+    alt Validation fails
+        CM-->>App: Error (rejected before write)
+    else Persist succeeds
         CM->>FS: persistConfig()
         CM-->>App: Success
-    else Validation or write fails
+    else Persist fails
         CM->>Backup: restoreLatestBackup()
         Backup-->>CM: Previous config
         CM->>FS: persistConfig(restored)
@@ -415,7 +420,7 @@ Validation rules include:
 - Cache TTL below 1 second triggers a warning
 - Missing default provider triggers a suggestion
 
-When validation fails during an `updateConfig()` call, the update is rejected and the backup is automatically restored. Your running config is never corrupted by a bad update.
+When validation fails during an `updateConfig()` call, the update is rejected before `.neurolink.config` is written; the pre-update backup remains available. If persistence itself fails after validation, `updateConfig()` calls `restoreLatestBackup()` and rethrows an error. Because the manager caches the candidate object before validation, a caller that catches a validation error should create a fresh `ConfigManager` or reload the process before assuming the in-memory value matches disk.
 
 ## Constructor Configuration and Environment Variables
 
@@ -425,6 +430,11 @@ The runtime constructor config controls behavior that varies per application ins
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink({
+  credentials: {
+    openai: { apiKey: process.env.OPENAI_API_KEY },
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+    googleAiStudio: { apiKey: process.env.GOOGLE_AI_API_KEY },
+  },
   conversationMemory: {
     enabled: true,
     maxSessions: 50,
@@ -438,8 +448,11 @@ const neurolink = new NeuroLink({
     dangerousActions: ["delete", "send-email"],
   },
   observability: {
-    tracing: true,
-    metricsExport: "prometheus",
+    openTelemetry: {
+      enabled: true,
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      serviceName: "product-api",
+    },
   },
 });
 ```
@@ -461,9 +474,9 @@ Environment variables handle secrets and deployment-specific settings:
 > **Note:** Never store API keys in the config file. Use environment variables for all secrets. The config file may be committed to version control; environment variables should not be.
 {: .prompt-warning }
 
-## Performance Tuning Reference
+## Application-Owned Policy Reference
 
-A quick reference for the most impactful performance settings:
+A quick reference for the performance policy fields that `ConfigManager` can persist. NeuroLink does not consume these fields automatically; use them as inputs to your host application's cache, fallback, concurrency, and retry implementations:
 
 | Setting | Default | Description | Tune For |
 |---|---|---|---|
@@ -480,21 +493,21 @@ A quick reference for the most impactful performance settings:
 | `maxConcurrency` | `5` | Parallel requests | Throughput vs rate limits |
 | `retryConfig.exponentialBackoff` | `false` | Exponential backoff | Transient errors |
 
-**Tuning tips:**
+**Tuning tips (for your host implementation):**
 
-- **High-throughput applications**: Increase `maxConcurrency` to 10-20, enable `cache.persistToDisk`, and set `retryConfig.exponentialBackoff: true`
-- **Latency-sensitive applications**: Lower `timeoutMs` to 10000, set `cache.ttlMs` to 60000, and enable `degradedMode`
-- **Cost-sensitive applications**: Increase `cache.ttlMs` to 3600000 (1 hour) and set `cache.maxSize` to 10000
+- **High-throughput applications**: Increase concurrency only after measuring provider rate limits; add persistent caching and exponential backoff in the host.
+- **Latency-sensitive applications**: Lower request timeouts and keep a short cache TTL, then define an explicit degraded-mode response in application code.
+- **Cost-sensitive applications**: Use a longer cache TTL and size the cache from measured memory usage rather than copying a fixed entry count.
 
 ## What's Next
 
-You have configured NeuroLink's two-layer system with providers, performance tuning, caching, fallback, analytics, and backup management. Here is what to do next:
+You now know where each configuration belongs: constructor config directly controls the SDK runtime, supported environment variables provide secrets and feature defaults, and `ConfigManager` maintains a separate persistent policy store with validation and backups. Here is what to do next:
 
-1. **Start with defaults** -- run `loadConfig()` and verify the default configuration works with your Google AI API key
-2. **Add your providers** -- use `updateProviderStatus()` to configure OpenAI, Anthropic, or any other providers you need
-3. **Tune performance** -- adjust `timeoutMs`, `maxConcurrency`, and cache settings based on your latency and cost requirements
-4. **Enable circuit breakers** -- set `fallback.circuitBreaker: true` to automatically stop sending requests to failing providers
-5. **Set up backup rotation** -- schedule `cleanupOldBackups(10)` to run periodically in your deployment pipeline
+1. **Configure the runtime first** -- pass provider keys through `credentials` (or environment variables) and enable only the constructor features your application needs.
+2. **Use `ConfigManager` only when you need persistence** -- call `loadConfig()` and explicitly map the stored policy into your application's own components.
+3. **Add provider metadata** -- use `updateProviderStatus()` to record availability and model preferences without writing API keys into the file.
+4. **Implement policy deliberately** -- if you persist cache, circuit-breaker, retry, or concurrency settings, connect them to real host-side implementations and test their failure behavior.
+5. **Set up backup rotation** -- schedule `cleanupOldBackups(10)` if your deployment pipeline updates the persistent config frequently.
 
 ---
 

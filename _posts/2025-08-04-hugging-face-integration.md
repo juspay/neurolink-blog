@@ -27,55 +27,34 @@ image:
 
 By the end of this guide, you'll have access to 100,000+ open-source models from Hugging Face through NeuroLink, with intelligent tool-calling detection and the same unified API you use with every other provider.
 
-You will set up the Hugging Face provider, understand which models support tool calling, use open models for code generation and conversational AI, and leverage the model recommendations API. NeuroLink automatically detects whether a model supports tools, so you never get errors from trying to use tool calling with an incompatible model.
+You will set up the Hugging Face provider, understand which models support tool calling, use open models for code generation and conversational AI, and know which models NeuroLink recommends for tool calling. NeuroLink checks tool-calling support before including your tool definitions in a request; when a model does not support tools, you get a clear provider error rather than a confusing failure -- see **Tool-Calling Support Is Model-Dependent** below for how the check works and its limits.
 
 ## How It Works
 
-Under the hood, NeuroLink's Hugging Face integration uses the same pattern as several other providers: it creates an OpenAI-compatible client via `createOpenAI` from `@ai-sdk/openai`, but with a custom base URL pointing to Hugging Face's router.
+Under the hood, NeuroLink's Hugging Face integration uses the same pattern as several other open-model providers: a generic OpenAI-compatible chat-completions client, configured entirely from a catalog entry (base URL, auth, model defaults, error rules) rather than a hand-written Hugging-Face-specific class.
 
 The endpoint is `https://router.huggingface.co/v1`, which is Hugging Face's unified inference router. This router implements the OpenAI-compatible API specification, meaning NeuroLink communicates with it using the same request and response format as OpenAI -- chat completions, streaming, and tool calling all follow the same protocol.
 
-Proxy support is included via `createProxyFetch()`, which is useful for corporate environments that require all outbound traffic to go through a proxy server.
+Proxy support is included via a shared proxy-fetch utility used across NeuroLink's providers, which is useful for corporate environments that require all outbound traffic to go through a proxy server.
 
-This architecture means that any model available through the Hugging Face Inference API can be accessed through NeuroLink, provided it supports chat completion (which most instruction-tuned models do).
+This architecture means that any model available through the Hugging Face Inference API can be accessed through NeuroLink, provided it supports chat completion (which most instruction-tuned models do) -- though Hugging Face's own hosted-model roster changes over time, so a given model ID can stop resolving without any change on NeuroLink's side.
 
 ## Supported Models and Tool Calling Detection
 
 ### Default Model
 
-The default model is `meta-llama/Llama-3.1-8B-Instruct`, a capable instruction-tuned model. You can override this via the `HUGGINGFACE_MODEL` environment variable.
+The default model is `Qwen/Qwen2.5-72B-Instruct`, a strong general-purpose instruction-tuned model. You can override this via the `HUGGINGFACE_MODEL` environment variable.
 
-> **Tip:** For high-quality reasoning tasks, consider upgrading to `meta-llama/Llama-3.1-70B-Instruct`. For lightweight, fast function calling, try `NousResearch/Hermes-3-Llama-3.2-3B`.
+> **Tip:** For high-quality reasoning tasks, consider `deepseek-ai/DeepSeek-R1`. For a lighter, faster option, `meta-llama/Llama-3.1-8B-Instruct` is NeuroLink's built-in fallback model and remains tool-calling capable.
 {: .prompt-tip }
 
-### Intelligent Tool-Calling Detection
+### Tool-Calling Support Is Model-Dependent
 
-NeuroLink's `supportsTools()` method examines the model identifier against a curated list of model families known to support tool calling. This prevents the common pitfall of sending tool definitions to models that do not understand them.
+NeuroLink checks whether the selected model supports function calling before deciding whether to send your tool definitions along with a request. For most providers this comes from a central model-capability registry that flags specific models as tool-incapable; for a catalog-driven, "it depends on the model" provider like Hugging Face, NeuroLink does not maintain a curated per-model allow-list. When a model has no explicit capability entry, tool support defaults to enabled.
 
-**Tool-Capable Models (tools enabled automatically):**
+In practice, that means NeuroLink will attempt to send tool definitions to whatever Hugging Face model you select, including small or non-chat models. If the underlying model or Hugging Face's router rejects the request because the model does not actually understand tool calling, you get a provider-level error (see **Error Handling** below) rather than NeuroLink silently disabling tools for you.
 
-| Model Pattern | Examples | Notes |
-|---|---|---|
-| `llama-3.1-*-instruct` | Llama-3.1-8B, 70B, 405B-Instruct | Full tool calling support |
-| `llama-3.1-nemotron-ultra` | nvidia/Llama-3.1-Nemotron-Ultra-253B-v1 | NVIDIA-optimized variant |
-| `hermes-3-llama-3.2` | NousResearch/Hermes-3-Llama-3.2-3B | Excellent function calling |
-| `hermes-2-pro` | Hermes 2 Pro series | Earlier function calling models |
-| `codellama-*-instruct` | CodeLlama-34b, 13b-Instruct | Code-focused with tool support |
-| `mistral-7b-instruct-v0.3` | mistralai/Mistral-7B-Instruct-v0.3 | Mistral open-weight model |
-| `mistral-8x7b-instruct` | Mixtral 8x7B | Mixture-of-experts with tools |
-| `nous-hermes` | NousResearch series | Community function calling models |
-| `openchat` | OpenChat models | Tool-capable chat models |
-| `wizardcoder` | WizardCoder models | Code generation with tools |
-
-**Non-Tool Models (tools disabled automatically):**
-
-| Model Pattern | Reason |
-|---|---|
-| `microsoft/DialoGPT-*` | Conversational model, treats tools as text |
-| `gpt2`, `bert`, `roberta` | Pre-2024 models without tool training |
-| Most pre-2024 models | Lack structured function calling capability |
-
-When tools are disabled for a model, NeuroLink gracefully degrades -- your tool definitions are simply not sent to the model, preventing confusing error responses. The model will still answer your question, just without tool use.
+The practical takeaway: pick a model you know is tool-capable when tool calling matters. NeuroLink's own error guidance points you toward models it recommends for tool calling -- `meta-llama/Llama-3.3-70B-Instruct`, `zai-org/GLM-5`, and `Qwen/Qwen3.5-397B-A17B` -- when a tool-calling request fails.
 
 ## Quick Setup
 
@@ -84,7 +63,8 @@ When tools are disabled for a model, NeuroLink gracefully degrades -- your tool 
 ```bash
 export HUGGINGFACE_API_KEY=hf_your_token_here
 
-# Recommended: Set a capable default model
+# Optional: override the built-in default (Qwen/Qwen2.5-72B-Instruct) with a
+# smaller, faster model
 export HUGGINGFACE_MODEL=meta-llama/Llama-3.1-8B-Instruct
 ```
 
@@ -100,7 +80,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: "Write a quicksort implementation in Python" },
   provider: "huggingface",
-  model: "codellama/CodeLlama-34b-Instruct-hf",
+  model: "Qwen/Qwen2.5-Coder-32B-Instruct",
 });
 
 for await (const chunk of result.stream) {
@@ -108,51 +88,47 @@ for await (const chunk of result.stream) {
 }
 ```
 
-This streams a code generation request through CodeLlama 34B, one of the best open-source coding models available. Because NeuroLink detects that CodeLlama Instruct models support tool calling, you could also pass tools to this request if needed.
+This streams a code generation request through Qwen2.5 Coder, a model purpose-built for code generation. You could also pass tools to this request -- see **Tool-Calling Support Is Model-Dependent** above for how NeuroLink decides whether to include them.
 
 ### Switching Models Per-Request
 
 One of the advantages of Hugging Face is the sheer variety of models available. You can switch models per-request without any configuration changes:
 
 ```typescript
-// General conversation with Llama 3.1
+// General conversation with Llama 3.3
 const chatResult = await neurolink.stream({
   input: { text: "Explain quantum entanglement in simple terms" },
   provider: "huggingface",
-  model: "meta-llama/Llama-3.1-70B-Instruct",
+  model: "meta-llama/Llama-3.3-70B-Instruct",
 });
 
-// Code generation with CodeLlama
+// Code generation with Qwen2.5 Coder
 const codeResult = await neurolink.stream({
   input: { text: "Write a REST API with Express.js" },
   provider: "huggingface",
-  model: "codellama/CodeLlama-34b-Instruct-hf",
+  model: "Qwen/Qwen2.5-Coder-32B-Instruct",
 });
 
-// Function calling with Hermes 3
+// Function calling with GLM-5
 const toolResult = await neurolink.stream({
   input: { text: "What time is it in London?" },
   provider: "huggingface",
-  model: "NousResearch/Hermes-3-Llama-3.2-3B",
+  model: "zai-org/GLM-5",
   tools: { /* ... */ },
 });
 ```
 
 ## Tool Calling with Open Models
 
-NeuroLink enhances tool calling for Hugging Face models through several mechanisms:
+NeuroLink handles tool calling for Hugging Face the same way it does for every OpenAI-compatible provider -- there is no Hugging-Face-specific prompt-injection or tool-formatting layer:
 
-### Enhanced System Prompts
+### Standard Tool Formatting
 
-When tools are enabled, NeuroLink injects enhanced system prompt instructions via `enhanceSystemPromptForTools()`. This adds explicit guidance to the model about how to format tool calls, improving reliability with models that support tools but may not always use them optimally.
-
-### Tool Formatting
-
-The `formatToolsForHuggingFace()` method passes tool definitions through for the OpenAI-compatible endpoint. Since Hugging Face's router implements the OpenAI tool calling specification, standard Zod-based tool definitions work without modification.
+Since Hugging Face's router implements the OpenAI tool-calling specification, your Zod-based tool definitions pass through unmodified, the same way they would for OpenAI itself.
 
 ### Conditional Tool Enablement
 
-The `prepareStreamOptions()` method checks `supportsTools()` before including tools in the request. For non-capable models, tools are disabled entirely -- preventing confusing error responses and ensuring the model still generates useful text output.
+Before a request goes out, NeuroLink's shared OpenAI-compatible provider client calls `supportsTools()` to decide whether to attach your tool definitions. As covered above, this check defaults to "supported" for Hugging Face models unless the model registry explicitly says otherwise, so plan for it to include your tools by default rather than assume it will filter out incompatible models for you.
 
 ### Complete Tool Calling Example
 
@@ -166,7 +142,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: "What's the weather in Berlin?" },
   provider: "huggingface",
-  model: "meta-llama/Llama-3.1-70B-Instruct",
+  model: "meta-llama/Llama-3.3-70B-Instruct",
   tools: {
     getWeather: tool({
       description: "Get the current weather for a city",
@@ -187,36 +163,26 @@ for await (const chunk of result.stream) {
 }
 ```
 
-Llama 3.1 Instruct models have strong native tool calling support, making them an excellent choice for function-calling workloads on open-source models.
+Llama 3.3 70B Instruct has strong native tool-calling support, making it an excellent choice for function-calling workloads on open-source models.
 
-> **Note:** Tool calling quality varies by model. Llama 3.1 70B Instruct and Hermes 3 are the most reliable options. For critical tool-calling workflows, test thoroughly with your specific tools and schemas before deploying to production.
+> **Note:** Tool calling quality varies by model. `meta-llama/Llama-3.3-70B-Instruct`, `zai-org/GLM-5`, and `Qwen/Qwen3.5-397B-A17B` are NeuroLink's built-in recommendations for tool-calling workloads. For critical tool-calling workflows, test thoroughly with your specific tools and schemas before deploying to production.
 {: .prompt-info }
 
-## Model Recommendations API
+## Choosing a Tool-Calling Model
 
-NeuroLink provides a static method `getToolCallingRecommendations()` on the `HuggingFaceProvider` class that returns performance ratings for recommended models:
+There is no separate recommendations API -- NeuroLink surfaces its tool-calling model suggestions directly in error messages when a request fails (see **Error Handling** below). Based on Hugging Face's current router roster, these are worth defaulting to for tool-calling workloads:
 
-```typescript
-const recs = HuggingFaceProvider.getToolCallingRecommendations();
-console.log(recs.recommended);
-// ["meta-llama/Llama-3.1-8B-Instruct", "meta-llama/Llama-3.1-70B-Instruct", ...]
-```
+| Model | Notes |
+|---|---|
+| `meta-llama/Llama-3.3-70B-Instruct` | Latest Llama on the router; strong general tool-calling support |
+| `zai-org/GLM-5` | Actively maintained, recommended for tool calling |
+| `Qwen/Qwen3.5-397B-A17B` | Large multimodal model, recommended for tool calling |
 
-Here are the detailed ratings (1-3 scale, 3 = best):
-
-| Model | Speed | Quality | Cost | Recommended For |
-|---|---|---|---|---|
-| `meta-llama/Llama-3.1-8B-Instruct` | 3 | 2 | 3 | Best overall balance |
-| `meta-llama/Llama-3.1-70B-Instruct` | 2 | 3 | 2 | Highest quality, slower |
-| `nvidia/Llama-3.1-Nemotron-Ultra-253B-v1` | 2 | 3 | 1 | Maximum capability, resource-heavy |
-| `NousResearch/Hermes-3-Llama-3.2-3B` | 3 | 2 | 3 | Lightweight, fast function calling |
-| `codellama/CodeLlama-34b-Instruct-hf` | 2 | 3 | 2 | Best for code generation |
-
-For most applications, **Llama 3.1 8B Instruct** is the recommended starting point. It offers the best balance of speed, quality, and cost. Scale up to the 70B variant when quality demands increase, or drop down to Hermes 3 (3B) when speed and cost are the top priorities.
+For most applications, **Llama 3.3 70B Instruct** is a reasonable starting point. For lighter, cheaper requests where tool calling is not required, NeuroLink's own fallback model, `meta-llama/Llama-3.1-8B-Instruct`, remains tool-calling capable and is considerably cheaper to run.
 
 ## Error Handling
 
-The Hugging Face provider implements enhanced error handling through `handleProviderError()`, including tool-calling-specific error guidance:
+Hugging Face requests go through NeuroLink's shared `handleProviderError()` mechanism -- the same one every catalog-driven provider uses -- configured with Hugging-Face-specific error rules that add tool-calling guidance:
 
 | Error Pattern | Classification | Guidance |
 |---|---|---|
@@ -259,21 +225,21 @@ Here is the complete architecture of NeuroLink's Hugging Face integration:
 ```mermaid
 flowchart TB
     A[Your App] --> B[NeuroLink SDK]
-    B --> C[HuggingFaceProvider]
-    C --> D["createOpenAI(@ai-sdk/openai)<br/>baseURL: router.huggingface.co/v1"]
+    B --> C["Catalog-driven OpenAI-compatible provider"]
+    C --> D["Chat completions client<br/>baseURL: router.huggingface.co/v1"]
     D --> E[Hugging Face Router]
 
     subgraph "Tool Detection"
         F{supportsTools?}
-        F -->|Llama 3.1, Hermes 3,<br/>CodeLlama| G[Tools Enabled]
-        F -->|DialoGPT, GPT-2,<br/>BERT| H[Tools Disabled]
+        F -->|No registry entry| G["Tools enabled - default"]
+        F -->|Registry says no| H[Tools disabled]
     end
 
     subgraph "Model Categories"
-        I["Llama 3.1 - General"]
-        J["CodeLlama - Code"]
-        K["Hermes 3 - Function Calling"]
-        L["Nemotron - Optimized"]
+        I["Qwen 2.5 / 3.5 - General"]
+        J["Qwen 2.5 Coder - Code"]
+        K["Llama 3.3, GLM-5 - Tool calling"]
+        L["DeepSeek R1 - Reasoning"]
     end
 
     E --> I
@@ -282,7 +248,7 @@ flowchart TB
     E --> L
 ```
 
-The flow is: your app talks to NeuroLink, which delegates to `HuggingFaceProvider`. The provider creates an OpenAI-compatible client pointing at Hugging Face's router endpoint. Before sending the request, it checks whether the selected model supports tool calling and adjusts the request accordingly. The response streams back through the same unified interface used by every NeuroLink provider.
+The flow is: your app talks to NeuroLink, which resolves Hugging Face's catalog entry and configures a generic OpenAI-compatible chat-completions client pointed at Hugging Face's router endpoint. Before sending the request, NeuroLink checks the model-capability registry for a tool-calling override (Hugging Face models default to enabled, as covered above) and adjusts the request accordingly. The response streams back through the same unified interface used by every NeuroLink provider.
 
 ## Choosing the Right Open Model
 
@@ -293,10 +259,10 @@ With 100,000+ models available, choosing the right one can be overwhelming. Here
 | Use Case | Model | Why |
 |---|---|---|
 | **General chat** | `meta-llama/Llama-3.1-8B-Instruct` | Fast, versatile, tool-capable |
-| **High-quality reasoning** | `meta-llama/Llama-3.1-70B-Instruct` | Best open-source reasoning |
-| **Code generation** | `codellama/CodeLlama-34b-Instruct-hf` | Purpose-built for code |
-| **Function calling** | `NousResearch/Hermes-3-Llama-3.2-3B` | Lightweight, excellent tool use |
-| **Multilingual** | `mistralai/Mistral-7B-Instruct-v0.3` | Strong European language support |
+| **High-quality reasoning** | `deepseek-ai/DeepSeek-R1` | Advanced reasoning model |
+| **Code generation** | `Qwen/Qwen2.5-Coder-32B-Instruct` | Purpose-built for code |
+| **Function calling** | `zai-org/GLM-5` | Actively maintained, recommended for tool calling |
+| **Multilingual / broad language support** | `google/gemma-3-27b-it` | Wide language coverage |
 
 ### Hugging Face vs Direct Provider
 
@@ -305,7 +271,7 @@ When should you use Hugging Face versus accessing a model's provider directly?
 **Use Hugging Face when:**
 
 - You want to experiment with many different open-source models
-- You need access to models not available through other providers (Hermes, CodeLlama, etc.)
+- You need access to models not available through other providers (DeepSeek, GLM, Gemma, etc.)
 - You want free-tier access for prototyping
 - You are evaluating models before deploying them on your own infrastructure
 

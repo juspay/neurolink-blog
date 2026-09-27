@@ -23,7 +23,7 @@ image:
   alt: 'Dropping NeuroLink into an existing Express or Fastify app (and the /embed route)'
 ---
 
-We designed NeuroLink's server adapters for brownfield integration because our first users at Juspay already had complex, mature Express.js backends. They couldn't just throw away years of work to adopt a new AI stack. We needed a way to drop NeuroLink's MCP routes, Claude proxy endpoints, and agent execution APIs directly into their existing `app`, not force them to start over from scratch. The entire server subsystem is built around this principle: your app, your server, your lifecycle. NeuroLink is a guest in your house.
+We designed NeuroLink's server adapters for brownfield integration because most real-world backends adopting an AI stack aren't greenfield — they're complex, mature Express.js or Fastify services already running in production. A team in that position can't just throw away years of work to adopt a new AI stack. We needed a way to drop NeuroLink's MCP routes, Claude proxy endpoints, and agent execution APIs directly into an existing `app`, not force a rewrite from scratch. The entire server subsystem is built around this principle: your app, your server, your lifecycle. NeuroLink is a guest in your house.
 
 Our previous post, [Server Adapters: Building AI APIs with Hono, Express, Fastify, or Koa](/posts/server-adapters/), covers the greenfield case: creating a brand new AI server from zero. This post goes deeper, exploring the architecture that makes brownfield integration safe and composable. We'll walk through the abstract base class, the state machine, the dynamic factory, the route groups, and the framework-agnostic middleware that let you wire NeuroLink into any running application.
 
@@ -211,11 +211,13 @@ The primary route groups live in `src/lib/server/routes/`:
 - `createHealthRoutes`: Simple health check endpoints.
 - `createOpenAIProxyRoutes`: A proxy for routing requests to OpenAI.
 - `createClaudeProxyRoutes`: A sophisticated multi-account, rate-limit-aware proxy for Anthropic's Claude models.
+- `createCodexProxyRoutes`: Exposes the ChatGPT-backend Responses API endpoint the Codex CLI talks to, pooled across multiple ChatGPT OAuth accounts.
+- `createGeminiProxyRoutes`: A Gemini-compatible proxy for the Google `generateContent` / `streamGenerateContent` endpoints the Gemini CLI calls.
 - `createOpenApiRoutes`: Serves an OpenAPI specification for all registered routes.
 
 The `createAllRoutes` function composes these factories into a `RouteGroup` array; `registerAllRoutes` is a convenience wrapper that calls `createAllRoutes` and then registers each group with an adapter. You can build your own composition to expose a smaller, more targeted API surface.
 
-The five core route groups (agent, tool, MCP, memory, health) are always included. Proxy route groups are **opt-in**: you must pass `{ proxy: true }` (or the per-format flags `claudeProxy`/`openaiProxy`) to `createAllRoutes` to include them.
+The five core route groups (agent, tool, MCP, memory, health) are always included. Proxy route groups are **opt-in**: passing `{ proxy: true }` to `createAllRoutes` enables all four proxy doors — Claude, OpenAI, Codex, and Gemini — or you can enable just one with its own flag (`claudeProxy`, `openaiProxy`, `codexProxy`, `geminiProxy`).
 
 ```typescript
 // Always included
@@ -231,7 +233,7 @@ function createCoreRoutes(basePath: string): RouteGroup[] {
 
 // Proxy routes require opt-in:
 // createAllRoutes(basePath, { proxy: true })
-// — this enables both Claude and OpenAI proxy endpoints
+// — this enables the Claude, OpenAI, Codex, and Gemini proxy endpoints
 ```
 
 ## Framework-Agnostic Middleware

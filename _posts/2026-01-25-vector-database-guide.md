@@ -121,7 +121,7 @@ class PineconeVectorStore implements VectorStore {
     return response.matches.map((match) => ({
       id: match.id,
       score: match.score || 0,
-      content: (match.metadata?.content as string) || "",
+      text: (match.metadata?.content as string) || "",
       metadata: match.metadata || {},
     }));
   }
@@ -135,7 +135,7 @@ const pineconeStore = new PineconeVectorStore(process.env.PINECONE_API_KEY!);
 const queryTool = createVectorQueryTool(
   {
     indexName: "knowledge-base",
-    embeddingModel: "text-embedding-3-small",
+    embeddingModel: { provider: "openai", modelName: "text-embedding-3-small" },
     topK: 10,
     enableFilter: true,
   },
@@ -192,7 +192,7 @@ class QdrantVectorStore implements VectorStore {
     return results.map((point) => ({
       id: String(point.id),
       score: point.score,
-      content: (point.payload?.content as string) || "",
+      text: (point.payload?.content as string) || "",
       metadata: (point.payload as Record<string, unknown>) || {},
     }));
   }
@@ -204,7 +204,7 @@ const qdrantStore = new QdrantVectorStore("http://localhost:6333");
 const queryTool = createVectorQueryTool(
   {
     indexName: "documents",
-    embeddingModel: "text-embedding-3-small",
+    embeddingModel: { provider: "openai", modelName: "text-embedding-3-small" },
     topK: 10,
   },
   qdrantStore
@@ -243,7 +243,7 @@ class PgVectorStore implements VectorStore {
     // Validate table name against allowlist
     const ALLOWED_TABLES = ['documents', 'embeddings', 'knowledge_base'];
     if (!ALLOWED_TABLES.includes(params.indexName)) {
-      return { success: false, error: `Table not allowed: ${params.indexName}` };
+      throw new Error(`Table not allowed: ${params.indexName}`);
     }
 
     const vectorStr = `[${params.queryVector.join(",")}]`;
@@ -278,7 +278,7 @@ class PgVectorStore implements VectorStore {
     return result.rows.map((row) => ({
       id: row.id,
       score: row.score,
-      content: row.content,
+      text: row.content,
       metadata: row.metadata || {},
     }));
   }
@@ -297,7 +297,7 @@ const pgStore = new PgVectorStore(process.env.DATABASE_URL!);
 const queryTool = createVectorQueryTool(
   {
     indexName: "documents",
-    embeddingModel: "text-embedding-3-small",
+    embeddingModel: { provider: "openai", modelName: "text-embedding-3-small" },
     topK: 10,
     enableFilter: true,
   },
@@ -331,7 +331,7 @@ const neurolink = new NeuroLink();
 const ragTool = createVectorQueryTool(
   {
     indexName: "knowledge-base",
-    embeddingModel: "text-embedding-3-small",
+    embeddingModel: { provider: "openai", modelName: "text-embedding-3-small" },
     topK: 5,
     enableFilter: true,
     includeSources: true,
@@ -343,7 +343,7 @@ const ragTool = createVectorQueryTool(
 const result = await neurolink.generate({
   input: { text: "What are our API rate limits?" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tools: { searchKnowledgeBase: ragTool },
 });
 ```
@@ -358,23 +358,25 @@ Pure vector search excels at semantic queries ("What is our refund policy?") but
 import {
   createHybridSearch,
   InMemoryBM25Index,
-  reciprocalRankFusion,
 } from "@juspay/neurolink";
 
 const hybridSearch = createHybridSearch({
   vectorStore: pineconeStore,
   bm25Index: new InMemoryBM25Index(),
-  fusionMethod: reciprocalRankFusion,
-  vectorWeight: 0.7,
-  bm25Weight: 0.3,
+  indexName: "knowledge-base",
+  defaultConfig: {
+    fusionMethod: "rrf",
+    vectorWeight: 0.7,
+    bm25Weight: 0.3,
+  },
 });
 
-const results = await hybridSearch.search("rate limiting best practices", {
+const results = await hybridSearch("rate limiting best practices", {
   topK: 10,
 });
 ```
 
-The `reciprocalRankFusion` function merges results from both sources by their rank positions, giving more weight to documents that appear near the top in both result sets. The `vectorWeight` and `bm25Weight` parameters let you tune the balance between semantic and keyword matching for your specific content.
+The `"rrf"` fusion method merges results from both sources by their rank positions, giving more weight to documents that appear near the top in both result sets. For `"linear"` fusion, the `vectorWeight` and `bm25Weight` parameters let you tune the balance between semantic and keyword matching for your specific content.
 
 ## Performance Benchmarks
 

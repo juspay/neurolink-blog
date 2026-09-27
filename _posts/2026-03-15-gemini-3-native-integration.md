@@ -153,7 +153,7 @@ const result = await neurolink.generate({
 console.log(result.content);
 ```
 
-The provider name for Vertex AI is `"vertex"` (not `"google-vertex"`). Both `google-ai` and `vertex` providers share the same native Gemini 3 code path through the shared `googleNativeGemini3.ts` module.
+The provider name for Vertex AI is `"vertex"` (not `"google-vertex"`). Both `google-ai` and `vertex` providers share the same native Gemini 3 code path through the shared `googleNativeGemini3` module.
 
 ---
 
@@ -256,21 +256,21 @@ for await (const chunk of result.stream) {
 > **Warning:** Higher thinking levels increase both latency and token consumption. Thinking tokens count toward your quota. Use `high` only when the task genuinely benefits from deep reasoning.
 {: .prompt-warning }
 
-For Gemini 2.5 models, the thinking configuration uses a token budget instead of levels:
+Gemini 2.5 models use the same `thinkingLevel` lever as Gemini 3 -- Gemini 2.5's own API has no `thinkingLevel` field, so NeuroLink translates your requested level into that model's underlying numeric token budget before sending the request:
 
 ```typescript
-// Gemini 2.5 path -- thinkingBudget instead of thinkingLevel
+// Gemini 2.5 -- same thinkingLevel contract as Gemini 3
 const result = await neurolink.stream({
   input: { text: 'Analyze this legal document for compliance risks...' },
   provider: 'google-ai',
   model: 'gemini-2.5-pro',
   thinkingConfig: {
-    thinkingBudget: 8000, // Token budget for thinking
+    thinkingLevel: 'high',
   },
 });
 ```
 
-NeuroLink's `createNativeThinkingConfig` utility handles the conversion between these two formats based on the model version.
+NeuroLink's `createNativeThinkingConfig` utility picks the wire-level shape based on the model: Gemini 3 gets `thinkingLevel` passed through as-is, while Gemini 2.5 gets a translated numeric budget. The separate `thinkingBudget` option is honored only for Anthropic models -- it is ignored for the whole Gemini family.
 
 ---
 
@@ -322,11 +322,11 @@ for await (const chunk of result.stream) {
 
 ### Retry Tracking and Permanent Failures
 
-NeuroLink tracks tool failures per tool name. After `DEFAULT_TOOL_MAX_RETRIES` failures (default: 3), the tool is marked as permanently failed. The model receives a structured error message telling it not to retry:
+NeuroLink tracks tool failures per tool name. After `DEFAULT_TOOL_MAX_RETRIES` failures (default: 2), the tool is marked as permanently failed. The model receives a structured error message telling it not to retry:
 
 ```json
 {
-  "error": "TOOL_PERMANENTLY_FAILED: The tool \"getWeather\" has failed 3 times...",
+  "error": "TOOL_PERMANENTLY_FAILED: The tool \"getWeather\" has failed 2 times...",
   "status": "permanently_failed",
   "do_not_retry": true
 }
@@ -380,7 +380,7 @@ console.log(result.content);
 const result = await neurolink.generate({
   input: {
     text: 'Summarize the key events in this video and provide timestamps.',
-    videos: ['data:video/mp4;base64,...'],
+    videoFiles: ['data:video/mp4;base64,...'],
   },
   provider: 'google-ai',
   model: 'gemini-3-flash-preview',
@@ -393,7 +393,7 @@ const result = await neurolink.generate({
 const result = await neurolink.generate({
   input: {
     text: 'Extract the key terms and obligations from this contract.',
-    documents: ['data:application/pdf;base64,...'],
+    pdfFiles: ['data:application/pdf;base64,...'],
   },
   provider: 'google-ai',
   model: 'gemini-3-flash-preview',
@@ -463,7 +463,7 @@ const result = await neurolink.generate({
 });
 ```
 
-> **Tip:** For cost-sensitive production workloads, `gemini-2.5-flash-lite` offers the lowest per-token cost. For maximum quality with extended thinking, `gemini-3.1-pro-preview` is Google's most capable model. Start with `gemini-3-flash-preview` as a solid middle ground.
+> **Tip:** For cost-sensitive production workloads, `gemini-2.5-flash-lite` offers the lowest per-token cost. For maximum quality with extended thinking, `gemini-3.1-pro-preview` is the most capable Gemini model in NeuroLink's catalog. Start with `gemini-3-flash-preview` as a solid middle ground.
 {: .prompt-tip }
 
 ---
@@ -501,7 +501,7 @@ const geminiResult = await neurolink.stream({
 const claudeResult = await neurolink.stream({
   input: { text: 'Search for the latest TypeScript release notes.' },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-5',
   tools,
 });
 ```
@@ -510,27 +510,22 @@ NeuroLink handles the schema conversion differences internally. Zod schemas are 
 
 ### Provider Failover
 
-For production deployments, configure automatic failover between Gemini and another provider:
+For production deployments, configure automatic failover between Gemini and another provider with a `providerFallback` callback:
 
 ```typescript
 const neurolink = new NeuroLink({
-  providers: [
-    {
-      name: 'google-ai',
-      priority: 1,
-      config: { apiKey: process.env.GOOGLE_AI_API_KEY },
-    },
-    {
-      name: 'anthropic',
-      priority: 2,
-      config: { apiKey: process.env.ANTHROPIC_API_KEY },
-    },
-  ],
-  failoverConfig: { enabled: true },
+  credentials: {
+    googleAiStudio: { apiKey: process.env.GOOGLE_AI_API_KEY },
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+  },
+  providerFallback: async (error) => {
+    // Invoked for any error except a genuine caller cancel
+    return { provider: 'anthropic', model: 'claude-sonnet-5' };
+  },
 });
 ```
 
-If Gemini 3 returns a rate limit error or network failure, NeuroLink automatically retries with Claude. Your application code does not change.
+If Gemini 3 returns a rate limit error or network failure, NeuroLink invokes `providerFallback` and retries with the `{ provider, model }` it returns -- in this case, Claude. Your application code does not change.
 
 ---
 

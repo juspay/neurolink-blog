@@ -55,6 +55,8 @@ flowchart TB
     end
 
     subgraph Adapter["BaseServerAdapter"]
+        ENTRY["Request Pipeline"]
+
         subgraph MW["Built-in Middleware"]
             REQID["Request ID"]
             LOGGING["Logging"]
@@ -83,15 +85,29 @@ flowchart TB
 
     subgraph Core["NeuroLink Core"]
         NL["NeuroLink SDK"]
-        PROV["13+ AI Providers"]
+        PROV["33 Named LLM Providers"]
     end
 
-    Clients --> MW
-    MW --> Routes
-    Routes --> NL
+    WEB --> ENTRY
+    MOB --> ENTRY
+    CLI --> ENTRY
+    ENTRY --> REQID
+    REQID --> LOGGING
+    LOGGING --> CORS
+    CORS --> RATE
+    RATE --> SEC
+    SEC --> TIMEOUT
+    TIMEOUT --> AGENT
+    AGENT --> NL
     NL --> PROV
-    CF --> Frameworks
-    Frameworks --> Adapter
+    CF --> HONO
+    CF --> EXPRESS
+    CF --> FASTIFY
+    CF --> KOA
+    HONO --> ENTRY
+    EXPRESS --> ENTRY
+    FASTIFY --> ENTRY
+    KOA --> ENTRY
 
     style HONO fill:#e36209,stroke:#bd5200,color:#fff
     style EXPRESS fill:#68a063,stroke:#4e7e4a,color:#fff
@@ -342,7 +358,7 @@ The `POST /agent/execute` endpoint accepts the following request body (from `Age
 {
   "input": "Explain microservices architecture",
   "provider": "openai",
-  "model": "gpt-4o",
+  "model": "gpt-5.4",
   "systemPrompt": "You are a senior architect",
   "temperature": 0.7,
   "maxTokens": 1000,
@@ -374,7 +390,7 @@ const server = await createServer(neurolink, { framework: 'hono' });
 
 // Register auth middleware
 server.registerMiddleware(createAuthMiddleware({
-  strategy: 'bearer',
+  type: 'bearer',
   validate: async (token) => {
     const user = await verifyJWT(token);
     return user ? { id: user.id, email: user.email, roles: user.roles } : null;

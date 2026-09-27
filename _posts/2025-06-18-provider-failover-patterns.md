@@ -23,16 +23,14 @@ image:
   alt: 'Multi-Provider Failover: Never Lose an API Call'
 ---
 
-> **Implementation Note**: The patterns shown in this guide are implemented on top of NeuroLink's core API. They are not built-in SDK features but represent recommended approaches you can build yourself.
+> **Implementation Note**: NeuroLink includes a built-in `providerFallback` callback and a same-provider `modelChain` option for basic automatic fallback. The circuit breakers, health tracking, weighted routing, and graceful degradation patterns in this guide go beyond that built-in and are implemented on top of NeuroLink's core API -- they are recommended approaches you build yourself.
 {: .prompt-info }
 
 By the end of this guide, you'll have a multi-provider failover system with retry logic, circuit breakers, health monitoring, and graceful degradation -- all working with NeuroLink's unified API.
 
-Your production AI system should never go down because a single provider has an outage. You will build failover logic once, and it will work across all 13 providers without vendor-specific error handling.
+Your production AI system should never go down because a single provider has an outage. You will build failover logic once and reuse it across multiple NeuroLink LLM providers without rewriting each provider's request API.
 
-> **Note:** NeuroLink provides type definitions for FallbackConfig and RetryConfig,
-> but automatic failover is currently user-implemented using the patterns shown below.
-> Built-in provider failover is on the roadmap for 2026.
+> **Note:** NeuroLink provides a `providerFallback` callback (returns the next `{ provider, model }` to try, or `null` to bubble the error) and a `modelChain` array for trying alternate models on the same provider -- both configurable on the constructor or per call. The manual patterns below (circuit breakers, health tracking, weighted/latency-based routing, caching) build additional resilience on top of that built-in fallback.
 
 ```mermaid
 flowchart TB
@@ -106,7 +104,7 @@ const neurolink = new NeuroLink();
 
 // Provider configuration with model mappings
 const providerConfigs = [
-  { provider: 'openai', model: 'gpt-4o' },
+  { provider: 'openai', model: 'gpt-5.4' },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
   { provider: 'vertex', model: 'gemini-2.5-pro' }
 ];
@@ -287,7 +285,7 @@ interface ProviderConfig {
 }
 
 const providers: ProviderConfig[] = [
-  { provider: 'openai', model: 'gpt-4o', maxRetries: 3 },
+  { provider: 'openai', model: 'gpt-5.4', maxRetries: 3 },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', maxRetries: 2 },
   { provider: 'vertex', model: 'gemini-2.5-pro', maxRetries: 2 }
 ];
@@ -417,7 +415,7 @@ const circuits = new Map<string, CircuitBreaker>([
 ]);
 
 const providerConfigs = [
-  { provider: 'openai', model: 'gpt-4o' },
+  { provider: 'openai', model: 'gpt-5.4' },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
   { provider: 'vertex', model: 'gemini-2.5-pro' }
 ];
@@ -642,7 +640,7 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 const modelMap: Record<string, string> = {
-  openai: 'gpt-4o',
+  openai: 'gpt-5.4',
   anthropic: 'claude-sonnet-4-5-20250929',
   vertex: 'gemini-2.5-pro'
 };
@@ -709,7 +707,7 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 const priorityOrder = [
-  { provider: 'openai', model: 'gpt-4o', priority: 1 },
+  { provider: 'openai', model: 'gpt-5.4', priority: 1 },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', priority: 2 },
   { provider: 'vertex', model: 'gemini-2.5-pro', priority: 3 }
 ];
@@ -744,7 +742,7 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 const weightedProviders = [
-  { provider: 'openai', model: 'gpt-4o', weight: 0.5 },
+  { provider: 'openai', model: 'gpt-5.4', weight: 0.5 },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', weight: 0.3 },
   { provider: 'vertex', model: 'gemini-2.5-pro', weight: 0.2 }
 ];
@@ -806,7 +804,7 @@ const neurolink = new NeuroLink();
 const latencyTracker = new Map<string, number[]>();
 
 const providers = [
-  { provider: 'openai', model: 'gpt-4o' },
+  { provider: 'openai', model: 'gpt-5.4' },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
   { provider: 'vertex', model: 'gemini-2.5-pro' }
 ];
@@ -992,7 +990,7 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 const cloudProviders = [
-  { provider: 'openai', model: 'gpt-4o' },
+  { provider: 'openai', model: 'gpt-5.4' },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
   { provider: 'vertex', model: 'gemini-2.5-pro' }
 ];
@@ -1052,7 +1050,7 @@ const neurolink = new NeuroLink();
 
 // Provider configuration
 const providers = [
-  { provider: 'openai', model: 'gpt-4o', maxRetries: 3 },
+  { provider: 'openai', model: 'gpt-5.4', maxRetries: 3 },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', maxRetries: 2 },
   { provider: 'vertex', model: 'gemini-2.5-pro', maxRetries: 2 },
   { provider: 'ollama', model: 'llama3.1:latest', maxRetries: 1, local: true }
@@ -1322,8 +1320,6 @@ Your next step: take the combined implementation from the "Complete Implementati
 ## Resources
 
 - [NeuroLink Documentation](https://neurolink.dev/docs)
-- Ollama Local LLM Setup
-- Error Handling Patterns
 
 **Related posts:**
 

@@ -9,7 +9,9 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  What You Actually Inherit When You Extend BaseProvider — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  The methods BaseProvider requires you to implement, the stream() call chain
+  that wraps them, and everything — lifecycle callbacks, tool handling, error
+  formatting, embeddings — you inherit for free when you add a new provider.
 toc: true
 mermaid: true
 pin: false
@@ -18,7 +20,7 @@ image:
   alt: 'What You Actually Inherit When You Extend BaseProvider'
 ---
 
-We designed NeuroLink's `BaseProvider` because every new model integration felt like starting from scratch. Adding Anthropic's Claude 3.5 Sonnet shouldn't require re-writing authentication, context management, and tool handling that we'd already perfected for OpenAI's GPT-4o and Google's Gemini on Vertex AI. Before `BaseProvider`, each new provider was a bespoke, monolithic class. The result was a constant drift in features, inconsistent error handling, and a testing matrix that was impossible to manage. The `BaseProvider` establishes a core contract: you implement the handful of methods unique to your target API, and you inherit a battle-tested engine for everything else.
+NeuroLink's `BaseProvider` abstraction exists so every new model integration doesn't start from scratch. Adding a provider for Anthropic's Claude Sonnet 5 shouldn't mean re-writing the authentication, context management, and tool handling already built for OpenAI's GPT-5.4 and Google's Gemini on Vertex AI. Before `BaseProvider`, each new provider was a bespoke, monolithic class. The result was a constant drift in features, inconsistent error handling, and a testing matrix that was hard to manage. The `BaseProvider` establishes a core contract: you implement the handful of methods unique to your target API, and you inherit a well-tested engine for everything else.
 
 This post is a deep-dive into that contract. We'll look at the abstract methods you *must* override, the rich suite of concrete functionality you get for free, and how this architecture lets us add a new provider in hours, not weeks.
 
@@ -32,12 +34,15 @@ Here are the non-negotiables:
 - `getDefaultModel()`: The default model ID to use if the user doesn't specify one.
 - `getAISDKModel()`: Returns the underlying AI SDK's model object.
 - `formatProviderError()`: Translates provider-specific API errors into a standardized `Error` format.
-- `executeStream()`: The big one. This is where you write the actual code to call the provider's streaming generation API.
 
-A skeleton for a new provider looks like this. Note that this is the *entire* required surface area.
+For streaming, you have two options. The simpler one is `doStream()`: return an async iterable of text chunks plus promises for `finishReason` and `usage`, and `BaseProvider` assembles a correct `executeStream()` around it for you. The older, still-valid option is overriding `executeStream()` directly, which is what the skeleton below does — full control over the call, at the cost of writing the wrapping yourself.
+
+A skeleton for a new provider looks like this, written the way it looks inside the NeuroLink repo (`BaseProvider` is the contract a new provider implements under `src/lib/providers/`; it isn't exported from the published `@juspay/neurolink` package).
 
 ```typescript
-import { BaseProvider, AIProviderName, StreamOptions, StreamResult } from '@juspay/neurolink';
+import { BaseProvider } from '../../core/baseProvider.js';
+import type { AIProviderName } from '../../constants/enums.js';
+import type { StreamOptions, StreamResult } from '../../types/index.js';
 import { LanguageModel } from 'ai';
 
 export class MyNewProvider extends BaseProvider {
@@ -135,7 +140,7 @@ Implementing five methods is the price of admission. The payoff is inheriting a 
 - **Embedding Endpoints**: You get `embed()` and `embedMany()` out of the box. `BaseProvider` provides a base implementation that will throw a "not supported" error, but you can easily override it by implementing the provider-specific `callEmbeddings` method.
 
     ```typescript
-    // src/lib/providers/openAI.ts
+    // src/lib/providers/openAI/client.ts
     export class OpenAIProvider extends OpenAIChatCompletionsProvider {
       // ...
       protected override async executeImageGeneration(
@@ -163,7 +168,7 @@ The power of this pattern is clear when you look at our real-world providers. Th
 For example, the `GoogleVertexProvider` has a massively complex `generate` method because it has to support both Gemini models and proxied Anthropic models on Vertex AI. It contains specialized logic like `executeNativeGemini3Generate` and `executeNativeAnthropicGenerate`.
 
 ```typescript
-// src/lib/providers/googleVertex.ts
+// src/lib/providers/googleVertex/client.ts
 export class GoogleVertexProvider extends BaseProvider {
   // ...
   async generate(
@@ -188,7 +193,7 @@ By enforcing a small, stable contract via `BaseProvider`, we allow for this dive
 
 You write five methods. You get a platform.
 
-Four of them just describe your provider. `executeStream` does the real work. That is the whole contract.
+Four of them just describe your provider. The fifth is your streaming implementation — `doStream()` if you take the simpler path, or a direct `executeStream()` override if you need full control. That is the whole contract.
 
 In return, `BaseProvider` runs the lifecycle. It builds the context. It fires the callbacks. It catches the errors. It records the metrics. Your code never touches that machinery, and it never has to.
 
@@ -209,8 +214,6 @@ That asymmetry is the point. The shared code is large. The per-provider code is 
 It also means bugs get fixed once. A retry fix in `handleProviderError` reaches every provider at the same time. You do not chase the same fix across five files. You change the base class, and it lands everywhere.
 
 The win is speed. A new model lands in hours. The chassis is already built, tested, and observable. You just plug in the part that is genuinely new.
-
----
 
 ---
 

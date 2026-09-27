@@ -35,27 +35,26 @@ You will set up Google AI Studio, configure NeuroLink's Google AI provider, and 
 
 ## Supported Models
 
-NeuroLink supports the complete Gemini model lineup through its `GoogleAIModels` enum:
+NeuroLink's `GoogleAIModels` enum includes the following current text, image, TTS, and embedding IDs:
 
 | Model Family | Model ID | Capabilities |
 |---|---|---|
-| **Gemini 3 Pro** | `gemini-3-pro-preview`, `gemini-3-pro-image-preview` | Adaptive thinking, image generation |
-| **Gemini 3 Flash** | `gemini-3-flash`, `gemini-3-flash-preview` | Fast, adaptive thinking |
+| **Gemini 3.1 Pro** | `gemini-3.1-pro-preview` | Adaptive thinking, latest frontier model |
+| **Gemini 3 Pro Image** | `gemini-3-pro-image-preview` | Adaptive thinking, image generation |
+| **Gemini 3 Flash** | `gemini-3-flash-preview` | Fast, adaptive thinking |
 | **Gemini 2.5 Pro** | `gemini-2.5-pro` | Best quality, deep analysis |
 | **Gemini 2.5 Flash** | `gemini-2.5-flash` _(default)_ | Best value, fast responses |
 | **Gemini 2.5 Flash Lite** | `gemini-2.5-flash-lite` | Lowest cost option |
 | **Gemini 2.5 Flash Image** | `gemini-2.5-flash-image` | Image generation |
-| **Gemini 2.5 Flash Live** | `gemini-2.5-flash-native-audio-preview-09-2025` | Real-time audio |
-| **Gemini 2.0 Flash** | `gemini-2.0-flash`, `gemini-2.0-flash-001` | General purpose |
-| **Gemini 2.0 Flash Lite** | `gemini-2.0-flash-lite` | Cost-optimized |
-| **Embeddings** | `gemini-embedding-001`, `text-embedding-004` | Text embeddings |
+| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | Text-to-speech preview |
+| **Embeddings** | `gemini-embedding-001` | Text embeddings |
 
-> **Note:** The `text-embedding-004` model is being superseded by `gemini-embedding-001`. New projects should use `gemini-embedding-001`.
+> **Note:** `gemini-2.0-flash` and `gemini-2.0-flash-lite` have also been retired; use `gemini-2.5-flash` or `gemini-2.5-flash-lite`. `gemini-3.1-pro-preview` is available as a newer preview option alongside `gemini-3-pro-preview`. Gemini Live currently defaults at runtime to the special non-enum ID `gemini-2.5-flash-preview-native-audio-dialog`; it is not a `GoogleAIModels` member.
 {: .prompt-info }
 
 The default model is `gemini-2.5-flash`, which offers an excellent balance of speed, quality, and cost. For prototyping and development, the free tier makes it an ideal starting point.
 
-> **Tip:** For cost-sensitive production workloads, `gemini-2.5-flash-lite` offers the lowest per-token cost. For maximum quality, `gemini-2.5-pro` is Google's most capable model. For bleeding-edge features like adaptive thinking, use the `gemini-3-pro-preview` or `gemini-3-flash` models.
+> **Tip:** For cost-sensitive production workloads, `gemini-2.5-flash-lite` is the fast, low-cost tier. `gemini-2.5-pro` is the current stable/GA flagship in NeuroLink's catalog, while `gemini-3.1-pro-preview` is the preview frontier option. Use preview models only when their lifecycle fits your deployment.
 {: .prompt-tip }
 > **Note:** Model names and IDs in code examples reflect versions available at time of writing. Model availability, naming conventions, and pricing change frequently. Always verify current model IDs with your provider's documentation before deploying to production.
 {: .prompt-info }
@@ -90,7 +89,7 @@ for await (const chunk of result.stream) {
 }
 ```
 
-That is all you need for basic usage. The provider name is `"google-ai"` (not `"google"` or `"google-ai-studio"`), and the default model is `gemini-2.5-flash`.
+That is all you need for basic usage. `"google-ai"` is the canonical provider ID, while `"google"`, `"gemini"`, `"googleAiStudio"`, and `"google-ai-studio"` are accepted aliases. The default model is `gemini-2.5-flash`.
 
 > **Note:** The Google Vertex AI provider (for enterprise GCP deployments) uses the config key `"vertex"`, not `"google-vertex"`. The `"google-ai"` provider is for Google AI Studio, which uses API keys instead of GCP service accounts.
 {: .prompt-info }
@@ -101,7 +100,7 @@ That is all you need for basic usage. The provider name is `"google-ai"` (not `"
 
 This is a critical provider-specific limitation you need to know about.
 
-Google Gemini cannot combine function calling (tools) with structured output (JSON schema) in the same request. When using schemas with `output.format: "json"`, you **must** set `disableTools: true`:
+The Gemini API cannot combine function calling (tools) with schema-enforced structured output in the same request. NeuroLink handles this conflict automatically: when a Gemini request includes both, it disables the incompatible tool path for that request and falls back to text-mode JSON coercion. You do **not** need to set `disableTools` yourself:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -119,15 +118,12 @@ const result = await neurolink.generate({
   provider: 'google-ai',
   schema: AnalysisSchema,
   output: { format: 'json' },
-  disableTools: true, // REQUIRED when using schemas with Google AI
 });
 ```
 
-Without `disableTools: true`, you will get the error: "Function calling with a response mime type: 'application/json' is unsupported."
+Set `disableTools: true` only when you explicitly want a tool-free call. The same vendor limitation applies to Gemini models through the Vertex provider, and NeuroLink applies the same automatic compatibility handling there.
 
-> **Warning:** This is a Google API limitation, not a NeuroLink limitation. Always set `disableTools: true` when using structured output schemas with `google-ai` or `vertex` providers. Other providers like OpenAI and Anthropic do not have this restriction.
-{: .prompt-warning }
-> **Note:** Gemini 3+ models lift this restriction and support function calling alongside structured output. The `disableTools: true` requirement applies only to Gemini 2.0 and 2.5 models.
+> **Note:** The underlying tools-plus-schema restriction applies across the Gemini model lineup, including Gemini 3. NeuroLink's compatibility layer prevents callers from having to predict and handle the vendor error themselves.
 {: .prompt-info }
 
 ---
@@ -149,7 +145,7 @@ Gemini models support "thinking" -- an extended reasoning mode where the model w
 const result = await neurolink.stream({
   input: { text: 'Solve this complex math problem: ...' },
   provider: 'google-ai',
-  model: 'gemini-3-pro-preview',
+  model: 'gemini-3.1-pro-preview',
   thinkingConfig: {
     thinkingLevel: 'high', // minimal | low | medium | high
   },
@@ -198,7 +194,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: 'Search for the latest news' },
   provider: 'google-ai',
-  model: 'gemini-3-pro-preview',
+  model: 'gemini-3.1-pro-preview',
   tools: {
     search: tool({
       description: 'Search the web',
@@ -375,6 +371,6 @@ Your next step: pick one capability -- text, images, or audio -- and ship it. Th
 
 **Related posts:**
 
-- [OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink](/posts/openai-integration-guide/)
+- [OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink](/posts/openai-integration-guide/)
 - [How to Switch AI Providers Without Rewriting Code](/posts/switch-ai-providers-without-rewriting/)
 - [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)

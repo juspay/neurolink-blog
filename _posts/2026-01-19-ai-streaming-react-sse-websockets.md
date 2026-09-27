@@ -25,7 +25,7 @@ image:
   alt: 'AI Streaming in React: Server-Sent Events and WebSockets'
 ---
 
-In this guide, you will implement AI streaming in React using both Server-Sent Events (SSE) and WebSockets with NeuroLink. You will build streaming hooks, handle partial token rendering, implement reconnection logic, and choose the right transport for your latency requirements.
+In this guide, you will implement AI streaming in React using both Server-Sent Events (SSE) and WebSockets with NeuroLink. You will build streaming hooks, handle partial token rendering and cancellation, and choose the right transport for your latency requirements. The examples focus on one connection attempt; production reconnection is discussed separately.
 
 Two technologies enable this: Server-Sent Events (SSE) for simple, unidirectional streaming, and WebSockets for bidirectional communication. Both work well with React, but they serve different use cases and come with different trade-offs.
 
@@ -41,7 +41,7 @@ Before building, understand the trade-offs.
 |---|---|---|
 | Direction | Server to client only | Bidirectional |
 | Protocol | HTTP/1.1 or HTTP/2 | ws:// or wss:// |
-| Reconnection | Built-in auto-reconnect | Manual implementation |
+| Reconnection | Built into `EventSource`; manual for POST `fetch` | Manual implementation |
 | Browser support | All modern browsers | All modern browsers |
 | Best for | AI text streaming | Chat with interrupts |
 | Complexity | Simple | Moderate |
@@ -59,7 +59,7 @@ flowchart LR
     end
 ```
 
-**SSE** is the simpler choice. It uses standard HTTP, reconnects automatically, and works through most proxies without configuration. For AI text streaming -- where the server generates text and the client displays it -- SSE is the right default.
+**SSE** is the simpler choice. It uses standard HTTP and works through most proxies without configuration. The browser's `EventSource` API reconnects automatically, but the POST `fetch` parser used in this tutorial does not; add bounded retry/backoff if your application needs reconnection. For AI text streaming -- where the server generates text and the client displays it -- SSE is the right default.
 
 **WebSocket** is necessary when the client needs to send messages while receiving a stream. Interrupting a generation mid-stream, sending typing indicators, or implementing voice chat all require bidirectional communication.
 
@@ -81,26 +81,37 @@ export async function POST(request: Request) {
   const result = await neurolink.stream({
     input: { text: prompt },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
     temperature: 0.7,
     maxTokens: 2000,
+    abortSignal: request.signal,
   });
 
   const encoder = new TextEncoder();
 
+  const iterator = result.stream[Symbol.asyncIterator]();
   const readableStream = new ReadableStream({
     async start(controller) {
-      for await (const chunk of result.stream) {
-        if ("content" in chunk) {
-          // SSE format: data: <json>\n\n
-          const event = `data: ${JSON.stringify({ content: chunk.content })}\n\n`;
-          controller.enqueue(encoder.encode(event));
+      try {
+        while (true) {
+          const { done, value: chunk } = await iterator.next();
+          if (done) break;
+          if ("content" in chunk) {
+            // SSE format: data: <json>\n\n
+            const event = `data: ${JSON.stringify({ content: chunk.content })}\n\n`;
+            controller.enqueue(encoder.encode(event));
+          }
         }
-      }
 
-      // Signal completion
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
+        // Signal completion
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (error) {
+        if (!request.signal.aborted) controller.error(error);
+      }
+    },
+    async cancel() {
+      await iterator.return?.();
     },
   });
 
@@ -116,8 +127,8 @@ export async function POST(request: Request) {
 
 ### Key details
 
-- **`result.stream`** is the async iterable from NeuroLink. Each iteration yields a `StreamChunk` (source: `src/lib/types/streamTypes.ts`).
-- **`StreamChunk`** is a discriminated union: `type: "text"` for text content, `type: "audio"` for TTS audio data.
+- **`result.stream`** is the async iterable from NeuroLink. Each iteration yields a `StreamChunk` (source: `src/lib/types/stream.ts`).
+- **`StreamChunk`** is a discriminated union: `type: "text"` for text content, `type: "tts_audio"` for TTS audio data.
 - **`Cache-Control: no-cache, no-transform`** prevents proxies from buffering the stream. Without this, some CDNs and reverse proxies will buffer the entire response before sending it to the client.
 - **`Connection: keep-alive`** keeps the TCP connection open for the duration of the stream.
 
@@ -206,7 +217,7 @@ export function useAIStream() {
 
 ### Design decisions
 
-**AbortController for cancellation.** When the user clicks "Stop generating," the `AbortController` cancels the fetch request and the server-side stream. The server receives a connection close event and stops generating tokens.
+**AbortController for cancellation.** When the user clicks "Stop generating," the `AbortController` cancels the fetch request. The route passes `request.signal` to NeuroLink as `abortSignal`, while the response stream's `cancel()` closes the async iterator, so cancellation propagates to the upstream generation instead of only disconnecting the browser.
 
 **Buffer for incomplete lines.** SSE events can be split across multiple read chunks. The buffer collects partial lines and only processes complete lines (those ending with `\n`). The last element of `split("\n")` might be an incomplete line, so it stays in the buffer.
 
@@ -223,7 +234,7 @@ A minimal component that uses the `useAIStream` hook.
 "use client";
 import { useAIStream } from "../hooks/useAIStream";
 
-export default function StreamingChat() {
+export function StreamingChat() {
   const { content, isStreaming, error, stream, cancel } = useAIStream();
 
   return (
@@ -272,37 +283,20 @@ For bidirectional communication -- where the user can interrupt a stream, send c
 ### Backend: WebSocket handler
 
 ```typescript
-// Backend: WebSocket handler (Express/Hono)
+// Backend: register NeuroLink's built-in streaming WebSocket handler
+import { NeuroLink } from "@juspay/neurolink";
 import {
   WebSocketConnectionManager,
-  WebSocketMessageRouter,
-} from "@juspay/neurolink";
+  createAgentWebSocketHandler,
+} from "@juspay/neurolink/server";
 
+const neurolink = new NeuroLink();
 const wsManager = new WebSocketConnectionManager();
-const router = new WebSocketMessageRouter();
 
-router.on("chat", async (message, connection) => {
-  const neurolink = new NeuroLink();
-
-  const result = await neurolink.stream({
-    input: { text: message.payload.prompt },
-    provider: "openai",
-  });
-
-  for await (const chunk of result.stream) {
-    if ("content" in chunk) {
-      connection.send(JSON.stringify({
-        type: "chunk",
-        content: chunk.content,
-      }));
-    }
-  }
-
-  connection.send(JSON.stringify({ type: "done" }));
-});
+wsManager.registerHandler("/ws", createAgentWebSocketHandler(neurolink));
 ```
 
-NeuroLink provides `WebSocketConnectionManager` for tracking active connections and `WebSocketMessageRouter` for routing messages by type (source: `src/lib/server/index.ts`).
+Connect the manager to your WebSocket server and pass accepted sockets to `handleConnection()`. The built-in agent handler accepts a message such as `{ "type": "stream", "payload": { "prompt": "Hello" } }` and emits `stream_start`, `chunk`, and `stream_complete` frames. `WebSocketConnectionManager` tracks active connections and handles heartbeat cleanup (source: `src/lib/server/websocket/WebSocketHandler.ts`).
 
 ### Frontend: WebSocket React hook
 
@@ -325,7 +319,7 @@ export function useWebSocketStream(url: string) {
       const data = JSON.parse(event.data);
       if (data.type === "chunk") {
         setContent((prev) => prev + data.content);
-      } else if (data.type === "done") {
+      } else if (data.type === "stream_complete") {
         setIsStreaming(false);
       }
     };
@@ -336,7 +330,7 @@ export function useWebSocketStream(url: string) {
   const send = useCallback((prompt: string) => {
     setContent("");
     setIsStreaming(true);
-    ws.current?.send(JSON.stringify({ type: "chat", payload: { prompt } }));
+    ws.current?.send(JSON.stringify({ type: "stream", payload: { prompt } }));
   }, []);
 
   return { content, isConnected, isStreaming, send };
@@ -347,14 +341,14 @@ export function useWebSocketStream(url: string) {
 
 - **Persistent connection.** The WebSocket connects once and stays open. No new HTTP request per message.
 - **Bidirectional.** The client can send messages at any time, including while receiving a stream. This enables interruption, typing indicators, and real-time corrections.
-- **Manual reconnection.** Unlike SSE, WebSockets do not auto-reconnect. You need to implement reconnection logic in the `onclose` handler.
+- **Manual reconnection.** WebSockets do not auto-reconnect. Implement reconnection in the `onclose` handler; the POST `fetch` SSE hook shown above likewise needs explicit retry/backoff.
 - **No proxy issues.** WebSockets work through most proxies, but some older corporate proxies block the upgrade handshake.
 
 ---
 
 ## Step 5: Handling Audio Streams
 
-NeuroLink supports TTS audio streaming alongside text. The `StreamChunk` discriminated union (source: `src/lib/types/streamTypes.ts`) includes an `audio` type with `AudioChunk` data.
+NeuroLink supports TTS audio streaming alongside text. The `StreamChunk` discriminated union (source: `src/lib/types/stream.ts`) includes a `tts_audio` type carrying `TTSChunk` data.
 
 ```typescript
 for await (const chunk of result.stream) {
@@ -362,15 +356,15 @@ for await (const chunk of result.stream) {
     case "text":
       process.stdout.write(chunk.content);
       break;
-    case "audio":
-      // chunk.audioChunk has: data (Buffer), sampleRateHz, channels, encoding
-      audioBuffer.push(chunk.audioChunk.data);
+    case "tts_audio":
+      // chunk.audio has: data (Buffer), format, index, isFinal
+      audioBuffer.push(chunk.audio.data);
       break;
   }
 }
 ```
 
-Audio chunks include the raw audio data, sample rate, channel count, and encoding format. On the frontend, you can feed these chunks into a Web Audio API context for real-time playback while text streams in parallel.
+Audio chunks include the raw audio data, the audio format, a sequence index, and a flag marking the final chunk. On the frontend, you can feed these chunks into a Web Audio API context for real-time playback while text streams in parallel.
 
 ---
 
@@ -398,7 +392,7 @@ flowchart TD
 
 - The AI generates text and the user reads it (unidirectional)
 - You want simplicity -- SSE is built on standard HTTP
-- You need automatic reconnection (SSE has it built in)
+- You can use `EventSource` for built-in reconnection, or add retry/backoff to a POST `fetch` stream
 - You are building a read-only streaming dashboard or notification feed
 - Your infrastructure uses standard HTTP proxies and load balancers
 
@@ -419,7 +413,7 @@ flowchart TD
 
 ### 1. Use AbortController for client-side cancellation
 
-Always provide a way for users to cancel a stream. The `AbortController` signals the server to stop generating, saving tokens and compute.
+Always provide a way for users to cancel a stream. Pair the client `AbortController` with a server route that forwards `request.signal` as NeuroLink's `abortSignal`; otherwise the browser may disconnect while upstream generation continues.
 
 ### 2. Buffer SSE events to reduce React re-renders
 

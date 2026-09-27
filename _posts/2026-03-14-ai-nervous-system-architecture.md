@@ -52,12 +52,12 @@ When we adopted the nervous system model, three things happened:
 
 In the nervous system model, neurons are where intelligence originates. Each LLM provider is a neuron -- a specialized signal generator with its own characteristics, costs, and capabilities.
 
-NeuroLink currently supports 13 neurons:
+NeuroLink currently supports 33 named LLM providers as neurons. Here is a representative sample:
 
 ```mermaid
 graph LR
     subgraph "Neurons — LLM Providers"
-        OAI[OpenAI<br/>GPT-4o, o1]
+        OAI[OpenAI<br/>GPT-5.4, GPT-5.4 Pro]
         ANT[Anthropic<br/>Claude 4]
         GAS[Google AI Studio<br/>Gemini 2.5]
         VTX[Google Vertex<br/>Enterprise Gemini]
@@ -115,14 +115,14 @@ const result = await neurolink.generate({
 });
 ```
 
-The consumer code does not know which neuron fired. It receives a normalized `EnhancedGenerateResult` regardless of whether the signal came from GPT-4o in Virginia or a Llama model running on your laptop. This is the provider abstraction in biological terms: the pipe does not care which neuron generated the signal, only that the signal conforms to the expected shape.
+The consumer code does not know which neuron fired. It receives a normalized `EnhancedGenerateResult` regardless of whether the signal came from GPT-5.4 in Virginia or a Llama model running on your laptop. This is the provider abstraction in biological terms: the pipe does not care which neuron generated the signal, only that the signal conforms to the expected shape.
 
-### Why 13 Neurons Matter
+### Why Many Neurons Matter
 
-A single-provider SDK is a nervous system with one neuron. It works -- until that neuron fails, or becomes too expensive, or cannot handle a particular signal type. Thirteen neurons give you:
+A single-provider SDK is a nervous system with one neuron. It works -- until that neuron fails, or becomes too expensive, or cannot handle a particular signal type. Many neurons give you:
 
 - **Redundancy.** If Anthropic has an outage, route to OpenAI. If cloud providers are too slow, route to Ollama locally.
-- **Cost optimization.** Use expensive neurons (GPT-4o, Claude) for complex reasoning. Use cheap neurons (Mistral, Ollama) for simple tasks.
+- **Cost optimization.** Use expensive neurons (GPT-5.4, Claude) for complex reasoning. Use cheap neurons (Mistral, Ollama) for simple tasks.
 - **Capability matching.** Use Gemini for 1M-token context windows. Use Anthropic for careful analysis. Use SageMaker for domain-specific fine-tuned models.
 - **Compliance.** Use Azure for enterprise governance. Use Ollama for air-gapped environments. Use Vertex for Google Cloud customers.
 
@@ -211,11 +211,11 @@ Tokens arrive as an async iterable. This is the core design invariant: **`genera
 ```typescript
 // This is what generate() does internally
 // There is no separate non-streaming code path
-let text = "";
+let content = "";
 for await (const token of this.stream(options)) {
-  text += token;
+  content += token;
 }
-return { text };
+return { content };
 ```
 
 The stream handles multiple event types: text deltas, tool calls, thinking blocks, and usage statistics. This streaming-first design means that real-time token delivery is not a feature bolted onto a batch system -- it is the system itself.
@@ -242,17 +242,17 @@ graph TB
         N1["OpenAI"]
         N2["Anthropic"]
         N3["Gemini"]
-        N4["...13 total"]
+        N4["...33 total"]
     end
 
     subgraph "The Pipe — NeuroLink Core"
         PIPE["Six-stage pipeline"]
         RAG["RAG Engine<br/>10 chunking strategies"]
         MEM["Persistent Memory<br/>cross-conversation learning"]
-        FILE["File Processor<br/>50+ file types"]
+        FILE["File Processor<br/>260+ file extensions"]
         TTS["Voice Engine"]
         IMG["Image Generator"]
-        MCP["MCP Tools<br/>58+ tool servers"]
+        MCP["MCP Tools<br/>9 one-command configs"]
     end
 
     subgraph "Organs — Applications"
@@ -303,9 +303,9 @@ The pipe is not a dumb conduit. It contains specialized subsystems that enrich i
 
 **RAG Engine.** Handles document ingestion, chunking, embedding, and retrieval. It supports 10 chunking strategies -- from simple fixed-size chunks to semantic paragraph splitting -- and provides hybrid search (vector similarity combined with keyword matching) with reranking for relevance. When you configure `rag: { files: [...] }`, the pipe automatically registers a `search_knowledge_base` tool. The model decides when to search and how to incorporate the results.
 
-**File Processor.** The `ProcessorRegistry` handles 50+ file types -- images, PDFs, spreadsheets, code files, audio, video metadata. Each file type is converted into a provider-appropriate format during the Context Building stage. Just as biological senses convert light and sound into neural signals, the file processor converts diverse document formats into token sequences that neurons can process.
+**File Processor.** The `ProcessorRegistry` handles 260+ file extensions -- images, PDFs, spreadsheets, code files, audio, video metadata. Each file type is converted into a provider-appropriate format during the Context Building stage. Just as biological senses convert light and sound into neural signals, the file processor converts diverse document formats into token sequences that neurons can process.
 
-**MCP Tools.** The Model Context Protocol integration gives the pipe access to 58+ tool servers across 4 transport protocols (stdio, HTTP, SSE, WebSocket). When the model decides it needs to search the web, query a database, or interact with an external service, it emits a tool call. The pipe intercepts the call, dispatches it to the appropriate tool server, and returns the result to the stream.
+**MCP Tools.** The Model Context Protocol integration lets the pipe connect to any MCP server across 4 transport protocols (stdio, HTTP, SSE, WebSocket), with 9 one-command configs for common ones (filesystem, GitHub, Postgres, SQLite, Brave, Puppeteer, Git, memory, Bitbucket). When the model decides it needs to search the web, query a database, or interact with an external service, it emits a tool call. The pipe intercepts the call, dispatches it to the appropriate tool server, and returns the result to the stream.
 
 ## Edge-First Streaming: Why Intelligence Flows
 
@@ -353,8 +353,8 @@ const result = await neurolink.generate({
   model: "claude-sonnet-4-5",
   // Pipe subsystems activate via configuration, not separate APIs
   rag: { files: ["./legal-docs/"] },
-  memory: { conversationId: "merger-review-2026" },
-  tools: ["search_web", "create_document"],
+  context: { userId: "merger-review-2026" },
+  toolFilter: ["search_web", "create_document"],
   systemPrompt: "You are a senior legal analyst.",
 });
 ```
@@ -378,13 +378,13 @@ The nervous system model scales in three directions, and each direction represen
 ```mermaid
 graph LR
     subgraph "Today"
-        T1["13 Neurons"]
+        T1["33+ Neurons"]
         T2["6-Stage Pipe + 6 Subsystems"]
         T3["3 Organs"]
     end
 
     subgraph "Next Quarter"
-        N1["15+ Neurons"]
+        N1["More Neurons"]
         N2["Smart Routing Pipe"]
         N3["More Organs + Edge Subsystems"]
     end

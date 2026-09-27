@@ -51,10 +51,10 @@ LangChain's mental model is: define your pipeline as a graph of operations, then
 
 ### NeuroLink's Approach: Provider Abstraction
 
-NeuroLink abstracts the **provider**. Its core primitive is the unified interface -- a single `generate()` and `stream()` API that works identically across 30 named AI providers.
+NeuroLink abstracts the **provider**. Its core primitive is the unified interface -- a single `generate()` and `stream()` API that works identically across 33 named LLM providers.
 
-- **Provider-first:** Unified interface across 30 named providers (defined in the `AIProviderName` enum, with OpenRouter registered dynamically)
-- **Lightweight wrapper:** Built on Vercel AI SDK primitives (`streamText`, `generateText`)
+- **Provider-first:** Unified interface across 33 named LLM providers (14 with dedicated implementations, plus 19 more through a shared JSON-catalog adapter, all defined in the `AIProviderName` enum)
+- **Direct-HTTP core:** Implementations use NeuroLink's shared direct-HTTP base where the API is OpenAI-compatible, native provider SDKs for selected providers, and dedicated clients for the remaining backends; NeuroLink no longer depends on the Vercel AI SDK
 - **TypeScript-native:** Built at Juspay for production TypeScript backends from day one
 - **MCP-native:** Tool integration through the Model Context Protocol standard, with stdio, SSE, WebSocket, and HTTP transports supported
 
@@ -74,7 +74,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Summarize this document' },
   provider: 'openai',  // Change to 'anthropic', 'vertex', 'bedrock', etc.
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 ```
 
@@ -88,15 +88,15 @@ Both frameworks support multiple AI providers, but the approach differs signific
 
 | Capability | NeuroLink | LangChain |
 |---|---|---|
-| **Named providers** | 30 (AIProviderName enum + OpenRouter dynamically registered) | 1000+ claimed (many in standalone @langchain/<provider> packages) |
+| **Named providers** | 33 LLM providers (14 dedicated implementations + 19 via JSON-catalog adapter, all in the AIProviderName enum) | 1000+ claimed (many in standalone @langchain/<provider> packages) |
 | **Provider switching** | One config change, same interface | Requires import change to different scoped package |
 | **Auto-detection** | `createBestAIProvider()` scans env vars | Manual configuration |
-| **Fallback** | Built-in `createAIProviderWithFallback()` | Via middleware or custom chain setup |
+| **Fallback** | `providerFallback` callback; helper for constructing a provider pair | Via middleware or custom chain setup |
 | **Streaming** | Unified streaming across all providers | Provider-specific streaming behavior; LCEL unifies via .stream() |
 
 NeuroLink has fewer named providers than LangChain, but every provider is maintained by the core team and implements the full `BaseProvider` interface. LangChain's `@langchain/community` package has been deprecated and is being sunset; integrations are migrating to standalone scoped packages, though quality still varies.
 
-NeuroLink's auto-detection (`createBestAIProvider()`) and automatic fallback (`createAIProviderWithFallback()`) are particularly useful for production deployments where resilience matters more than raw integration count.
+NeuroLink's auto-detection (`createBestAIProvider()`) and configurable `providerFallback` callback are particularly useful for production deployments where resilience matters more than raw integration count. The separate `createAIProviderWithFallback()` helper constructs the primary and fallback instances for caller-managed failover.
 
 ## Side-by-Side Code Comparisons
 
@@ -112,7 +112,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Explain quantum computing' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 console.log(result.content);
 ```
@@ -121,7 +121,7 @@ console.log(result.content);
 // LangChain.js v1.x
 import { ChatOpenAI } from '@langchain/openai';
 
-const model = new ChatOpenAI({ modelName: 'gpt-4o' });
+const model = new ChatOpenAI({ modelName: 'gpt-5.4' });
 const result = await model.invoke('Explain quantum computing');
 console.log(result.content);
 ```
@@ -131,16 +131,16 @@ For basic text generation, both frameworks are concise. The key difference emerg
 ### Tool Calling
 
 ```typescript
-// NeuroLink -- Uses Vercel AI SDK's tool() + MCP tools
+// NeuroLink -- Uses its own tool() helper + MCP tools
 import { z } from 'zod';
-import { tool } from 'ai';
+import { tool } from '@juspay/neurolink';
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
 const weatherTool = tool({
   description: 'Get current weather',
-  parameters: z.object({ city: z.string() }),
+  inputSchema: z.object({ city: z.string() }),
   execute: async ({ city }) => ({ temp: 22, city }),
 });
 
@@ -155,7 +155,7 @@ for await (const chunk of result.stream) {
 }
 ```
 
-NeuroLink uses the Vercel AI SDK's `tool()` function with Zod schemas, which is also the foundation for MCP tool definitions. This means tools you build for NeuroLink are compatible with the broader MCP ecosystem.
+NeuroLink ships its own `tool()` helper with Zod schema support (`inputSchema`), which is also the foundation for MCP tool definitions. This means tools you build for NeuroLink are compatible with the broader MCP ecosystem.
 
 ### RAG Pipeline
 
@@ -165,13 +165,13 @@ import { RAGPipeline } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o-mini' },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4-mini' },
 });
 await pipeline.ingest(['./docs/*.md']);
 const response = await pipeline.query('What are the key features?');
 ```
 
-NeuroLink's RAG pipeline includes 9 chunking strategies (Character, HTML, JSON, LaTeX, Markdown, Recursive, SemanticMarkdown, Sentence, Token), hybrid vector+BM25 search, reranking, and GraphRAG out of the box. LangChain's RAG support is more flexible (with many retriever options) but requires more assembly.
+NeuroLink's RAG pipeline includes 10 chunking strategies (Character, HTML, JSON, LaTeX, Markdown, Recursive, Semantic, SemanticMarkdown, Sentence, Token), hybrid vector+BM25 search, reranking, and GraphRAG out of the box. LangChain's RAG support is more flexible (with many retriever options) but requires more assembly.
 
 ## When LangChain is the Better Choice
 
@@ -211,7 +211,7 @@ NeuroLink is TypeScript-native from the ground up. Types are not generated or po
 
 ### Production Multi-Provider Deployments
 
-One interface, 30 providers, automatic fallback, circuit breakers, health checking -- NeuroLink was built at Juspay for production fintech systems where downtime is not an option. The `createAIProviderWithFallback()` and `ProviderHealthChecker` utilities handle provider resilience at the SDK level.
+One interface, 33 named LLM providers, configurable failover, circuit breakers, and public health checks -- NeuroLink was built at Juspay for production fintech systems where downtime is not an option. `createAIProviderWithFallback()` creates a primary/fallback provider pair for caller-managed failover; automatic switching requires a configured `providerFallback` callback. Public `NeuroLink` methods such as `getProviderStatus()`, `checkProviderHealth()`, and `checkAllProvidersHealth()` expose provider diagnostics without relying on the internal `ProviderHealthChecker` class.
 
 ### MCP Tool Integration
 
@@ -240,12 +240,12 @@ Here is a detailed comparison across all major features:
 | Feature | NeuroLink | LangChain |
 |---|---|---|
 | **Language** | TypeScript (native) | Python (primary), TypeScript (LangChain.js, same v1.x major version; core API surface covered) |
-| **AI Providers** | 30 unified (AIProviderName enum + OpenRouter) | 1000+ claimed integrations (standalone @langchain/<provider> packages; @langchain/community deprecated) |
+| **AI Providers** | 33 named LLM providers (AIProviderName enum: 14 dedicated + 19 via JSON-catalog adapter) | 1000+ claimed integrations (standalone @langchain/<provider> packages; @langchain/community deprecated) |
 | **Streaming** | Unified across providers | Via LCEL .stream() (Runnable interface) |
-| **Tool/Function Calling** | Vercel AI SDK + MCP | Custom tool abstraction; @langchain/mcp-adapters for MCP |
+| **Tool/Function Calling** | Own `tool()` helper + MCP | Custom tool abstraction; @langchain/mcp-adapters for MCP |
 | **MCP Support** | Native (stdio, SSE, WebSocket, HTTP transports) | Via @langchain/mcp-adapters (stateless per invocation by default) |
-| **RAG** | Built-in (9 chunkers, hybrid vector+BM25, reranking, GraphRAG) | Via LangChain retrievers (more options, more assembly) |
-| **Workflow Engine** | Built-in (ensemble, chain, adaptive, judge scoring) | Via LangGraph (graph-based, durable runtime, suspend/resume) |
+| **RAG** | Built-in (10 chunkers, hybrid vector+BM25, reranking, GraphRAG) | Via LangChain retrievers (more options, more assembly) |
+| **Workflow Engine** | Built-in (ensemble, chain, adaptive, custom) | Via LangGraph (graph-based, durable runtime, suspend/resume) |
 | **Server Adapters** | 4 frameworks (Hono, Express, Fastify, Koa) | LangServe (FastAPI only) |
 | **Middleware** | Factory pattern (analytics, guardrails, custom) | Built-in middleware (HITL, summarization, PII redaction) in v1.x |
 | **HITL** | Built-in with approval workflows | Via `createAgent()` middleware (v1.x) |
@@ -274,7 +274,7 @@ If you are considering moving from LangChain.js to NeuroLink, here is the genera
 | LangChain.js Concept | NeuroLink Equivalent |
 |---|---|
 | `ChatOpenAI`, `ChatAnthropic`, etc. | `neurolink.generate({ provider: "openai" })` |
-| Custom tools with `DynamicTool` | `tool()` from Vercel AI SDK + MCP servers |
+| Custom tools with `DynamicTool` | `tool()` from `@juspay/neurolink` + MCP servers |
 | `ConversationBufferMemory` (now in @langchain/classic) | `conversationMemory` constructor option (Redis) |
 | `LLMChain` (now in @langchain/classic) | `neurolink.generate()` or `neurolink.stream()` |
 | `createAgent({ model, tools, middleware })` | NeuroLink workflow engine + HITL module |
@@ -290,7 +290,7 @@ These are different tools for different contexts. Here is an honest summary:
 
 **Choose LangChain when** your team is Python-first, you need a vast integration ecosystem, you are building complex multi-agent systems with LangGraph's durable runtime, or you want the LangSmith observability platform.
 
-**Choose NeuroLink when** your team is TypeScript-first, you need production-grade multi-provider resilience across 30 providers, you want native MCP tool integration, or you need enterprise patterns like HITL, guardrails, task scheduling, and circuit breakers.
+**Choose NeuroLink when** your team is TypeScript-first, you need production-grade multi-provider resilience across 33 named LLM providers, you want native MCP tool integration, or you need enterprise patterns like HITL, guardrails, task scheduling, and circuit breakers.
 
 **Choose both when** you have a polyglot architecture with Python and TypeScript services, or you want to standardize on MCP tools that work across frameworks.
 

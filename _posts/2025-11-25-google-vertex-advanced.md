@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Advanced Vertex AI Patterns with NeuroLink
+title: 'Advanced Vertex AI Patterns with NeuroLink'
 date: '2025-11-25 10:00:00 +0530'
 categories:
   - Tutorial
@@ -12,8 +12,8 @@ tags:
   - multimodal
 author: neurolink
 description: >-
-  Advanced Vertex AI integration. Gemini models, multimodal, and enterprise
-  patterns.
+  Configure Vertex AI with NeuroLink for Gemini and Claude models, multimodal
+  inputs, structured output, extended thinking, retries, and tool calling.
 toc: true
 mermaid: false
 pin: false
@@ -22,9 +22,7 @@ image:
   alt: Advanced Vertex AI Patterns with NeuroLink
 ---
 
-You will configure advanced Vertex AI patterns through NeuroLink, including enterprise authentication with service accounts, Gemini 2.5 extended context capabilities, multimodal pipelines, and production deployment. By the end of this tutorial, you will have a production-ready Vertex AI integration with failover, cost optimization, and region-specific routing.
-
-Vertex AI authentication differs from API key-based providers, so you will start with credential configuration before moving to advanced generation patterns.
+You will configure Vertex AI through NeuroLink with service-account authentication, Gemini 2.5 extended context, multimodal inputs, structured output, and retry handling. By the end of this tutorial, you will know when caller-supplied regions apply, how to choose stable Gemini tiers, and how to invoke Claude models hosted on Vertex.
 
 ## Configuring Vertex AI with NeuroLink
 
@@ -58,16 +56,18 @@ const response = await neurolink.generate({
 console.log(response.content);
 ```
 
-You can also specify the region per-request:
+You can also specify a region per-request for non-Gemini models on Vertex, such as Claude:
 
 ```typescript
 const response = await neurolink.generate({
   input: { text: "Process this request in EU region" },
   provider: "vertex",
-  model: "gemini-2.5-flash",
-  region: "europe-west4" // For GDPR compliance
+  model: "claude-sonnet-4-6",
+  region: "europe-west4" // Honored for Claude-on-Vertex; ignored for Gemini
 });
 ```
+
+Gemini models are always routed to Vertex's `global` endpoint regardless of any `region` you pass -- the `region` option only takes effect for non-Gemini models such as Claude on Vertex.
 
 ### Required IAM Permissions
 
@@ -92,25 +92,25 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
 
 ### Regional Endpoints
 
-Vertex AI operates regionally. Choose locations based on data residency requirements and model availability. Configure via environment variables or specify per-request:
+Vertex AI operates regionally, but NeuroLink routes every Gemini model (`gemini-*`) to Vertex's `global` endpoint regardless of the `region` you pass -- the caller-supplied region is honored only for non-Gemini Vertex models, such as Claude. For data residency requirements on Gemini, set the project's default location instead:
 
 ```typescript
 import { NeuroLink, VertexModels } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Specify region per-request for data residency compliance
+// GOOGLE_CLOUD_LOCATION / GOOGLE_VERTEX_LOCATION sets the project default;
+// Gemini requests still resolve to the global endpoint internally.
 const response = await neurolink.generate({
   input: { text: "Analyze this document" },
   provider: "vertex",
   model: VertexModels.GEMINI_2_5_PRO,
-  region: "europe-west4" // GDPR compliance
 });
 ```
 
 ## Gemini Model Capabilities
 
-Gemini models represent Google's most advanced model family. NeuroLink provides access to all variants through a unified interface.
+NeuroLink's Vertex model catalog includes stable Gemini 2.5 tiers as well as newer preview entries. The examples below use stable Gemini 2.5 model IDs for long-lived application code.
 
 ### Model Selection
 
@@ -170,29 +170,6 @@ const response = await neurolink.generate({
 });
 
 console.log(response.content);
-```
-
-### Using PDF Files
-
-Process PDF documents directly:
-
-```typescript
-import { NeuroLink, VertexModels } from '@juspay/neurolink';
-import * as fs from 'fs';
-
-const neurolink = new NeuroLink();
-
-const pdfBuffer = fs.readFileSync('contract.pdf');
-
-const response = await neurolink.generate({
-  input: {
-    text: "Extract key terms from this contract: parties, effective date, payment terms.",
-    pdfFiles: [pdfBuffer]
-  },
-  provider: "vertex",
-  model: VertexModels.GEMINI_2_5_PRO,
-  maxTokens: 2048
-});
 ```
 
 ## Multimodal Processing
@@ -311,18 +288,22 @@ const reportAnalysis = await neurolink.generate({
 
 ## Extended Thinking Capabilities
 
-Gemini 2.5 models support advanced reasoning for complex tasks:
+Gemini 2.5 models support advanced reasoning for complex tasks. Pass `thinkingConfig` with a token budget and NeuroLink translates it into the wire shape Gemini 2.5 expects:
 
 ```typescript
 import { NeuroLink, VertexModels } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Enable advanced reasoning for complex analysis
+// Enable extended thinking with a token budget for complex analysis
 const response = await neurolink.generate({
   input: { text: "Solve this complex optimization problem step by step..." },
   provider: "vertex",
   model: VertexModels.GEMINI_2_5_PRO,
+  thinkingConfig: {
+    enabled: true,
+    budgetTokens: 8000
+  },
   maxTokens: 8000
 });
 
@@ -360,11 +341,10 @@ const response = await neurolink.generate({
   input: { text: "Analyze the iPhone 16 Pro Max" },
   provider: "vertex",
   model: VertexModels.GEMINI_2_5_PRO,
-  schema: ProductAnalysis,
-  disableTools: true // Required for Google providers with schemas
+  schema: ProductAnalysis
 });
 
-console.log(response.content); // Structured JSON matching the schema
+console.log(response.structuredData); // Parsed object matching the schema
 ```
 
 ## Enterprise Deployment Patterns
@@ -380,9 +360,6 @@ Configure Vertex AI through environment variables:
 export GOOGLE_CLOUD_PROJECT="your-project"
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 export GOOGLE_CLOUD_LOCATION="us-central1"
-
-# Optional: For VPC Service Controls
-export VERTEX_API_ENDPOINT="private.us-central1-aiplatform.googleapis.com"
 ```
 
 ### Cost-Effective Model Selection
@@ -468,8 +445,7 @@ async function generateWithRetry(
 Gemini models support function calling:
 
 ```typescript
-import { NeuroLink, VertexModels } from '@juspay/neurolink';
-import { tool } from 'ai';
+import { NeuroLink, VertexModels, tool } from '@juspay/neurolink';
 import { z } from 'zod';
 
 const neurolink = new NeuroLink();
@@ -509,11 +485,11 @@ import { NeuroLink, VertexModels } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Claude 4.5 Sonnet on Vertex AI
+// Claude 4.6 Sonnet on Vertex AI
 const claudeResponse = await neurolink.generate({
   input: { text: "Explain the benefits of using Claude through Vertex AI" },
   provider: "vertex",
-  model: VertexModels.CLAUDE_4_5_SONNET, // "claude-sonnet-4-5@20250929"
+  model: VertexModels.CLAUDE_4_6_SONNET, // "claude-sonnet-4-6"
   maxTokens: 2048
 });
 
@@ -521,7 +497,7 @@ const claudeResponse = await neurolink.generate({
 const reasoningResponse = await neurolink.generate({
   input: { text: "Solve this complex reasoning problem..." },
   provider: "vertex",
-  model: VertexModels.CLAUDE_3_7_SONNET, // "claude-3-7-sonnet@20250219"
+  model: VertexModels.CLAUDE_4_6_SONNET, // "claude-sonnet-4-6"
   maxTokens: 4096
 });
 
@@ -533,9 +509,9 @@ console.log(reasoningResponse.content);
 
 ## What You Built
 
-You configured Vertex AI authentication with service accounts and workload identity, selected the right Gemini model for each task (Flash for speed, Pro for reasoning), processed multimodal inputs including images, video, audio, and documents through a consistent interface, set up enterprise security with VPC controls and customer-managed encryption, and implemented cost tracking with budget alerts.
+You configured Vertex AI authentication with service accounts, selected the right Gemini model for each task (Flash for speed, Pro for reasoning), processed multimodal inputs including images, video, and PDF documents through a consistent interface, used extended thinking and structured output for complex analysis, and added retry logic and function calling for production reliability.
 
-> **Note:** Gemini 3 models are expected to be available through Vertex AI in the future. Check the [Vertex AI model documentation](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini) for the latest model availability and preview status.
+> **Note:** NeuroLink's Vertex catalog includes `gemini-3.1-pro-preview`, but preview IDs can change. The examples use stable Gemini 2.5 models; check the [Vertex AI model documentation](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini) before choosing a preview for production.
 
 Start with simple text generation, then progressively add multimodal inputs as your use case demands. The combination of Gemini's capabilities and NeuroLink's unified interface creates powerful AI applications on Google Cloud infrastructure.
 

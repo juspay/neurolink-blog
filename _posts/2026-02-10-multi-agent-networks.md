@@ -138,7 +138,7 @@ and compile detailed findings. Always cite your sources.`,
 clear, engaging content. Follow the provided style guide.`,
     tools: ['get_findings', 'generate_outline', 'write_section'],
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
   },
   editor: {
     systemPrompt: `You are a meticulous editor. Review content for clarity, accuracy,
@@ -150,7 +150,7 @@ grammar, and adherence to style guidelines. Provide specific revision suggestion
 };
 ```
 
-Notice that each agent uses a different model suited to its role. The researcher uses Claude Sonnet for thorough reasoning, the writer uses GPT-4o for creative generation, and the editor uses Claude Sonnet again for meticulous review. NeuroLink's provider-agnostic API makes this mix-and-match approach seamless.
+Notice that each agent uses a different model suited to its role. The researcher uses Claude Sonnet for thorough reasoning, the writer uses GPT-5.4 for creative generation, and the editor uses Claude Sonnet again for meticulous review. NeuroLink's provider-agnostic API makes this mix-and-match approach seamless.
 
 ### The RoutingAgent: Intelligent Task Delegation
 
@@ -165,7 +165,7 @@ async function routeTask(task: string): Promise<string> {
 Task: ${task}
 Respond with just the category name.` },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     temperature: 0,
   });
 
@@ -188,7 +188,7 @@ Respond with just the category name.` },
 }
 ```
 
-The classification step uses `temperature: 0` for deterministic routing. The routing model can be a fast, cheap model (like GPT-4o-mini) since classification is a simple task. The actual work gets dispatched to the appropriate specialist model.
+The classification step uses `temperature: 0` for deterministic routing. The routing model can be a fast, cheap model (like GPT-5.4-mini) since classification is a simple task. The actual work gets dispatched to the appropriate specialist model.
 
 > **Note:** For production systems, add validation on the classification result. If the model returns an unexpected category, fall back to a default agent or return an error rather than crashing.
 {: .prompt-warning }
@@ -348,7 +348,7 @@ const blogPost = await runContentPipeline('quantum computing advances in 2026');
 console.log(blogPost);
 ```
 
-Each step in the pipeline uses the appropriate specialist agent. The research step benefits from Claude Sonnet's thorough reasoning, the writing steps leverage GPT-4o's creative generation, and the editing step uses Claude Sonnet's precision.
+Each step in the pipeline uses the appropriate specialist agent. The research step benefits from Claude Sonnet's thorough reasoning, the writing steps leverage GPT-5.4's creative generation, and the editing step uses Claude Sonnet's precision.
 
 ## Using Different Models for Different Agents
 
@@ -356,9 +356,9 @@ One of the most powerful advantages of multi-agent networks is cost optimization
 
 ```typescript
 const agentModels = {
-  router: { provider: 'openai', model: 'gpt-4o-mini' },        // Fast classification
+  router: { provider: 'openai', model: 'gpt-5.4-mini' },        // Fast classification
   researcher: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' }, // Thorough reasoning
-  writer: { provider: 'openai', model: 'gpt-4o' },              // Creative generation
+  writer: { provider: 'openai', model: 'gpt-5.4' },              // Creative generation
   factChecker: { provider: 'vertex', model: 'gemini-2.5-pro' }, // Grounded verification
 };
 ```
@@ -369,9 +369,9 @@ Here is a cost comparison for a typical content pipeline processing 100 articles
 
 | Agent Role | Model | Cost per 1K tokens | Estimated Cost (100 articles) |
 |---|---|---|---|
-| Router | GPT-4o-mini | $0.00015 | $0.15 |
+| Router | GPT-5.4-mini | $0.00015 | $0.15 |
 | Researcher | Claude Sonnet | $0.003 | $6.00 |
-| Writer | GPT-4o | $0.0025 | $5.00 |
+| Writer | GPT-5.4 | $0.0025 | $5.00 |
 | Fact-Checker | Gemini 2.5 Pro | $0.00125 | $2.50 |
 | **Total** | | | **$13.65** |
 
@@ -398,7 +398,7 @@ const draft = await neurolink.generate({
   input: { text: `Write a blog post using this research context:
 ${JSON.stringify(researchContext, null, 2)}` },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 ```
 

@@ -67,7 +67,7 @@ The `ToolDiscoveryService` is the core discovery engine. It extends `EventEmitte
 
 ```typescript
 export class ToolDiscoveryService extends EventEmitter {
-  // Maps "serverId::toolName" -> full tool metadata
+  // Maps "serverId:toolName" -> full tool metadata
   private toolRegistry = new Map<string, ExternalMCPToolInfo>();
 
   // Maps serverId -> Set of tool names for fast lookup
@@ -358,20 +358,42 @@ In production, NeuroLink agents typically connect to multiple MCP servers simult
 
 ### Unified Tool Registry
 
-When tools from different servers share the same name (for example, both a GitHub server and a GitLab server expose a tool called `createPullRequest`), the registry uses a composite key: `serverId::toolName`. The `getUnifiedTools()` method returns a deduplicated list where server-specific tools are disambiguated by their server ID prefix.
+Internally, `EnhancedToolDiscovery` keys each tool by `serverId:toolName` so two servers can register a tool with the same name without colliding in its own registry. `getUnifiedTools()` works at a different level: it groups tools by name across every registered server into one entry with a `servers` list, and flags that entry `hasConflict: true` when more than one server exposes the same name -- for example, both a GitHub server and a GitLab server exposing `createPullRequest`.
 
 ```typescript
 const discovery = new EnhancedToolDiscovery();
 
-// Register multiple servers
-discovery.registerServer({ id: "github", client: githubClient });
-discovery.registerServer({ id: "gitlab", client: gitlabClient });
-discovery.registerServer({ id: "slack", client: slackClient });
+// Discover tools from each connected server, then register the results so
+// the unified view has per-server metadata and tool lists to work with
+const gh = await discovery.discoverToolsWithAnnotations("github", githubClient);
+discovery.registerServer({
+  id: "github",
+  name: "GitHub",
+  description: "GitHub repository operations",
+  transport: "stdio",
+  status: "connected",
+  tools: gh.tools,
+});
 
-// Discover tools from all servers
-for (const server of registeredServers) {
-  await discovery.discoverToolsWithAnnotations(server.id, server.client);
-}
+const gl = await discovery.discoverToolsWithAnnotations("gitlab", gitlabClient);
+discovery.registerServer({
+  id: "gitlab",
+  name: "GitLab",
+  description: "GitLab repository operations",
+  transport: "stdio",
+  status: "connected",
+  tools: gl.tools,
+});
+
+const sl = await discovery.discoverToolsWithAnnotations("slack", slackClient);
+discovery.registerServer({
+  id: "slack",
+  name: "Slack",
+  description: "Slack messaging operations",
+  transport: "stdio",
+  status: "connected",
+  tools: sl.tools,
+});
 
 // Get unified tools across all servers
 const allTools = discovery.getUnifiedTools();
@@ -575,8 +597,8 @@ You can extend the discovery system with custom logic for your environment. A di
 ### Plugin Structure
 
 ```typescript
-import { ToolDiscoveryService } from "@juspay/neurolink";
-import type { ExternalMCPToolInfo } from "@juspay/neurolink";
+import { ExternalServerManager } from "@juspay/neurolink";
+import type { ExternalMCPToolInfo } from "@juspay/neurolink/types";
 
 type DiscoveryPlugin = {
   name: string;
@@ -629,8 +651,10 @@ const orgMetadataPlugin: DiscoveryPlugin = {
 ### Registering Plugins
 
 ```typescript
-// Apply plugin to discovery service
-const discoveryService = new ToolDiscoveryService();
+// Apply plugin to discovery service (ExternalServerManager owns the
+// ToolDiscoveryService instance and exposes it via getToolDiscovery())
+const serverManager = new ExternalServerManager();
+const discoveryService = serverManager.getToolDiscovery();
 
 discoveryService.on("toolRegistered", ({ toolInfo }) => {
   const transformed = orgMetadataPlugin.transformTool?.(toolInfo);

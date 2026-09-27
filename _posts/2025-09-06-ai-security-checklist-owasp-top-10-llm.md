@@ -30,7 +30,7 @@ image:
 > This checklist follows the **OWASP Top 10 for LLM Applications v2.0 (2025)**. For the original 2023 v1.1 list, see [owasp.org/llm-top-10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
 {: .prompt-info }
 
-By the end of this guide, you will have a concrete mitigation for every vulnerability in the OWASP Top 10 for LLM Applications v2.0 -- with working NeuroLink code examples for guardrails middleware, HITL approval workflows, auto-evaluation quality gates, and telemetry-based anomaly detection.
+By the end of this guide, you will have a concrete mitigation for every vulnerability in the OWASP Top 10 for LLM Applications v2.0 -- with working NeuroLink code examples for guardrails middleware, HITL approval workflows, auto-evaluation scoring with an application-enforced quality gate, and telemetry-based anomaly detection.
 
 LLM vulnerabilities do not require zero-day exploits. A well-crafted prompt bypasses your security model. An unsanitized model output enables XSS. An agent with unrestricted tool access deletes production data. This post maps each OWASP vulnerability to the NeuroLink feature that mitigates it, with a production checklist you can deploy today.
 
@@ -100,22 +100,26 @@ NeuroLink's guardrails middleware provides two defenses against prompt injection
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
-import { MiddlewareFactory } from '@juspay/neurolink/middleware';
 
 const neurolink = new NeuroLink();
 
-// Configure middleware separately
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    guardrails: {
-      enabled: true,
-      config: {
-        precallEvaluation: {
-          enabled: true, // Evaluates prompts BEFORE sending to LLM
-        },
-        badWords: {
-          enabled: true,
-          regexPatterns: ['ignore previous instructions', 'system prompt'],
+// Guardrails middleware is configured per-call via `middleware.middlewareConfig`
+const result = await neurolink.generate({
+  input: { text: userInput },
+  provider: 'openai',
+  model: 'gpt-5.4',
+  middleware: {
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          precallEvaluation: {
+            enabled: true, // Evaluates prompts BEFORE sending to LLM
+          },
+          badWords: {
+            enabled: true,
+            regexPatterns: ['ignore previous instructions', 'system prompt'],
+          },
         },
       },
     },
@@ -140,27 +144,32 @@ LLMs can inadvertently reveal PII, credentials, or proprietary data in responses
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
-import { MiddlewareFactory } from '@juspay/neurolink/middleware';
 
 const neurolink = new NeuroLink();
 
-// Configure middleware separately
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    guardrails: {
-      enabled: true,
-      config: {
-        badWords: {
-          enabled: true,
-          regexPatterns: [
-            '\\b\\d{3}-\\d{2}-\\d{4}\\b',          // SSN pattern
-            '\\b[\\w.-]+@[\\w.-]+\\.\\w+\\b',       // Email pattern
-            '\\b(?:sk-|sk-ant-|AIza)[\\w-]+\\b',    // API key patterns
-          ],
-          replacementText: '[REDACTED]',
-        },
-        modelFilter: {
-          enabled: true,  // Secondary model checks for PII leakage
+// Guardrails middleware is configured per-call via `middleware.middlewareConfig`
+const result = await neurolink.generate({
+  input: { text: userInput },
+  provider: 'openai',
+  model: 'gpt-5.4',
+  middleware: {
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          badWords: {
+            enabled: true,
+            regexPatterns: [
+              '\\b\\d{3}-\\d{2}-\\d{4}\\b',          // SSN pattern
+              '\\b[\\w.-]+@[\\w.-]+\\.\\w+\\b',       // Email pattern
+              '\\b(?:sk-|sk-ant-|AIza)[\\w-]+\\b',    // API key patterns
+            ],
+            replacementText: '[REDACTED]',
+          },
+          modelFilter: {
+            enabled: true,
+            filterModel: 'openai:gpt-5.4-mini', // Secondary model checks for PII leakage
+          },
         },
       },
     },
@@ -183,7 +192,7 @@ neurolink mcp test           # Test all configured servers
 neurolink mcp test filesystem # Test specific server
 
 # MCP server discovery from trusted sources only
-neurolink discover --source claude-desktop
+neurolink mcp discover --source claude-desktop
 ```
 
 Best practices for supply chain security:
@@ -201,29 +210,43 @@ Compromised training data or fine-tuning datasets can cause models to produce bi
 
 ### NeuroLink Mitigation
 
-Auto-evaluation middleware provides a quality gate that catches anomalous outputs:
+Auto-evaluation middleware can score potentially anomalous outputs before `generate()` returns. Your application must enforce the quality threshold:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
-import { MiddlewareFactory } from '@juspay/neurolink/middleware';
 
 const neurolink = new NeuroLink();
+let evaluationScore: number | undefined;
 
-// Configure middleware separately
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    autoEvaluation: {
-      enabled: true,
-      config: {
-        threshold: 8,
-        blocking: true,
+// Auto-evaluation middleware is configured per-call via `middleware.middlewareConfig`
+const result = await neurolink.generate({
+  input: { text: userInput },
+  provider: 'openai',
+  model: 'gpt-5.4',
+  middleware: {
+    middlewareConfig: {
+      autoEvaluation: {
+        enabled: true,
+        config: {
+          threshold: 8,
+          blocking: true, // Wait for evaluation before returning
+          onEvaluationComplete: (evaluation) => {
+            evaluationScore = evaluation.overall;
+          },
+        },
       },
     },
   },
 });
+
+if (evaluationScore === undefined || evaluationScore < 8) {
+  throw new Error('Response withheld: quality threshold not met');
+}
+
+return result.content;
 ```
 
-The auto-evaluation middleware scores responses on relevance, accuracy, and completeness. Low-scoring responses are blocked before reaching the user. Over time, tracking evaluation scores reveals model quality degradation -- a potential indicator of data or model poisoning.
+The auto-evaluation middleware scores responses on relevance, accuracy, and completeness. Here, `blocking: true` makes `generate()` wait for evaluation, while the application checks the score and withholds low-scoring output. Over time, tracking evaluation scores reveals model quality degradation -- a potential indicator of data or model poisoning.
 
 > **Note:** RAGAS (Retrieval Augmented Generation Assessment) is a separate, third-party evaluation framework -- it is not a built-in feature of NeuroLink. You can use RAGAS alongside NeuroLink to evaluate RAG pipeline quality, but it requires its own installation and configuration. See the [RAGAS documentation](https://docs.ragas.io/) for setup details.
 {: .prompt-info }
@@ -310,29 +333,34 @@ NeuroLink's guardrails middleware can detect and filter system prompt content fr
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
-import { MiddlewareFactory } from '@juspay/neurolink/middleware';
 
 const neurolink = new NeuroLink();
 
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    guardrails: {
-      enabled: true,
-      config: {
-        precallEvaluation: {
-          enabled: true,
-        },
-        badWords: {
-          enabled: true,
-          regexPatterns: [
-            'repeat your instructions',
-            'output your system prompt',
-            'ignore all previous',
-            'what are your rules',
-          ],
-        },
-        postcallEvaluation: {
-          enabled: true, // Scans outputs for system prompt content
+const result = await neurolink.generate({
+  input: { text: userInput },
+  provider: 'openai',
+  model: 'gpt-5.4',
+  middleware: {
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          precallEvaluation: {
+            enabled: true,
+          },
+          badWords: {
+            enabled: true,
+            regexPatterns: [
+              'repeat your instructions',
+              'output your system prompt',
+              'ignore all previous',
+              'what are your rules',
+            ],
+          },
+          modelFilter: {
+            enabled: true,
+            filterModel: 'openai:gpt-5.4-mini', // Scans outputs for system prompt content
+          },
         },
       },
     },
@@ -343,7 +371,7 @@ const middleware = new MiddlewareFactory({
 Best practices for preventing system prompt leakage:
 
 - **Never store secrets in system prompts.** API keys, database credentials, and internal URLs belong in environment variables, not in the prompt text the model can access.
-- **Use postcall evaluation** to scan model outputs for content that resembles your system prompt. NeuroLink's postcall guardrails can detect when the model echoes back its own instructions.
+- **Use the model-based output filter** to scan model outputs for content that resembles your system prompt. NeuroLink's guardrails middleware can detect when the model echoes back its own instructions.
 - **Implement prompt boundary detection.** Structure system prompts with clear delimiters and instruct the model to never reproduce content between those boundaries.
 - **Rotate sensitive instructions.** If your system prompt contains logic that would be valuable to attackers, treat it like a credential and rotate it periodically.
 
@@ -358,50 +386,36 @@ RAG pipelines rely on vector embeddings to retrieve relevant context before gene
 
 ### NeuroLink Mitigation
 
-NeuroLink's RAG pipeline provides source verification and embedding validation:
+NeuroLink's RAG pipeline lets you tag documents by source at ingestion time, then restrict retrieval to trusted sources with metadata filtering:
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
 import { RAGPipeline } from '@juspay/neurolink';
 
-const neurolink = new NeuroLink();
-
 const rag = new RAGPipeline({
-  embeddingProvider: 'openai',
-  embeddingModel: 'text-embedding-3-small',
-  vectorStore: {
-    type: 'pinecone',
-    config: { indexName: 'verified-docs' },
-  },
-  retrieval: {
-    topK: 5,
-    similarityThreshold: 0.78, // Reject low-similarity matches
-    sourceVerification: {
-      enabled: true,
-      trustedSources: ['internal-docs', 'approved-vendors'],
-    },
-  },
-  sanitization: {
-    enabled: true, // Sanitize retrieved context before LLM ingestion
-    stripInjectionPatterns: true,
-  },
+  embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
+  defaultTopK: 5,
 });
 
-const result = await rag.query({
-  query: userQuery,
-  provider: 'openai',
-  model: 'gpt-4o',
+// Tag each document with its source and trust status at ingestion time
+await rag.ingest([documentText], {
+  metadata: { source: 'internal-docs', verified: true },
+});
+
+// Restrict retrieval to trusted sources via metadata filtering
+const result = await rag.query(userQuery, {
+  topK: 5,
+  filter: { source: 'internal-docs' },
 });
 ```
 
 Best practices for securing vector and embedding pipelines:
 
-- **Set similarity thresholds.** Reject retrieved documents that fall below a minimum cosine similarity score. Low-similarity matches are more likely to be adversarial or irrelevant.
+- **Tag documents by source at ingestion.** Attach `metadata` (source, trust level) to every document you ingest, then use `filter` on `query()` to restrict retrieval to trusted sources.
 - **Validate embedding sources.** Only ingest documents from trusted, verified sources into your vector store. Track document provenance with metadata.
-- **Sanitize retrieved context.** Strip injection patterns from retrieved documents before passing them to the LLM. Adversarial documents may contain embedded prompt injection payloads.
+- **Sanitize retrieved context at the application layer.** NeuroLink's RAG pipeline does not include a dedicated sanitization step -- strip injection patterns from retrieved documents yourself before passing them to the LLM. Adversarial documents may contain embedded prompt injection payloads.
 - **Monitor embedding drift.** Track embedding distributions over time. Sudden shifts in vector space density or clustering patterns may indicate poisoned document injection.
 
-> **Warning:** A RAG pipeline without source verification is an open door. Any document that enters your vector store becomes part of the model's trusted context.
+> **Warning:** A RAG pipeline without source tracking is an open door. Any document that enters your vector store becomes part of the model's trusted context.
 {: .prompt-warning }
 
 ## LLM09: Misinformation
@@ -417,20 +431,21 @@ LLMs generate confident-sounding text that may be factually incorrect, outdated,
 const result = await neurolink.generate({
   input: { text: "What is the recommended dosage for this medication?" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
+  enableEvaluation: true,
 });
 
 // Show confidence indicators
-const evalResult = result.evaluationResult;
+const evalResult = result.evaluation;
 if (evalResult) {
   ui.showConfidenceBar({
-    relevance: evalResult.relevanceScore,
-    accuracy: evalResult.accuracyScore,
-    completeness: evalResult.completenessScore,
-    overall: evalResult.finalScore,
+    relevance: evalResult.relevance,
+    accuracy: evalResult.accuracy,
+    completeness: evalResult.completeness,
+    overall: evalResult.overall,
   });
 
-  if (evalResult.finalScore < 7) {
+  if (evalResult.overall < 7) {
     ui.showWarning('This response may contain inaccuracies. Please verify independently.');
   }
 }
@@ -453,7 +468,7 @@ Three layers of defense:
 ```typescript
 // Monitor for consumption anomalies
 const telemetry = TelemetryService.getInstance();
-telemetry.recordAIRequest('openai', 'gpt-4o', tokens, duration);
+telemetry.recordAIRequest('openai', 'gpt-5.4', tokens, duration);
 
 // Alert on anomalous usage
 const health = await telemetry.getHealthMetrics();
@@ -489,7 +504,7 @@ Deploy this checklist before going to production:
 - [ ] Output sanitization at the application layer (HTML, SQL, shell)
 - [ ] Audit logging enabled for compliance
 - [ ] System prompt leakage tested with red-team prompts
-- [ ] Vector store source verification enabled for RAG pipelines
+- [ ] Vector store documents tagged with source metadata and retrieval filtered to trusted sources
 - [ ] Per-session cost budgets configured
 
 > **Note:** Security is not a one-time configuration. Schedule quarterly reviews of your guardrails configuration, HITL rules, and evaluation thresholds. Threat models evolve, and your defenses should evolve with them.
@@ -497,7 +512,7 @@ Deploy this checklist before going to production:
 
 ## What's Next
 
-You now have a concrete mitigation for every OWASP Top 10 for LLM Applications v2.0 vulnerability: guardrails middleware for prompt injection and sensitive data, HITL for excessive agency, postcall evaluation for system prompt leakage, RAG pipeline validation for vector embedding weaknesses, auto-evaluation for misinformation, and telemetry for unbounded consumption. Deploy the security checklist above before going to production, then schedule quarterly reviews.
+You now have a concrete mitigation for every OWASP Top 10 for LLM Applications v2.0 vulnerability: guardrails middleware for prompt injection and sensitive data, HITL for excessive agency, model-based output filtering for system prompt leakage, RAG pipeline metadata filtering for vector embedding weaknesses, auto-evaluation for misinformation, and telemetry for unbounded consumption. Deploy the security checklist above before going to production, then schedule quarterly reviews.
 
 For deeper coverage of specific areas:
 

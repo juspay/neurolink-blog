@@ -134,35 +134,45 @@ import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// Middleware is configured separately through the MiddlewareFactory:
-const abTestMiddleware = new MiddlewareFactory({
-  middlewareConfig: {
-    analytics: { enabled: true },
-    autoEvaluation: {
-      enabled: true,
-      config: { threshold: 7, blocking: false }, // Non-blocking for A/B
-    },
-  },
-});
-
 async function abTestPrompt(
   product: Product,
   variants: PromptVersion[]
 ): Promise<ABTestResult> {
   const results = await Promise.all(
     variants.map(async (variant) => {
+      // The score never lands on the object generate() returns -- capture it
+      // via the autoEvaluation middleware's onEvaluationComplete callback
+      // instead. `blocking: true` is required here (not just for safety):
+      // it makes generate() await the evaluation, so the callback has
+      // already run by the time the score is read below.
+      let evaluationScore = 0;
+
       const result = await neurolink.generate({
         input: { text: variant.template(product) },
         provider: 'anthropic',
         model: 'claude-sonnet-4-5-20250929',
         systemPrompt: variant.systemPrompt,
-        middleware: abTestMiddleware,
+        middleware: {
+          middlewareConfig: {
+            analytics: { enabled: true },
+            autoEvaluation: {
+              enabled: true,
+              config: {
+                threshold: 7,
+                blocking: true,
+                onEvaluationComplete: (evaluation) => {
+                  evaluationScore = evaluation.overall ?? 0;
+                },
+              },
+            },
+          },
+        },
       });
 
       return {
         version: variant.version,
         content: result.content,
-        evaluationScore: result.evaluationResult?.finalScore ?? 0,
+        evaluationScore,
         tokenUsage: result.usage,
       };
     })
@@ -178,7 +188,7 @@ async function abTestPrompt(
 }
 ```
 
-The A/B test runs both prompt variants against the same input, scores each output using auto-evaluation, and ranks them. The `blocking: false` setting ensures that evaluation failures do not prevent responses from being returned -- you want data, not hard failures during testing.
+The A/B test runs both prompt variants against the same input, scores each output using auto-evaluation, and ranks them. Middleware is a plain options object passed via the `middleware` field on `generate()` -- there is no `MiddlewareFactory` instance to construct separately.
 
 A few important considerations for prompt A/B testing:
 
@@ -200,12 +210,19 @@ async function evaluatePromptChange(
 ): Promise<PromptChangeReport> {
   const neurolink = new NeuroLink();
 
-  // Auto-evaluation middleware is configured separately through the MiddlewareFactory:
-  const qualityGateMiddleware = new MiddlewareFactory({
+  // Build a fresh middleware config per call: like the A/B test above, the
+  // score is only available through onEvaluationComplete, so each parallel
+  // generate() call needs its own closure variable to avoid a race.
+  const qualityGateMiddleware = (onScore: (score: number) => void) => ({
     middlewareConfig: {
       autoEvaluation: {
         enabled: true,
-        config: { threshold: 7, blocking: true },
+        config: {
+          threshold: 7,
+          blocking: true,
+          onEvaluationComplete: (evaluation: { overall: number }) =>
+            onScore(evaluation.overall ?? 0),
+        },
       },
     },
   });
@@ -215,29 +232,31 @@ async function evaluatePromptChange(
 
   const comparisons = await Promise.all(
     testCases.map(async (testCase) => {
-      const [oldResult, newResult] = await Promise.all([
+      let oldScore = 0;
+      let newScore = 0;
+
+      await Promise.all([
         neurolink.generate({
           input: { text: oldPrompt.template(testCase.input) },
           systemPrompt: oldPrompt.systemPrompt,
           provider: 'anthropic',
           model: 'claude-sonnet-4-5-20250929',
-          middleware: qualityGateMiddleware,
+          middleware: qualityGateMiddleware((score) => (oldScore = score)),
         }),
         neurolink.generate({
           input: { text: newPrompt.template(testCase.input) },
           systemPrompt: newPrompt.systemPrompt,
           provider: 'anthropic',
           model: 'claude-sonnet-4-5-20250929',
-          middleware: qualityGateMiddleware,
+          middleware: qualityGateMiddleware((score) => (newScore = score)),
         }),
       ]);
 
       return {
         testCase: testCase.name,
-        oldScore: oldResult.evaluationResult?.finalScore ?? 0,
-        newScore: newResult.evaluationResult?.finalScore ?? 0,
-        improved: (newResult.evaluationResult?.finalScore ?? 0) >
-                  (oldResult.evaluationResult?.finalScore ?? 0),
+        oldScore,
+        newScore,
+        improved: newScore > oldScore,
       };
     })
   );
@@ -334,11 +353,12 @@ Track these metrics per prompt version:
 Use the analytics middleware to attribute costs to specific prompt versions:
 
 ```typescript
-const analyticsMiddleware = new MiddlewareFactory({
+// Pass this plain options object via the `middleware` field on generate():
+const analyticsMiddleware = {
   middlewareConfig: {
     analytics: { enabled: true },
   },
-});
+};
 
 // After generation, result.usage contains:
 // { input: tokenCount, output: tokenCount, total: tokenCount }

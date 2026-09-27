@@ -14,8 +14,8 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Build a production content pipeline that generates 10K+ AI descriptions daily
-  while keeping costs under control with NeuroLink.
+  Design a cost-aware NeuroLink pipeline for a 10K-description daily target,
+  with bounded concurrency, caching, quality scoring, and tiered retries.
 toc: true
 mermaid: true
 pin: false
@@ -25,7 +25,7 @@ image:
   alt: 'Generating 10,000 Descriptions a Day: Cost-Optimized Content Pipelines'
 ---
 
-We designed a content pipeline that generates 10,000 product descriptions per day at a cost under $50. This deep dive examines the model tiering strategy (which tasks warrant GPT-4 vs. Gemini Flash), the caching layer that eliminates 40% of redundant generations, the quality scoring pipeline that catches bad outputs before they reach production, and the concurrency controls that prevent rate limit storms.
+This post designs an illustrative content pipeline for a target of 10,000 product descriptions per day. It examines model tiering (which tasks warrant GPT-5.4 versus Gemini 2.5 Flash), a cache that avoids exact duplicate generations, a quality-scoring gate, and concurrency controls that prevent rate-limit storms. The dollar figures and pass rates in a real deployment depend on current provider pricing, token counts, prompts, and catalog mix.
 
 The business case for high-volume AI content is clear. E-commerce catalogs with thousands of SKUs, real estate platforms with hundreds of new listings daily, job boards with continuous postings, and content localization across multiple markets all need automated content at scale. But brute-force generation fails in three ways: cost explosion from using premium models for simple content, quality variance from inconsistent prompting, and zero observability into what you are spending and why.
 
@@ -41,9 +41,9 @@ flowchart LR
     CACHE -->|"Yes"| CACHED(["Cached Result"])
     CACHE -->|"No"| TIER{"Cost Tier<br/>Selection"}
 
-    TIER --> FAST["Tier 1: Fast/Cheap<br/>GPT-4o-mini, Gemini Flash"]
-    TIER --> BALANCED["Tier 2: Balanced<br/>GPT-4o, Claude Sonnet"]
-    TIER --> PREMIUM["Tier 3: Premium<br/>Claude Opus, GPT-4"]
+    TIER --> FAST["Tier 1: Fast<br/>GPT-5.4 Nano, Gemini 2.5 Flash"]
+    TIER --> BALANCED["Tier 2: Balanced<br/>GPT-5.4 Mini, Claude Sonnet 5"]
+    TIER --> PREMIUM["Tier 3: Premium<br/>Claude Opus 5, GPT-5.4"]
 
     FAST & BALANCED & PREMIUM --> EVAL["Auto-Evaluation<br/>Quality Score"]
     EVAL -->|"Score >= 7"| OUTPUT(["Published Content"])
@@ -69,26 +69,28 @@ const neurolink = new NeuroLink();
 // Use the models CLI to find cost-effective models
 // neurolink models search --use-case creative --max-cost 0.01
 // neurolink models best --creative --cost-effective
-// neurolink models compare gpt-4o-mini claude-3-haiku gemini-2.0-flash
+// neurolink models compare gpt-5.4-mini claude-haiku-4-5-20251001 gemini-2.5-flash
 ```
 
-Here is a cost comparison for content generation models:
+A current tiering plan can use these in-catalog models:
 
-| Model | Provider | Input Cost/1M tokens | Output Cost/1M tokens | Quality Rating | Best For |
-|---|---|---|---|---|---|
-| GPT-4o-mini | OpenAI | $0.15 | $0.60 | Good | Simple descriptions, short-form |
-| Gemini 2.0 Flash | Google AI | $0.10 | $0.40 | Good | High-volume, fast turnaround |
-| GPT-4o | OpenAI | $2.50 | $10.00 | Excellent | Complex, nuanced content |
-| Claude Sonnet | Anthropic | $3.00 | $15.00 | Excellent | Detailed, structured content |
-| Claude Opus | Anthropic | $15.00 | $75.00 | Premium | Complex reasoning, premium quality |
+| Tier | Model | Provider | Best For |
+|---|---|---|---|
+| Fast | GPT-5.4 Nano | OpenAI | Short, structurally simple descriptions |
+| Fast | Gemini 2.5 Flash | Google AI | High-volume first passes |
+| Balanced | GPT-5.4 Mini | OpenAI | Descriptions that need more nuance |
+| Balanced | Claude Sonnet 5 | Anthropic | Detailed, structured content |
+| Premium | Claude Opus 5 or GPT-5.4 | Anthropic or OpenAI | Items that fail the lower-tier quality gate |
 
-For a 10K daily pipeline with an average of 500 tokens per description (input + output), the cost difference between tiers is significant:
+Provider prices change, so calculate rather than hard-code the daily estimate. For each tier, multiply its input and output token totals by the provider's current rates, then add the evaluation and retry costs. The blended total is the sum across tiers:
 
-- **Tier 1 (GPT-4o-mini)**: ~$3.75/day
-- **Tier 2 (GPT-4o)**: ~$62.50/day
-- **Tier 3 (Claude Opus)**: ~$450/day
+```text
+daily cost = sum(tier input tokens * current input rate
+               + tier output tokens * current output rate)
+             + evaluation cost
+```
 
-If 85% of items pass on Tier 1, 12% need Tier 2, and 3% need Tier 3, your blended daily cost is approximately $14 -- dramatically lower than running everything on Tier 2 or Tier 3.
+Measure the pass rate for your own catalog before setting a budget. A pipeline saves money only when enough items pass on the lower tiers to offset evaluation and retry calls.
 
 ## Batching Strategy: Processing Items Efficiently
 
@@ -136,7 +138,7 @@ async function generateDescriptions(items: Product[]): Promise<Description[]> {
         neurolink.generate({
           input: { text: buildPrompt(item) },
           provider: 'openai',
-          model: 'gpt-4o-mini',
+          model: 'gpt-5.4-mini',
           systemPrompt: 'You are a product copywriter. Write compelling, SEO-friendly descriptions.',
         })
       )
@@ -145,7 +147,7 @@ async function generateDescriptions(items: Product[]): Promise<Description[]> {
     results.push(...batchResults.map((r, idx) => ({
       id: batch[idx].id,
       content: r.content,
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       tokensUsed: r.usage.total,
     })));
 
@@ -208,18 +210,18 @@ You cannot optimize what you do not measure. NeuroLink's analytics middleware tr
 ```typescript
 const neurolink = new NeuroLink();
 
-// Analytics middleware is configured separately through the MiddlewareFactory:
-// const middleware = new MiddlewareFactory({
-//   middlewareConfig: {
-//     analytics: { enabled: true },
-//   },
-// });
+const result = await neurolink.generate({
+  input: { text: buildPrompt(product) },
+  provider: 'openai',
+  model: 'gpt-5.4-mini',
+  enableAnalytics: true,
+});
 
-// Analytics tracks per-request:
-// - Token usage (input + output)
-// - Response time
-// - Provider and model used
-// Access via result.experimental_providerMetadata.neurolink.analytics
+// GenerateResult exposes per-request fields directly:
+console.log(result.usage);        // input, output, total
+console.log(result.responseTime);
+console.log(result.provider, result.model);
+console.log(result.analytics);
 ```
 
 Build a cost dashboard from the analytics data:
@@ -233,20 +235,19 @@ interface CostReport {
   tierBreakdown: Record<string, { count: number; cost: number }>;
 }
 
-function buildCostReport(results: Description[]): CostReport {
-  const tierCosts: Record<string, number> = {
-    'gpt-4o-mini': 0.00075,    // per 1K tokens (blended)
-    'gpt-4o': 0.00625,
-    'claude-sonnet-4-5-20250929': 0.009,
-    'claude-opus-4-6': 0.045,
-  };
-
+function buildCostReport(
+  results: Description[],
+  blendedRatesPer1K: Readonly<Record<string, number>>,
+): CostReport {
   const tierBreakdown: Record<string, { count: number; cost: number }> = {};
   let totalTokens = 0;
   let totalCost = 0;
 
   for (const result of results) {
-    const costPer1K = tierCosts[result.model] || 0.005;
+    const costPer1K = blendedRatesPer1K[result.model];
+    if (costPer1K === undefined) {
+      throw new Error(`Missing current rate for ${result.model}`);
+    }
     const cost = (result.tokensUsed / 1000) * costPer1K;
 
     totalTokens += result.tokensUsed;
@@ -293,35 +294,29 @@ Auto-evaluation is the mechanism that makes tiered model selection work. Every g
 ```typescript
 const neurolink = new NeuroLink();
 
-// Auto-evaluation middleware is configured separately through the MiddlewareFactory:
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    autoEvaluation: {
-      enabled: true,
-      config: {
-        threshold: 7,
-        blocking: true,
-        onEvaluationComplete: async (evalResult) => {
-          if (!evalResult.isPassing) {
-            await logLowQuality(evalResult);
-          }
-        },
-      },
-    },
-  },
+const result = await neurolink.generate({
+  input: { text: buildPrompt(product) },
+  provider: 'openai',
+  model: 'gpt-5.4-mini',
+  enableEvaluation: true,
+  evaluationDomain: 'e-commerce product descriptions',
 });
+
+if (result.evaluation && result.evaluation.overall < 7) {
+  await logLowQuality(result.evaluation);
+}
 ```
 
-The evaluation checks multiple dimensions:
+The evaluation result exposes three component scores and an overall score:
 
-- **Relevance**: Does the description match the product attributes?
+- **Relevance**: Does the description address the requested product?
 - **Accuracy**: Are the claims factually correct?
-- **Completeness**: Does it cover all key features?
-- **Style**: Does it match the brand voice and tone?
+- **Completeness**: Does it cover the requested information?
+- **Overall**: The combined quality score used by the retry gate
 
 Set different thresholds for different content types. Product descriptions for your homepage might require a score of 8+, while bulk catalog entries might accept a 6+.
 
-> **Note:** Evaluation tokens add to your total cost. For 10K items, evaluation might add 15-20% to your token usage. Factor this into your cost calculations.
+> **Note:** Evaluation is an additional model call, so its input and output tokens add to your total cost. Measure that overhead with your evaluator and prompts rather than assuming a fixed percentage.
 {: .prompt-warning }
 
 ## Token Cost Distribution
@@ -352,9 +347,9 @@ async function generateWithFallback(
   tier: 'fast' | 'balanced' | 'premium' = 'fast'
 ): Promise<string> {
   const models = {
-    fast: { provider: 'openai', model: 'gpt-4o-mini' },
-    balanced: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-    premium: { provider: 'anthropic', model: 'claude-opus-4-6' },
+    fast: { provider: 'openai', model: 'gpt-5.4-nano' },
+    balanced: { provider: 'anthropic', model: 'claude-sonnet-5' },
+    premium: { provider: 'anthropic', model: 'claude-opus-5' },
   };
 
   const config = models[tier];
@@ -362,12 +357,14 @@ async function generateWithFallback(
     input: { text: buildPrompt(item) },
     provider: config.provider,
     model: config.model,
+    enableEvaluation: true,
+    evaluationDomain: 'e-commerce product descriptions',
   });
 
   // Check quality score
-  if (result.evaluationResult?.finalScore < 7 && tier !== 'premium') {
+  if (result.evaluation && result.evaluation.overall < 7 && tier !== 'premium') {
     const nextTier = tier === 'fast' ? 'balanced' : 'premium';
-    console.log(`Item ${item.id}: Score ${result.evaluationResult?.finalScore}, escalating to ${nextTier}`);
+    console.log(`Item ${item.id}: Score ${result.evaluation.overall}, escalating to ${nextTier}`);
     return generateWithFallback(item, nextTier);
   }
 
@@ -375,13 +372,13 @@ async function generateWithFallback(
 }
 ```
 
-In practice, the distribution typically looks like:
+Track the observed distribution across three buckets:
 
-- **85% Tier 1**: Simple products with clear attributes (shoes, basic electronics, standard apparel)
-- **12% Tier 2**: Products needing nuanced descriptions (luxury goods, technical equipment)
-- **3% Tier 3**: Complex products requiring detailed reasoning (industrial machinery, specialized tools)
+- **Tier 1**: Simple products with clear attributes (shoes, basic electronics, standard apparel)
+- **Tier 2**: Products needing nuanced descriptions (luxury goods, technical equipment)
+- **Tier 3**: Complex products requiring detailed reasoning (industrial machinery, specialized tools)
 
-This distribution means your effective cost is heavily weighted toward Tier 1 pricing.
+The effective cost is weighted toward Tier 1 only if your measured first-pass rate is high. Record the rate by category rather than assuming a universal split.
 
 ## Caching: Avoiding Duplicate Generation
 
@@ -427,13 +424,9 @@ async function generateWithCache(item: Product): Promise<string> {
 }
 ```
 
-NeuroLink supports multiple caching backends depending on your scale:
+The `Map` above is a simple in-process cache for one worker. NeuroLink also exports an `InMemoryCacheStore` for server response caching, but it does not ship file or Redis cache stores. For a multi-worker production pipeline, adapt your own durable or distributed cache behind the same `get`/`set` boundary.
 
-- **Memory cache**: Simple in-process cache, good for single-run pipelines
-- **File cache**: Persistent across runs, good for development and testing
-- **Redis cache**: Distributed, good for production with multiple workers
-
-For a 10K daily pipeline, even a 10% cache hit rate saves 1,000 API calls per day.
+At a 10% cache hit rate, a 10K-item workload would avoid 1,000 generation calls. Treat that as a sizing example; measure the actual hit rate for your catalog.
 
 ## Observability: OpenTelemetry Integration
 
@@ -465,18 +458,18 @@ Key metrics to monitor in your pipeline dashboard:
 
 Before deploying your pipeline, walk through this checklist:
 
-1. **Use the cheapest model that meets quality thresholds.** Do not default to GPT-4o for everything. Test GPT-4o-mini and Gemini Flash first.
+1. **Use the cheapest model that meets quality thresholds.** Do not default to GPT-5.4 for everything. Test GPT-5.4 Mini and Gemini 2.5 Flash first.
 2. **Cache aggressively for similar products.** Hash your prompts and skip generation for duplicates.
 3. **Batch requests to amortize overhead.** Network latency per request adds up at 10K scale.
 4. **Monitor token usage per content type.** Some product categories may need longer descriptions (more tokens) than others.
 5. **Set up alerts for cost anomalies.** A prompt change that increases output length by 50% doubles your output token cost.
 6. **Use shorter system prompts to reduce input tokens.** Every token in your system prompt is charged on every request.
 7. **Run evaluation in non-blocking mode for lower tiers.** Only block on evaluation for Tier 2 and above.
-8. **Schedule heavy processing during off-peak hours.** Some providers offer better latency during off-peak times.
+8. **Schedule around measured provider capacity.** Use your latency and rate-limit telemetry to choose processing windows.
 
 ## What's Next
 
-The architecture decisions we have described represent trade-offs that worked for our scale and constraints. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
+The architecture decisions described here are trade-offs to weigh against your own scale and constraints, not a fixed prescription. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
 
 ---
 

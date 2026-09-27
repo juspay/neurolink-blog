@@ -113,28 +113,26 @@ Four components make an agent:
 
 Tools give your agent its capabilities. Without tools, it is just a chatbot. With tools, it can search the web, read files, query databases, send emails, and interact with any API. You will register tools in two ways.
 
-### Tool registration via constructor
+### Tool registration via `registerTool()`
 
-The recommended approach is registering tools in the NeuroLink constructor. These tools are available for every `generate()` and `stream()` call:
+The recommended approach is registering tools on the NeuroLink instance with `registerTool()`, once at startup. These tools are available for every `generate()` and `stream()` call:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 import { z } from 'zod';
-import { tool } from 'ai';
 
-const neurolink = new NeuroLink({
-  toolRegistry: {
-    web_search: tool({
-      description: 'Search the web for current information. Use when you need facts, data, or recent events.',
-      parameters: z.object({
-        query: z.string().describe('Search query'),
-        maxResults: z.number().optional().describe('Maximum results to return')
-      }),
-      execute: async ({ query, maxResults = 5 }) => {
-        const results = await searchAPI.search(query, maxResults);
-        return results.map(r => ({ title: r.title, snippet: r.snippet, url: r.url }));
-      }
-    }),
+const neurolink = new NeuroLink();
+
+neurolink.registerTool('web_search', {
+  name: 'web_search',
+  description: 'Search the web for current information. Use when you need facts, data, or recent events.',
+  inputSchema: z.object({
+    query: z.string().describe('Search query'),
+    maxResults: z.number().optional().describe('Maximum results to return')
+  }),
+  execute: async ({ query, maxResults = 5 }) => {
+    const results = await searchAPI.search(query, maxResults);
+    return results.map(r => ({ title: r.title, snippet: r.snippet, url: r.url }));
   }
 });
 ```
@@ -142,7 +140,7 @@ const neurolink = new NeuroLink({
 Each tool has three parts:
 
 - **`description`**: A natural language description that tells the LLM when and how to use the tool. Be specific -- "Search the web for current information" is better than "Search."
-- **`parameters`**: A Zod schema that defines the tool's input. The LLM generates arguments that match this schema. Zod's `.describe()` method adds parameter-level documentation.
+- **`inputSchema`**: A Zod schema that defines the tool's input. The LLM generates arguments that match this schema. Zod's `.describe()` method adds parameter-level documentation.
 - **`execute`**: An async function that performs the action and returns the result. The return value is fed back to the LLM as context for the next reasoning step.
 
 ### Registering multiple tools
@@ -150,37 +148,40 @@ Each tool has three parts:
 Your agent becomes powerful when it has multiple complementary tools. Here is how you register a tool set for a research agent:
 
 ```typescript
-const neurolink = new NeuroLink({
-  toolRegistry: {
-    web_search: tool({
-      description: 'Search the web for information on a topic',
-      parameters: z.object({
-        query: z.string().describe('Search query'),
-      }),
-      execute: async ({ query }) => {
-        return await searchAPI.search(query);
-      }
-    }),
-    read_url: tool({
-      description: 'Read the full content of a web page given its URL',
-      parameters: z.object({
-        url: z.string().url().describe('URL to read'),
-      }),
-      execute: async ({ url }) => {
-        return await fetchAndParse(url);
-      }
-    }),
-    save_note: tool({
-      description: 'Save a research note with a title and content',
-      parameters: z.object({
-        title: z.string().describe('Note title'),
-        content: z.string().describe('Note content with citations'),
-      }),
-      execute: async ({ title, content }) => {
-        await notesDB.save({ title, content, timestamp: Date.now() });
-        return { saved: true, title };
-      }
-    }),
+const neurolink = new NeuroLink();
+
+neurolink.registerTool('web_search', {
+  name: 'web_search',
+  description: 'Search the web for information on a topic',
+  inputSchema: z.object({
+    query: z.string().describe('Search query'),
+  }),
+  execute: async ({ query }) => {
+    return await searchAPI.search(query);
+  }
+});
+
+neurolink.registerTool('read_url', {
+  name: 'read_url',
+  description: 'Read the full content of a web page given its URL',
+  inputSchema: z.object({
+    url: z.string().url().describe('URL to read'),
+  }),
+  execute: async ({ url }) => {
+    return await fetchAndParse(url);
+  }
+});
+
+neurolink.registerTool('save_note', {
+  name: 'save_note',
+  description: 'Save a research note with a title and content',
+  inputSchema: z.object({
+    title: z.string().describe('Note title'),
+    content: z.string().describe('Note content with citations'),
+  }),
+  execute: async ({ title, content }) => {
+    await notesDB.save({ title, content, timestamp: Date.now() });
+    return { saved: true, title };
   }
 });
 ```
@@ -193,14 +194,14 @@ For dynamic tools that vary by request, pass them in the `tools` option of `gene
 const result = await neurolink.generate({
   input: { text: 'Analyze this dataset' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   tools: {
     query_database: dynamicQueryTool,
   },
 });
 ```
 
-Use constructor registration for persistent tools (web search, file operations) and per-call registration for request-specific tools (database queries with specific connection strings).
+Use `registerTool()` for persistent tools (web search, file operations) and per-call registration for request-specific tools (database queries with specific connection strings).
 
 ## Your first agent: A research assistant
 
@@ -263,7 +264,7 @@ Next, you will add real-time feedback using `stream()` instead of `generate()`. 
 const result = await neurolink.stream({
   input: { text: 'Analyze our Q4 sales data and create a report' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 for await (const chunk of result.stream) {
@@ -275,7 +276,7 @@ for await (const chunk of result.stream) {
 // Monitor tool execution events
 for await (const event of result.toolEvents) {
   if (event.type === 'tool:start') {
-    console.log(`[Agent is using: ${event.toolName}]`);
+    console.log(`[Agent is using: ${event.tool}]`);
   }
 }
 ```
@@ -345,7 +346,7 @@ Tools fail. APIs return errors. Files go missing. You will handle this by return
 ```typescript
 const web_search = tool({
   description: 'Search the web',
-  parameters: z.object({ query: z.string() }),
+  inputSchema: z.object({ query: z.string() }),
   execute: async ({ query }) => {
     try {
       const results = await searchAPI.search(query);
@@ -370,7 +371,7 @@ The same agent definition works across every provider NeuroLink supports. Your t
 const openaiResult = await neurolink.generate({
   input: { text: goal },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 const anthropicResult = await neurolink.generate({
@@ -390,8 +391,8 @@ Tips for choosing the right model for agentic workloads:
 
 | Use Case | Recommended Models | Why |
 |----------|-------------------|-----|
-| Complex multi-step tasks | Claude Sonnet 4.5, GPT-4o | Best reasoning for tool selection |
-| Fast, simple tool use | Gemini 2.5 Flash, GPT-4o-mini | Low latency, cost-effective |
+| Complex multi-step tasks | Claude Sonnet 4.5, GPT-5.4 | Best reasoning for tool selection |
+| Fast, simple tool use | Gemini 2.5 Flash, GPT-5.4-mini | Low latency, cost-effective |
 | Deep reasoning + tools | o3, Claude with extended thinking | For tasks requiring planning |
 
 ## Production considerations

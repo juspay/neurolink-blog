@@ -23,7 +23,7 @@ image:
   alt: 'Diagram showing three voice stream topologies: STT audio-to-text, TTS text-to-audio, and full-duplex bidirectional realtime flow.'
 ---
 
-We designed NeuroLink's `ChunkedAudioStream` because our first real-time voice demos with ElevenLabs were collapsing under load. A fast text-to-speech (TTS) provider generating audio chunks faster than a client's network could consume them would lead to uncontrolled buffer growth, memory exhaustion, and dropped WebSocket connections. We needed a stream primitive that understood backpressure natively, queuing data when downstream consumers were busy and draining it gracefully when they were ready. This became the foundation for all three of our voice topologies: speech-to-text, text-to-speech, and full-duplex conversational agents.
+We designed NeuroLink's `ChunkedAudioStream` to solve a structural problem in real-time voice streaming: a fast text-to-speech (TTS) provider generating audio chunks faster than a client's network can consume them will otherwise cause uncontrolled buffer growth, memory exhaustion, and dropped WebSocket connections. We needed a stream primitive that understood backpressure natively, queuing data when downstream consumers were busy and draining it gracefully when they were ready. This became the foundation for all three of our voice topologies: speech-to-text, text-to-speech, and full-duplex conversational agents.
 
 While our provider abstraction pattern is a good starting point, the engineering required for robust voice streaming runs much deeper. This post dives into the audio-specific architecture: the stream primitives, the full-duplex state machine, codec handling, and the subtle but critical differences between providers like OpenAI and Gemini.
 
@@ -68,7 +68,7 @@ graph TD
 
 The foundation of our voice system is `stream-handler.ts`. It knows nothing about audio formats or AI providers; it only knows how to move buffers of data efficiently and reliably.
 
-The core component is `ChunkedAudioStream`. It's an EventEmitter that implements a critical feature: backpressure. When a downstream consumer can't keep up, the `write()` method returns `false`, and the stream buffers subsequent data until the consumer emits a `drain` event. This prevents the memory blowouts we saw in our early prototypes. The high-water mark, which defaults to 64 KB, is the key tuning parameter.
+The core component is `ChunkedAudioStream`. It's an EventEmitter that implements a critical feature: backpressure. When a downstream consumer can't keep up, the `write()` method returns `false`, and the stream buffers subsequent data until the consumer emits a `drain` event. This prevents the memory blowouts that unbounded buffering would otherwise cause. The high-water mark, which defaults to 64 KB, is the key tuning parameter.
 
 ```typescript
 // A simplified view of the backpressure mechanism in ChunkedAudioStream
@@ -195,7 +195,7 @@ The state machine is simple and robust:
 4. **`disconnecting`**: The transient state after `disconnect()` is called.
 5. **`error`**: A terminal fault state.
 
-Any provider extending `BaseRealtimeHandler` uses the `protected emitStateChange` method to broadcast transitions to the subclass implementor. It is a `protected` hook — external consumers observe state changes via the `onStateChange` callback registered on `RealtimeEventHandlers` (via the `on(handlers)` method at `RealtimeVoiceAPI.ts:484`). This keeps the internal state machine sealed from application code while still providing a clean subscription surface.
+Any provider extending `BaseRealtimeHandler` uses the `protected emitStateChange` method to broadcast transitions to the subclass implementor. It is a `protected` hook — external consumers observe state changes via the `onStateChange` callback registered on `RealtimeEventHandlers` (via the `on(handlers)` method on `BaseRealtimeHandler`). This keeps the internal state machine sealed from application code while still providing a clean subscription surface.
 
 ## Provider Divergence: `OpenAIRealtime` vs. `GeminiLive`
 
@@ -229,10 +229,10 @@ For developers building full-fledged voice agents, we provide an integration wit
 
 ## The Provider Handlers
 
-Finally, the `src/lib/voice/providers/` directory contains the concrete implementations. We ship with handlers for a wide range of services.
+Finally, the `src/lib/voice/providers/` directory contains most of the concrete implementations. We ship with handlers for a wide range of services.
 
 - **STT Providers**: `DeepgramSTT`, `AzureSTT`, `OpenAISTT`, `GoogleSTT`. Each implements the `STTHandler` interface, which requires `transcribe`, `getSupportedFormats`, and `isConfigured`. Note that `transcribeStream` is an _optional_ method on `STTHandler` — not all providers need to implement streaming transcription, though `DeepgramSTT` does.
-- **TTS Providers**: `OpenAITTS`, `ElevenLabsTTS`, `AzureTTS`, `CartesiaTTS`, `FishAudioTTS`. Each implements the `TTSHandler` interface, centered around the `synthesize` method.
+- **TTS Providers**: `OpenAITTS`, `ElevenLabsTTS`, `AzureTTS`, `CartesiaTTS`, `FishAudioTTS` — plus `GoogleTTSHandler`, which lives in `src/lib/adapters/tts/` rather than this directory. Each implements the `TTSHandler` interface, centered around the `synthesize` method.
 - **Realtime Providers**: `OpenAIRealtime` and `GeminiLive`, which extend `BaseRealtimeHandler` as discussed.
 
 Each class is a thin adapter, responsible only for translating NeuroLink's standard models and errors into the provider's specific API format. For example, the `CartesiaTTS` handler contains logic for `mapOutputFormat` to convert our standard `TTSAudioFormat` enum into the format strings Cartesia's API expects.

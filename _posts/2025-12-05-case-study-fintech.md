@@ -127,7 +127,7 @@ import OpenAI from 'openai';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const response = await openai.chat.completions.create({
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   messages: [{ role: 'user', content: prompt }],
 });
 
@@ -138,7 +138,7 @@ const neurolink = new NeuroLink();
 
 const response = await neurolink.generate({
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
   input: { text: prompt },
 });
 ```
@@ -169,7 +169,7 @@ async function analyzeHighValueTransaction(transactionData: string) {
 async function analyzeStandardTransaction(transactionData: string) {
   return neurolink.generate({
     provider: 'anthropic',
-    model: 'claude-3-haiku-20240307',
+    model: 'claude-haiku-4-5-20251001',
     input: {
       text: `Quick fraud check for transaction: ${transactionData}`
     },
@@ -190,7 +190,7 @@ async function routeFraudCheck(transaction: { value: number; data: string }) {
 | Use Case | High Complexity | Standard | Low Complexity |
 |----------|-----------------|----------|----------------|
 | Fraud Detection | Claude Sonnet | Claude Haiku | Gemini Flash |
-| Customer Support | GPT-4 | GPT-4o-mini | Cached Response |
+| Customer Support | GPT-5.4 | GPT-5.4-mini | Cached Response |
 | Document Processing | Claude Sonnet | Claude Haiku | Gemini Flash |
 
 ### Implementing Failover
@@ -205,8 +205,8 @@ const neurolink = new NeuroLink();
 async function generateWithFailover(prompt: string) {
   const providers = [
     { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-    { provider: 'openai', model: 'gpt-4o' },
-    { provider: 'vertex', model: 'gemini-2.0-flash' },
+    { provider: 'openai', model: 'gpt-5.4' },
+    { provider: 'vertex', model: 'gemini-2.5-flash' },
   ];
 
   for (const config of providers) {
@@ -239,7 +239,7 @@ const neurolink = new NeuroLink();
 async function streamCustomerResponse(query: string) {
   const result = await neurolink.stream({
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     input: { text: query },
   });
 
@@ -258,8 +258,8 @@ async function streamCustomerResponse(query: string) {
 
 Not every request needs the most expensive model. Analyze your use cases:
 
-- **Complex reasoning**: Use capable models (Claude Sonnet, GPT-4)
-- **Simple classification**: Use efficient models (Claude Haiku, GPT-4o-mini)
+- **Complex reasoning**: Use capable models (Claude Sonnet, GPT-5.4)
+- **Simple classification**: Use efficient models (Claude Haiku, GPT-5.4-mini)
 - **High-volume, low-complexity**: Use the most cost-effective option (Gemini Flash)
 
 ### Strategy 2: Implement Application-Level Caching
@@ -282,7 +282,7 @@ async function getCachedOrGenerate(query: string) {
   // Generate new response
   const response = await neurolink.generate({
     provider: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
     input: { text: query },
   });
 

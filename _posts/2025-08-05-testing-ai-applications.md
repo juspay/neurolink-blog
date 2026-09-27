@@ -511,7 +511,7 @@ export class ChatService {
     const result = await this.provider.generate({
       input: { text: this.buildPrompt(userMessage) },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
 
     this.history.push({ role: 'assistant', content: result.content });
@@ -625,7 +625,7 @@ For configuration validation, you can use the NeuroLink CLI's `--dryRun` flag to
 
 ```bash
 # Validate configuration without making real API calls
-npx neurolink generate --provider openai --model gpt-4 --input "Test" --dryRun
+npx neurolink generate --provider openai --model gpt-5.4 --input "Test" --dryRun
 ```
 
 You can also validate your configuration programmatically:
@@ -642,7 +642,7 @@ async function validateConfig() {
     const result = await provider.generate({
       input: { text: 'Test configuration' },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
 
     console.log('Configuration is valid!');

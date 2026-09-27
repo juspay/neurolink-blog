@@ -208,7 +208,7 @@ const result = await fetchWithRetry<GenerateResult>(
   () => neurolink.generate({
     input: { text: 'Hello, world!' },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
   })
 );
 
@@ -336,7 +336,7 @@ async function analyzeSentiment(text: string): Promise<SentimentAnalysis> {
     systemPrompt: 'Analyze sentiment. Respond with JSON matching the schema.',
     schema: SentimentAnalysisSchema,
     provider: 'google-ai',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
   });
 
   // When using schema, NeuroLink validates and parses automatically

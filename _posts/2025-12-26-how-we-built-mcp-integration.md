@@ -28,9 +28,9 @@ image:
   alt: 'How We Built MCP Integration: Supporting 4 Transport Protocols'
 ---
 
-We designed NeuroLink's MCP integration to support four transport protocols -- stdio, HTTP SSE, WebSocket, and in-process -- through a single unified interface. This deep dive examines how we abstracted transport-level concerns away from tool execution, the connection lifecycle management that prevents resource leaks, and the discovery protocol that enables dynamic tool registration at runtime.
+We designed NeuroLink's MCP integration to support four transport protocols -- stdio, SSE, WebSocket, and Streamable HTTP -- through a single unified interface. This deep dive examines how we abstracted transport-level concerns away from tool execution, the connection lifecycle management that prevents resource leaks, and the discovery protocol that enables dynamic tool registration at runtime.
 
-Model Context Protocol (MCP) is the open standard for connecting AI models to external tools. NeuroLink integrates MCP so that any MCP server can be used as a tool across all 13 supported providers. But building a reliable MCP client that works across four transport protocols -- with OAuth, circuit breakers, and rate limiting -- was harder than it looked.
+Model Context Protocol (MCP) is the open standard for connecting AI models to external tools. NeuroLink integrates MCP so that any MCP server can be used as a tool across its supported model providers. But building a reliable MCP client that works across four transport protocols -- with OAuth, circuit breakers, and rate limiting -- was harder than it looked.
 
 This post traces the evolution from stdio-only MCP support to a production-grade multi-transport system. We will cover the bugs that taught us about process lifecycle, the security model we chose, and the resilience patterns that keep things running when servers crash.
 
@@ -42,7 +42,7 @@ Before diving into our implementation, here is what the MCP specification demand
 
 **Core concepts.** A Client (NeuroLink) connects to a Server (tools provider). The server declares its tools. The client discovers them, registers them with the AI provider, and executes them when the model requests a tool call.
 
-**The handshake.** The client connects via a transport, calls `initialize`, the server responds with capabilities, the client calls `listTools`, and the tools are registered. Miss any step and the tools exist but cannot be called -- exactly the bug our customer hit.
+**The handshake.** The client connects via a transport, calls `initialize`, the server responds with capabilities, the client calls `listTools`, and the tools are registered. Miss any step and the tools exist but cannot be called -- a failure mode that is easy to reproduce in an incomplete client.
 
 **Transport layer.** The MCP spec defines multiple transports. The protocol itself is transport-agnostic. The same JSON-RPC messages flow over stdio pipes, SSE streams, WebSocket frames, or HTTP requests. The transport is just the pipe.
 
@@ -64,7 +64,7 @@ It worked in demos. It failed in production.
 
 **No health monitoring.** If the server process died from an OOM kill, a crash, or a segfault, NeuroLink kept trying to call tools on a dead connection. Timeouts stacked up. Each failed tool call waited 30 seconds before timing out, and the model would often attempt multiple tool calls in sequence.
 
-**Environment variable leakage.** The spawned process inherited all of NeuroLink's environment variables, including API keys for all 13 providers. A malicious MCP server could read `process.env` and exfiltrate credentials.
+**Environment variable leakage.** The spawned process inherited all of NeuroLink's environment variables, including configured provider API keys. A malicious MCP server could read `process.env` and exfiltrate credentials.
 
 > **Note:** The environment variable leakage issue was particularly concerning for enterprise deployments where MCP servers might come from third-party vendors.
 {: .prompt-info }
@@ -81,11 +81,11 @@ The `ExternalServerManager` (source: `src/lib/mcp/externalServerManager.ts`) bec
 
 ### Lifecycle management
 
-The manager provides three core methods for controlling server lifecycle:
+The manager provides three core lifecycle paths:
 
-- **`loadServer(config)`** spawns the process, creates the client, performs the handshake, and discovers tools
-- **`unloadServer(serverId)`** performs graceful shutdown: close the client, close the transport, send SIGTERM, wait 5 seconds, then SIGKILL if still running
-- **`unloadAllServers()`** is called on process exit to clean up all running servers
+- **`addServer(serverId, config)`** creates the client, starts the configured transport, performs the handshake, and discovers tools
+- **`removeServer(serverId)`** stops the server, clears health and restart timers, closes the client and transport, and unregisters its tools
+- **`shutdown()`** stops every managed server and is wired into process shutdown handling
 
 ### Health monitoring
 
@@ -93,7 +93,7 @@ Periodic pings detect dead connections before tool execution fails. Instead of w
 
 ### Environment variable substitution
 
-Instead of passing raw environment variables to spawned processes, the manager uses `substituteEnvVariables()` to replace `${VAR_NAME}` patterns in configuration with `process.env` values. Server configs use template syntax, keeping secrets out of the spawned process environment.
+The manager uses `substituteEnvVariables()` to replace `${VAR_NAME}` patterns in configured `env` and header values. This keeps literal credentials out of saved server configuration. It does not sandbox the process: the current stdio transport starts from the parent `process.env` and overlays the configured `env`, so run untrusted MCP servers in a separately scoped environment.
 
 ### HITL integration
 
@@ -101,7 +101,7 @@ Before executing sensitive tools, the manager checks with `HITLManager`. If the 
 
 ### Event system
 
-The manager emits lifecycle events via `EventEmitter`: `server:connected`, `server:disconnected`, `server:error`, and `tool:discovered`. These events power observability dashboards and alerting.
+The manager emits lifecycle events via `EventEmitter`, including `connected`, `disconnected`, `failed`, `statusChanged`, `healthCheck`, `toolDiscovered`, and `toolRemoved`. Applications can consume these events for observability and alerting.
 
 ---
 
@@ -199,7 +199,7 @@ const httpClient = await MCPClientFactory.createClient({
 
 ### Rate limiting
 
-The `HTTPRateLimiter` (source: `src/lib/mcp/httpRateLimiter.ts`) uses a token bucket algorithm to prevent overwhelming MCP servers. The `globalRateLimiterManager` creates per-server rate limiters with configurable `requestsPerMinute`, `maxBurst`, and `refillRate` parameters.
+The `HTTPRateLimiter` (source: `src/lib/mcp/httpRateLimiter.ts`) uses a token bucket algorithm to prevent overwhelming MCP servers. MCP server configuration accepts `requestsPerMinute`, `maxBurst`, and `useTokenBucket`; the client factory translates those settings into the rate limiter's `requestsPerWindow`, `windowMs`, `refillRate`, and `maxBurst` fields.
 
 ### Retry with exponential backoff
 
@@ -248,11 +248,11 @@ flowchart TD
 
 ### Connection with timeout
 
-The factory uses `Promise.race([client.connect(transport), timeout])` to prevent hanging on unresponsive servers. Without this, a single unresponsive MCP server could block the entire initialization sequence.
+The factory wraps `client.connect(transport)` in a timeout helper built on `Promise.race` so an unresponsive server cannot block initialization indefinitely.
 
 ### Test connection
 
-The `testConnection(config, timeout)` method creates a temporary client, verifies connectivity, then cleans up. The setup CLI uses this to validate MCP server configurations before saving them.
+The `testConnection(config, timeout)` method creates a temporary client, verifies connectivity, then cleans up. It can be used to validate MCP server configurations before saving them.
 
 ### Validation
 
@@ -325,7 +325,7 @@ The `CircuitBreakerManager` creates and retrieves per-server circuit breakers by
 | `failureThreshold` | 5 | Open circuit after 5 failures |
 | `resetTimeout` | 60000ms | Try half-open after 60 seconds |
 | `halfOpenMaxCalls` | 3 | Allow 3 test calls in half-open state |
-| `operationTimeout` | 30000ms | Per-operation timeout |
+| `operationTimeout` | 60000ms | Per-operation timeout |
 | `statisticsWindowSize` | 300000ms | Track stats over 5-minute windows |
 
 ---
@@ -343,29 +343,32 @@ The `ToolDiscoveryService` (source: `src/lib/mcp/toolDiscoveryService.ts`) calls
 MCP tools declare `inputSchema` as JSON Schema. The `ToolsManager` (source: `src/lib/core/modules/ToolsManager.ts`) wraps these schemas with `jsonSchema()` from the Vercel AI SDK for provider compatibility. For OpenAI strict mode, `fixSchemaForOpenAIStrictMode()` patches the schema to meet OpenAI's stricter requirements.
 
 ```typescript
-// Inside ToolsManager.processExternalMCPTools()
+// Simplified from ToolsManager.processExternalMCPTools()
 const externalTools = await this.neurolink.getExternalMCPTools();
 
 for (const tool of externalTools) {
-  // Convert MCP JSON Schema to AI SDK format
-  const finalSchema = tool.inputSchema
-    ? jsonSchema(fixSchemaForOpenAIStrictMode(tool.inputSchema))
-    : z.object({});
+  if (tools[tool.name]) continue;
+
+  const fixedSchema = tool.inputSchema
+    ? this.utilities.fixSchemaForOpenAIStrictMode(tool.inputSchema)
+    : {};
+  const inputSchema = tool.inputSchema
+    ? jsonSchema(fixedSchema)
+    : this.utilities.createPermissiveZodSchema();
 
   tools[tool.name] = createAISDKTool({
     description: tool.description || `External MCP tool ${tool.name}`,
-    parameters: finalSchema,
+    inputSchema,
     execute: async (params) => {
-      // Event emission for observability
-      emitter.emit('tool:start', { tool: tool.name, input: params });
+      this.emitToolEvent('tool:start', tool.name, { input: params });
 
       const result = await this.neurolink.executeExternalMCPTool(
-        tool.serverId,
+        tool.serverId || 'unknown',
         tool.name,
         params,
       );
 
-      emitter.emit('tool:end', { tool: tool.name, result });
+      this.emitToolEvent('tool:end', tool.name, { result, success: true });
       return result;
     },
   });
@@ -408,38 +411,34 @@ Every layer adds protection. The circuit breaker prevents hammering a dead serve
 
 ---
 
-## Benchmarks and Production Metrics
+## What to Measure in Production
 
-We track performance across all four transports in production at Juspay.
+Transport performance depends on process startup, network distance, authentication, server load, and the tool itself. Rather than treating one environment's latency as a universal benchmark, instrument each layer separately.
 
-### Connection time (p50 / p95)
+### Connection measurements
 
-| Transport | p50 | p95 | Notes |
-|---|---|---|---|
-| stdio | 180ms | 420ms | Process spawn + handshake |
-| SSE | 95ms | 310ms | HTTP connection + SSE setup |
-| WebSocket | 110ms | 350ms | WebSocket upgrade + handshake |
-| HTTP | 85ms | 280ms | Single HTTP request + handshake |
+Track connection and handshake latency by transport, including percentiles rather than only averages. For stdio, separate process startup from MCP initialization. For SSE, WebSocket, and HTTP, also record DNS, TLS, authentication, and reconnect time where available.
 
 ### Tool execution overhead
 
-NeuroLink adds minimal overhead per tool call (not including actual tool execution time):
+Measure NeuroLink-side work independently from the external tool's execution time:
 
-| Operation | Latency |
-|---|---|
-| Event emission | 0.08ms |
-| Schema validation | 0.3ms |
-| Result serialization | 0.15ms |
-| **Total NeuroLink overhead** | **~0.5ms** |
+- Schema validation and tool-call repair
+- Event and trace emission
+- Request and result serialization
+- Rate-limiter queue time
+- Circuit-breaker rejections and operation timeouts
 
-### Circuit breaker recovery
+### Recovery and reliability
 
-- **Mean time to detect failure:** 2.1 seconds (5 failures at ~420ms average timeout)
-- **Mean time to recovery detection:** 61 seconds (resetTimeout + first half-open success)
+Useful service-level indicators include:
 
-### Reliability
+- Time from the first failed call until the breaker opens
+- Time from the reset window until the first successful half-open call
+- Successful tool executions divided by total attempts, segmented by server and transport
+- Reconnect attempts, health-check failures, timeout rates, and rate-limit wait time
 
-99.94% successful tool executions across 50,000 calls per day in production (Juspay internal).
+Publish benchmark numbers only with the workload, region, server implementation, sample size, and measurement window so readers can reproduce the comparison.
 
 ---
 
@@ -449,19 +448,19 @@ Building MCP integration across four transports taught us several things the har
 
 **1. Process lifecycle is the hard part.** Spawning a process is easy. Cleaning it up reliably across crashes, signals, and unexpected exits is the real engineering challenge. SIGTERM, wait, SIGKILL is not elegant, but it is reliable.
 
-**2. OAuth adds 10x complexity.** Token refresh, PKCE challenges, secure storage, and expiration handling turn a simple HTTP client into a state machine. If you are building MCP server integration, budget time for OAuth.
+**2. OAuth adds substantial complexity.** Token refresh, PKCE challenges, secure storage, and expiration handling turn a simple HTTP client into a state machine. If you are building MCP server integration, budget time for OAuth.
 
 **3. Circuit breakers are essential for external dependencies.** Without them, one crashed MCP server degrades the entire system. Fast failure is better than slow failure.
 
-**4. Transport abstraction pays off.** Adding WebSocket support took one day because the transport layer was already abstracted. The protocol (JSON-RPC) is the same across all transports. The investment in the factory pattern paid for itself immediately.
+**4. Transport abstraction pays off.** A shared client factory keeps protocol handling independent from the transport-specific setup. The same JSON-RPC protocol flows through each transport, so adding another transport does not require rewriting tool discovery and execution.
 
-**5. Test with real servers.** Mock transports hide timing bugs, lifecycle issues, and protocol edge cases that only appear with real MCP server processes. Our test suite includes integration tests against actual MCP servers for each transport.
+**5. Test with real servers.** Mock transports hide timing bugs, lifecycle issues, and protocol edge cases that only appear with real MCP server processes. Include integration tests against representative servers for every transport you enable.
 
 ---
 
 ## What's Next
 
-The architecture decisions we have described represent trade-offs that worked for our scale and constraints. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
+These architecture decisions represent trade-offs rather than universal defaults. Start with the simplest design that handles the current load, instrument it so bottlenecks are visible before they become outages, and add abstraction when concrete transport and lifecycle requirements justify it. The implementation details will differ, but the underlying constraints -- latency budgets, failure domains, and resource contention -- are universal.
 
 ---
 

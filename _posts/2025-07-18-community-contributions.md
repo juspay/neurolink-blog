@@ -204,7 +204,7 @@ The `generate` method throws an error when using structured output with Anthropi
 const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   provider: 'anthropic',
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-5',
   input: { text: 'Return a JSON object with name and age' },
   responseFormat: { type: 'json_object' }
 });
@@ -233,13 +233,12 @@ Have an idea for improving NeuroLink? Feature requests help shape the project ro
 The NeuroLink SDK can be extended through custom tools and integrations. Here is how to create a custom tool:
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import { NeuroLink, jsonSchema } from '@juspay/neurolink';
 
 // Define a custom tool
 const weatherTool = {
-  name: 'get_weather',
   description: 'Get current weather for a location',
-  parameters: {
+  inputSchema: jsonSchema({
     type: 'object' as const,
     properties: {
       location: {
@@ -253,6 +252,24 @@ const weatherTool = {
       }
     },
     required: ['location']
+  }),
+  execute: async ({
+    location,
+    units = 'celsius'
+  }: {
+    location: string;
+    units?: 'celsius' | 'fahrenheit';
+  }) => {
+    const unitFlag = units === 'fahrenheit' ? 'u' : 'm';
+    const response = await fetch(
+      `https://wttr.in/${encodeURIComponent(location)}?format=%l:+%t,+%C&${unitFlag}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Weather lookup failed with status ${response.status}`);
+    }
+
+    return { location, units, current: await response.text() };
   }
 };
 
@@ -261,11 +278,11 @@ const neurolink = new NeuroLink();
 
 const response = await neurolink.generate({
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   input: {
     text: 'What is the weather in Tokyo?'
   },
-  tools: [weatherTool]
+  tools: { get_weather: weatherTool }
 });
 ```
 
@@ -296,7 +313,7 @@ async function reviewPullRequest(
   // Get AI-powered code review
   const review = await neurolink.generate({
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-5',
     input: {
       text: `Review this pull request diff and provide feedback on:
         1. Code quality
@@ -387,7 +404,7 @@ function processResponse(
 // Prefer const over let when values do not change
 const config = {
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 };
 
 // Use descriptive variable names
@@ -422,7 +439,7 @@ describe('NeuroLink.generate', () => {
 
     const result = await neurolink.generate({
       provider: 'openai',
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       input: { text: 'Say hello' }
     });
 

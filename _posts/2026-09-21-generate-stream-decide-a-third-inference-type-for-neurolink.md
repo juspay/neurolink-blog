@@ -60,7 +60,7 @@ The fix is one field on `ProviderDescriptor`, and it is the keystone of the whol
 inferenceKinds?: readonly ("generate" | "stream" | "decide")[];
 ```
 
-Omitting it means `["generate", "stream"]`, so all 40 existing providers keep their current meaning with no edit. This is now **the only declarative statement of provider modality in the codebase**. Before it, modality was *implied* — by `toolSupport`, by `healthCheck`, by the auto-select ranks. Anything building a generation fallback chain, running the health sweep or offering model choices now filters on `inferenceKinds` instead of special-casing a provider by name.
+Omitting it means `["generate", "stream"]`, so every other existing provider keeps its current meaning with no edit. This is now **the only declarative statement of provider modality in the codebase**. Before it, modality was *implied* — by `toolSupport`, by `healthCheck`, by the auto-select ranks. Anything building a generation fallback chain, running the health sweep or offering model choices now filters on `inferenceKinds` instead of special-casing a provider by name.
 
 It also retroactively fixed a wart. Embedding-only providers such as Voyage and Jina were forced to claim they were text providers, and implemented `getAISDKModel()` as a `throw` to cover the lie. They can now say what they are.
 
@@ -73,7 +73,13 @@ Every internal consumer calls `tryDecide()`, not `decide()`. It returns `null` o
 ```typescript
 const decision = await tryDecide({
   state: { request, estimatedTokens, hasTools },
-  questions: { model: { type: "choice", options: candidateIds } },
+  questions: {
+    model: {
+      type: "choice",
+      instructions: "Which model should serve this request?",
+      criteria: candidateCriteria,
+    },
+  },
 });
 
 if (!decision) {
@@ -136,12 +142,12 @@ Measurements from one representative request, run twice against the same prompt 
 
 | Integration | Without | With |
 | --- | --- | --- |
-| Model routing (hard prompt) | `gpt-4o-mini`, difficulty *moderate* | `gpt-4o`, difficulty *hard* |
+| Model routing (hard prompt) | `gpt-5.4-mini`, difficulty *moderate* | `gpt-5.4`, difficulty *hard* |
 | Relevance compaction | 0 messages dropped | 7 of 15 eligible dropped |
 | Tool / MCP routing | all 5 servers exposed | only `postgres` exposed |
 | RAG planning | `topK=5`, fixed | 3 for a narrow query, 13 for a broad one |
 
-Net on that request: **1,382 input tokens saved for about $0.00004 of decision cost.** Break-even is 5.2× against `gpt-4o-mini`, 86× against `gpt-4o` and 104× against `claude-sonnet` — the cheaper your generation model, the less this matters, and against a frontier model it is not close.
+Net on that request: **1,382 input tokens saved for about $0.00004 of decision cost.** Break-even is 5.2× against `gpt-5.4-mini`, 86× against `gpt-5.4` and 104× against `claude-sonnet-5` — the cheaper your generation model, the less this matters, and against a frontier model it is not close.
 
 One caveat stated plainly, because the number looks better than its evidence: the token counts for conversation history are measured, but the per-tool schema cost used in the MCP row is an estimate. Treat the MCP saving as directional.
 
@@ -207,8 +213,15 @@ const neurolink = new NeuroLink();
 const result = await neurolink.decide({
   state: "User asked to refactor a 2,000-line payment module for readability.",
   questions: {
-    difficulty: { type: "score", rubric: ["trivial", "moderate", "hard", "expert"] },
-    needsTools: { type: "noul", statement: "This task requires reading files from disk." },
+    difficulty: {
+      type: "score",
+      instructions: "How difficult is this task?",
+      criteria: ["trivial", "moderate", "hard", "expert"],
+    },
+    needsTools: {
+      type: "boolean",
+      instructions: "This task requires reading files from disk.",
+    },
   },
 });
 ```
@@ -216,8 +229,6 @@ const result = await neurolink.decide({
 Set a key and the five integrations above activate on their own. Set no key and every one of them falls back to the behaviour it had before — which is the point. You can turn this on in production and measure it before you depend on it.
 
 The provider reference is in the [NeuroLink documentation](https://docs.neurolink.ink/getting-started/providers/typesafe), and the implementation is on [GitHub](https://github.com/juspay/neurolink).
-
----
 
 ---
 

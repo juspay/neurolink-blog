@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Building AI Slack Bots with NeuroLink
+title: 'Building AI Slack Bots with NeuroLink'
 date: '2025-11-15 10:00:00 +0530'
 categories:
   - Tutorial
@@ -23,7 +23,7 @@ image:
   alt: Building AI Slack Bots with NeuroLink
 ---
 
-You will build an AI-powered Slack bot using the Slack Bolt framework and NeuroLink's generation API. By the end of this tutorial, you will have a production-ready bot that responds to natural language queries, analyzes sentiment, summarizes threads, and routes requests to the right team members.
+You will build an AI-powered Slack bot using the Slack Bolt framework and NeuroLink's generation API. By the end of this tutorial, you will have a working bot that responds to natural language queries, analyzes sentiment, summarizes text supplied to a slash command, extracts action items, and responds to message reactions.
 
 > **Tip:** This tutorial builds a custom Slack bot from scratch. NeuroLink does not provide a built-in Slack integration -- you will build the webhook handlers and event listeners yourself using Bolt, with NeuroLink handling the AI generation.
 {: .prompt-tip }
@@ -52,9 +52,9 @@ npm install -D typescript @types/node ts-node nodemon
 
 Before we begin, ensure you have:
 
-- **Node.js 20.18.1+** installed
+- **Node.js 22+** installed
 - **A Slack workspace** where you have admin permissions
-- **NeuroLink account** with API access
+- **An OpenAI API key** for the provider used in this tutorial
 - **Required packages** (see External Dependencies section above)
 - Basic familiarity with JavaScript and async/await patterns
 - A code editor of your choice
@@ -216,7 +216,7 @@ async function generateResponse(prompt, context = {}) {
           Be helpful, concise, and professional. Format responses appropriately for Slack
           using markdown when helpful. Keep responses focused and actionable.`,
       provider: 'openai',
-      model: 'gpt-4o'  // Specify model directly - NeuroLink doesn't use env vars for model selection
+      model: 'gpt-5.4'  // Specify model directly - NeuroLink doesn't use env vars for model selection
     });
 
     return result.content;
@@ -796,7 +796,7 @@ Update your `package.json` with production scripts:
 Create a `Dockerfile` for containerized deployment:
 
 ```dockerfile
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -850,9 +850,9 @@ healthServer.listen(3000, () => {
 });
 ```
 
-### Rate Limiting
+### Rate-Limiting Utility
 
-Implement rate limiting to prevent abuse:
+The handlers above do not yet enforce rate limits. This utility can be imported and called before each generation path; when it returns `false`, the handler should stop and send a user-visible retry-later response:
 
 ```javascript
 const rateLimits = new Map();
@@ -926,7 +926,7 @@ You built an AI-powered Slack bot with slash commands, conversation handling, me
 
 Remember to monitor your bot's performance, gather user feedback, and iterate on the experience. The best bots evolve based on how teams actually use them.
 
-For more advanced NeuroLink features, explore the documentation at docs.neurolink.ink. You'll find capabilities like function calling, structured outputs, and fine-tuning that can make your Slack bot even more powerful.
+For more advanced NeuroLink features, explore the documentation at docs.neurolink.ink. You'll find capabilities like function calling, structured outputs, and multi-provider fallback that can make your Slack bot even more powerful.
 
 Happy building!
 

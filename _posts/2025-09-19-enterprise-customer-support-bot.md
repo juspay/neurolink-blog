@@ -25,7 +25,6 @@ image:
   alt: Building an Enterprise Customer Support Bot That Never Goes Down
 ---
 
-
 You will build an enterprise customer support bot with 99.9% uptime using NeuroLink's multi-provider fallback, circuit breakers, rate limiting, and conversation memory. By the end of this tutorial, your bot will automatically switch providers during outages, maintain session continuity across switches, and handle zero-downtime deployments.
 
 > **Note:** The 99.9% uptime target refers specifically to the AI provider availability layer (achieved through multi-provider failover). Overall system uptime depends on all infrastructure components — databases, networking, deployment platform, and monitoring. A comprehensive SLA requires end-to-end reliability engineering beyond the AI layer.
@@ -41,7 +40,7 @@ flowchart TB
     LB --> Bot[Support Bot Service]
 
     Bot --> Primary[Primary Provider<br/>Vertex Gemini Pro]
-    Bot --> Secondary[Secondary Provider<br/>OpenAI GPT-4o]
+    Bot --> Secondary[Secondary Provider<br/>OpenAI GPT-5.4]
     Bot --> Tertiary[Tertiary Provider<br/>Bedrock Claude]
     Bot --> Emergency[Emergency Provider<br/>Ollama Local]
 
@@ -64,7 +63,7 @@ flowchart TB
     end
 ```
 
-The architecture centers on a fallback chain pattern. Each provider in the chain is wrapped in a `CircuitBreaker` that monitors its health in real time. When a provider starts failing (three consecutive failures by default), the circuit breaker "opens" and all traffic is immediately routed to the next provider in the chain. No manual intervention required.
+The architecture centers on a fallback chain pattern. Each provider in the chain is wrapped in a circuit breaker (created via `CircuitBreakerManager`) that monitors its health in real time. When a provider starts failing (three consecutive failures by default), the circuit breaker "opens" and all traffic is immediately routed to the next provider in the chain. No manual intervention required.
 
 The `CircuitBreakerManager` from NeuroLink coordinates all breakers centrally. It tracks which providers are healthy, which are in recovery (half-open state), and which are completely down. The emergency fallback to Ollama running locally ensures that even if every cloud provider is down simultaneously, customers still get responses -- perhaps slower, perhaps less sophisticated, but never silence.
 
@@ -77,11 +76,9 @@ The core of our resilience strategy is the provider cascade. Each provider gets 
 ```typescript
 import {
   AIProviderFactory,
-  CircuitBreaker,
   withRetry,
-  RateLimiter,
+  CircuitBreakerManager,
 } from '@juspay/neurolink';
-import { MCPCircuitBreaker, CircuitBreakerManager } from '@juspay/neurolink';
 
 const cbManager = new CircuitBreakerManager();
 
@@ -105,7 +102,7 @@ const bedrockBreaker = cbManager.getBreaker("bedrock", {
 async function getResponse(userMessage: string, sessionId: string) {
   const providers = [
     { name: "vertex", model: "gemini-2.5-pro", breaker: vertexBreaker },
-    { name: "openai", model: "gpt-4o", breaker: openaiBreaker },
+    { name: "openai", model: "gpt-5.4", breaker: openaiBreaker },
     { name: "bedrock", model: null, breaker: bedrockBreaker },
     { name: "ollama", model: "llama3.1:8b", breaker: null }, // No breaker for local
   ];
@@ -117,10 +114,10 @@ async function getResponse(userMessage: string, sessionId: string) {
       const execute = () => withRetry(
         () => provider.generate({
           input: { text: userMessage },
-          sessionId, // Use session for conversation continuity
+          context: { sessionId }, // Use session for conversation continuity
           disableTools: false,
         }),
-        { maxAttempts: 2, initialDelay: 1000 }
+        { maxRetries: 1, baseDelayMs: 1000 }
       );
 
       const result = breaker
@@ -147,7 +144,7 @@ Let us break down what is happening here. The `CircuitBreakerManager` manages mu
 - **Open** (unhealthy): After `failureThreshold` consecutive failures, the breaker opens. All requests immediately fail without calling the provider, enabling instant fallback to the next provider in the chain.
 - **Half-open** (recovering): After `resetTimeout` milliseconds, the breaker allows `halfOpenMaxCalls` test requests through. If they succeed, the breaker closes again. If they fail, it reopens.
 
-The `withRetry` wrapper adds an additional layer: each individual call gets up to two attempts with a one-second initial delay and exponential backoff. This handles transient network blips without triggering the circuit breaker for temporary issues.
+The `withRetry` wrapper adds an additional layer: each individual call gets up to one retry (`maxRetries: 1`) after a one-second base delay (`baseDelayMs: 1000`), with exponential backoff on further attempts. This handles transient network blips without triggering the circuit breaker for temporary issues.
 
 The Ollama emergency fallback has no circuit breaker because it is running locally. If the local model is down, the entire machine is likely down, and no amount of circuit breaking will help.
 
@@ -182,10 +179,23 @@ When structured output is needed (for example, when the bot creates a support ti
 Now you will add rate limiting and cost control. Your bot needs to handle burst traffic during outages without bankrupting the company on API costs.
 
 ```typescript
-import { RateLimiter } from '@juspay/neurolink';
-import { ModelConfigurationManager } from '@juspay/neurolink';
+// NeuroLink does not export a generic rate limiter from its public API --
+// this sliding-window limiter is plain application code, following the
+// same pattern NeuroLink uses internally.
+class RateLimiter {
+  private requests: number[] = [];
+  constructor(private maxRequests: number, private windowMs: number) {}
 
-const modelConfig = ModelConfigurationManager.getInstance();
+  async acquire(): Promise<void> {
+    const now = Date.now();
+    this.requests = this.requests.filter((t) => now - t < this.windowMs);
+    if (this.requests.length >= this.maxRequests) {
+      const waitTime = this.windowMs - (now - this.requests[0]);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+    this.requests.push(Date.now());
+  }
+}
 
 // Per-customer rate limiter
 const customerLimiters = new Map<string, RateLimiter>();
@@ -197,31 +207,38 @@ function getCustomerLimiter(customerId: string): RateLimiter {
   return customerLimiters.get(customerId)!;
 }
 
-// Cost tracking per interaction
-const vertexCost = modelConfig.getCostInfo("vertex", "gemini-2.5-pro");
-// Returns: { input: 0.000075, output: 0.0003 }
+// Cost tracking per interaction, using the public analytics field
+const result = await neurolink.generate({
+  input: { text: userMessage },
+  provider: "vertex",
+  model: "gemini-2.5-pro",
+  enableAnalytics: true,
+});
+console.log("Cost for this request:", result.analytics?.cost);
 ```
 
-The `RateLimiter` uses a sliding window algorithm, allowing 20 messages per minute per customer by default. This prevents a single automated client from consuming your entire API budget while still allowing normal human conversation rates.
+The rate limiter uses a sliding window algorithm, allowing 20 messages per minute per customer by default. This prevents a single automated client from consuming your entire API budget while still allowing normal human conversation rates.
 
-Cost optimization goes further with intelligent routing. Simple queries like "What are your business hours?" do not need GPT-4o. Route them to a fast, cheap model and save the expensive reasoning models for complex troubleshooting:
+Cost optimization goes further with intelligent routing. Simple queries like "What are your business hours?" do not need GPT-5.4. Route them to a fast, cheap model and save the expensive reasoning models for complex troubleshooting:
 
 ```typescript
 async function routeByComplexity(message: string, sessionId: string) {
   const isSimple = message.length < 100;
 
   if (isSimple) {
-    // Fast tier: ~$0.0001 per query
+    // Fast tier
     return neurolink.generate({
       input: { text: message },
+      context: { sessionId },
       provider: "vertex",
       model: "gemini-2.5-flash",
     });
   }
 
-  // Quality tier: ~$0.003 per query
+  // Quality tier
   return neurolink.generate({
     input: { text: message },
+    context: { sessionId },
     provider: "vertex",
     model: "gemini-2.5-pro",
   });
@@ -233,35 +250,43 @@ async function routeByComplexity(message: string, sessionId: string) {
 Next, you will connect your bot to real backend systems. NeuroLink's MCP integration provides a standardized tool interface for CRM lookups, ticket creation, and knowledge base search.
 
 ```typescript
-import { MCPRegistry } from '@juspay/neurolink';
+import { NeuroLink } from '@juspay/neurolink';
+import { z } from 'zod';
 
-const mcpRegistry = new MCPRegistry();
+const neurolink = new NeuroLink();
 
-// Register CRM tool server
-await mcpRegistry.registerServer("crm-connector", {
-  description: "Customer CRM data access",
-  tools: {
-    lookupCustomer: { /* tool schema */ },
-    createTicket: { /* tool schema */ },
-    getOrderHistory: { /* tool schema */ },
-  },
+// Register CRM and knowledge base tools
+neurolink.registerTool('lookupCustomer', {
+  name: 'lookupCustomer',
+  description: 'Look up a customer record in the CRM by ID or email',
+  inputSchema: z.object({
+    customerId: z.string().optional(),
+    email: z.string().optional(),
+  }),
+  execute: async ({ customerId, email }) => crm.lookupCustomer({ customerId, email }),
 });
 
-// Register knowledge base server
-await mcpRegistry.registerServer("kb-search", {
-  description: "Internal knowledge base search",
-  tools: {
-    searchArticles: { /* tool schema */ },
-    getArticle: { /* tool schema */ },
-  },
+neurolink.registerTool('createTicket', {
+  name: 'createTicket',
+  description: 'Create a support ticket for the customer',
+  inputSchema: z.object({
+    customerId: z.string(),
+    summary: z.string(),
+  }),
+  execute: async ({ customerId, summary }) => crm.createTicket({ customerId, summary }),
 });
 
-// List all available tools
-const tools = await mcpRegistry.listTools();
-// Returns: [{ name: "lookupCustomer", serverId: "crm-connector" }, ...]
+neurolink.registerTool('searchArticles', {
+  name: 'searchArticles',
+  description: 'Search the internal knowledge base for relevant articles',
+  inputSchema: z.object({
+    query: z.string(),
+  }),
+  execute: async ({ query }) => knowledgeBase.search(query),
+});
 ```
 
-The `MCPRegistry` manages all external tool integrations. Each tool server (CRM, knowledge base, ticketing system) is registered with its available tools and their schemas. When the LLM decides it needs to look up a customer record, it calls `lookupCustomer` through the registry, which routes the call to the appropriate backend.
+`registerTool()` makes each tool available on every subsequent `generate()`/`stream()` call. Each tool server (CRM, knowledge base, ticketing system) is registered with its own description and Zod input schema. When the LLM decides it needs to look up a customer record, it calls `lookupCustomer`, which routes the call to the appropriate backend.
 
 Each tool call is wrapped with `MCPCircuitBreaker` for fault tolerance. If your CRM API starts timing out, the circuit breaker prevents the support bot from hanging on every request. Instead, the bot gracefully acknowledges that it cannot access customer data at the moment and offers alternative help.
 
@@ -290,14 +315,32 @@ The health check returns detailed statistics for each provider: current circuit 
 
 Each breaker's `getStats()` returns a `CircuitBreakerStats` object with `state`, `totalCalls`, `failureRate`, and `nextRetryTime`. Feed these into Grafana, Datadog, or your preferred observability platform for real-time dashboards.
 
-You can also use `ServiceRegistry.getRegisteredServices()` for a broader view of all registered services and their health, including MCP tool servers.
-
 ## Graceful shutdown
 
-Finally, you will add graceful shutdown for zero-downtime deployments. The `GracefulShutdown` utility ensures in-flight conversations complete before the old instance shuts down.
+Finally, you will add graceful shutdown for zero-downtime deployments. The shutdown tracker below ensures in-flight conversations complete before the old instance shuts down.
 
 ```typescript
-import { GracefulShutdown } from '@juspay/neurolink';
+// NeuroLink does not export a shutdown tracker from its public API --
+// this mirrors the same in-flight-promise-tracking pattern NeuroLink
+// uses internally, implemented as plain application code.
+class GracefulShutdown {
+  private operations = new Set<Promise<unknown>>();
+
+  track<T>(operation: Promise<T>): Promise<T> {
+    this.operations.add(operation);
+    operation.finally(() => this.operations.delete(operation));
+    return operation;
+  }
+
+  async shutdown(timeoutMs = 30000): Promise<void> {
+    await Promise.race([
+      Promise.all(this.operations),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Shutdown timeout")), timeoutMs),
+      ),
+    ]).catch((error) => console.warn("Shutdown warning:", error.message));
+  }
+}
 
 const shutdown = new GracefulShutdown();
 
@@ -326,7 +369,7 @@ Here is what the complete support bot looks like when all the pieces come togeth
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink({
-  conversationMemory: true,
+  conversationMemory: { enabled: true },
   hitl: {
     enabled: true,
     dangerousActions: ['refund', 'account-delete', 'escalate-manager'],

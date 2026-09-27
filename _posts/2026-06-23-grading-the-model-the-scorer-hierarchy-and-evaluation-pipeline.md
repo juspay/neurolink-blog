@@ -9,7 +9,9 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Grading the model: the scorer hierarchy and evaluation pipeline — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  Inside NeuroLink's evaluation system: the BaseScorer/BaseLLMScorer/BaseRuleScorer
+  class hierarchy, the PipelineBuilder-driven EvaluationPipeline that runs scorers
+  together, and how batching, factories, and observability hooks fit around it.
 toc: true
 mermaid: true
 pin: false
@@ -18,7 +20,7 @@ image:
   alt: 'Grading the model: the scorer hierarchy and evaluation pipeline'
 ---
 
-We designed NeuroLink's scorer hierarchy because a single, monolithic evaluation function was impossible to test, extend, or debug. When a RAG pipeline's `FaithfulnessScorer` started returning anomalous scores after a Gemini API update, we had no way to isolate it from the `ToxicityScorer` or the deterministic `FormatScorer` running in the same evaluation pass. A failure in one check could silently corrupt the entire result. We needed a system where every evaluation concern was a distinct, composable class, managed by a predictable pipeline.
+We designed NeuroLink's scorer hierarchy because a single, monolithic evaluation function was difficult to test, extend, or debug. If a RAG pipeline's `FaithfulnessScorer` were to start returning anomalous scores — say, after an upstream provider changed its output format — a monolithic function would give us no way to isolate that from the `ToxicityScorer` or the deterministic `FormatScorer` running in the same evaluation pass. A failure in one check could silently corrupt the entire result. We needed a system where every evaluation concern was a distinct, composable class, managed by a predictable pipeline.
 
 This post dives deep into that architecture. It's the next level of detail from our previous post on [Model Evaluation and Scoring: RAGAS-Style Quality Assessment](/posts/model-evaluation-scoring/), which covered the *what* of our metrics. Here, we cover the *how*: the class hierarchy, the pipeline orchestrator, and the observability hooks that make our evaluation system robust and extensible.
 
@@ -50,7 +52,7 @@ export abstract class BaseScorer {
 // For scorers that call a provider like OpenAI or Anthropic
 export abstract class BaseLLMScorer extends BaseScorer {
   abstract generatePrompt(input: ScorerInput): string;
-  abstract parseResponse(response: string): Partial<ScoreResult>;
+  abstract parseResponse(response: string, input: ScorerInput): Partial<ScoreResult>;
 
   protected async callLLM(prompt: string): Promise<string>;
 }
@@ -89,14 +91,14 @@ A special case is `ContentSimilarityScorer`, which extends `BaseScorer` directly
 export class AnswerRelevancyScorer extends BaseLLMScorer {
   // Each LLM scorer implements a specific prompt generation strategy.
   generatePrompt(input: ScorerInput): string {
-    const { question, answer } = input;
-    if (!question || !answer) {
-      throw new Error("Question and answer are required for AnswerRelevancyScorer.");
+    const { query, response } = input;
+    if (!query || !response) {
+      throw new Error("Query and response are required for AnswerRelevancyScorer.");
     }
     // The prompt asks a separate evaluation model to grade the primary model's output.
     return `
-      Given the question: "${question}"
-      And the answer: "${answer}"
+      Given the question: "${query}"
+      And the answer: "${response}"
 
       Please evaluate the relevancy of the answer to the question on a scale of 1 to 10.
       A score of 1 means completely irrelevant.
@@ -106,7 +108,7 @@ export class AnswerRelevancyScorer extends BaseLLMScorer {
   }
 
   // It also implements a corresponding response parser.
-  parseResponse(response: string): Partial<ScoreResult> {
+  parseResponse(response: string, input: ScorerInput): Partial<ScoreResult> {
     const json = this.extractJSON(response);
     return {
       score: json?.score,
@@ -129,14 +131,17 @@ const jsonFormatScorer = ScorerBuilder.create('custom-json-check', 'JSON Format 
   .type('rule')
   .customRule({
     id: 'is-json',
-    name: 'Is Valid JSON',
-    evaluate: (input: ScorerInput) => {
-      try {
-        JSON.parse(input.answer);
-        return { passed: true, score: 1, reasoning: 'Output is valid JSON.' };
-      } catch (e) {
-        return { passed: false, score: 0, reasoning: `JSON parsing failed: ${e.message}` };
-      }
+    description: 'Is Valid JSON',
+    type: 'custom',
+    params: {
+      evaluate: (input: ScorerInput) => {
+        try {
+          JSON.parse(input.response);
+          return { passed: true, score: 1 };
+        } catch {
+          return { passed: false, score: 0 };
+        }
+      },
     },
   })
   .build();
@@ -152,13 +157,13 @@ We use the `PipelineBuilder` to construct pipelines. It offers a fluent API for 
 graph TD
     subgraph Pipeline Execution
         A[ScorerInput] --> B{EvaluationPipeline};
-        B -- dispatches to --> C1["FaithfulnessScorer (LLM)"];
-        B -- dispatches to --> C2["FormatScorer (Rule)"];
+        B -- dispatches to --> C1["FaithfulnessScorer - LLM"];
+        B -- dispatches to --> C2["FormatScorer - Rule"];
         B -- dispatches to --> C3["..."];
     end
 
     subgraph Scoring
-        C1 -- calls provider --> D["LLM (e.g., Gemini)"];
+        C1 -- calls provider --> D["External LLM Provider"];
         D -- response --> C1;
         C1 --> E1[ScoreResult];
         C2 -- evaluates rules --> E2[ScoreResult];
@@ -192,47 +197,46 @@ const ragPipeline = await PipelineBuilder.create('rag-quality-pipeline')
   .timeout(5000)
   .buildAndInitialize();
 
-// const results = await ragPipeline.evaluate(myScorerInput);
+// const results = await ragPipeline.execute(myScorerInput);
 ```
 
 ## Batch Processing at Scale
 
-Evaluating a single interaction is useful, but robust quality assessment requires running evaluations over large datasets. The `BatchEvaluator` is designed for this purpose. It wraps an `EvaluationPipeline` and provides methods like `evaluateBatch` to run the pipeline against an array of inputs. It manages concurrency to avoid overwhelming providers and includes per-item retry logic.
+Evaluating a single interaction is useful, but robust quality assessment requires running evaluations over large datasets. `BatchStrategy`, in `pipeline/strategies/`, is built for exactly this: it wraps an `EvaluationPipeline` and exposes an `evaluate` method that runs an array of `ScorerInput` through the pipeline with a configurable concurrency limit, `continueOnError` handling, and progress/result callbacks.
 
-The `BatchStrategy` in `pipeline/strategies/` complements this by defining how to process raw arrays of `ScorerInput`, allowing for different dispatch and concurrency patterns for large-scale jobs. This is a core part of our internal quality control, as detailed in [How We Test NeuroLink: 20 Continuous Test Suites and Counting](/posts/neurolink-testing-20-test-suites/).
+NeuroLink also ships a `BatchEvaluator`, but it batches a different, adjacent system: the single-call, RAGAS-style auto-evaluator (`Evaluator`) that grades one `generate()` result at a time, not the scorer `EvaluationPipeline`. It takes a config object (`concurrency`, `maxRetries`, `retryDelay`) and runs `evaluateBatch` over an array of `{ id, options, result }` items. This is a core part of our internal quality control, as detailed in [How We Test NeuroLink: 20 Continuous Test Suites and Counting](/posts/neurolink-testing-20-test-suites/).
 
 ```typescript
-// An example of how the BatchEvaluator might be invoked
+// Running an EvaluationPipeline over a dataset with BatchStrategy
 async function runBulkEvaluation(pipeline: EvaluationPipeline, dataset: ScorerInput[]) {
-  const batchEvaluator = new BatchEvaluator(pipeline, {
-    concurrency: 10, // Process 10 items in parallel
-    itemRetry: 2,    // Retry each failed item up to 2 times
+  const batchStrategy = new BatchStrategy(pipeline, {
+    concurrency: 10,        // Process 10 items in parallel
+    continueOnError: true,  // Keep going if one item fails
   });
 
-  const results = await batchEvaluator.evaluateBatch(dataset);
-
-  const aggregator = new EvaluationAggregator(results);
-  const stats = aggregator.calculateStatistics();
-  console.log('Batch evaluation complete:', stats);
+  const { summary } = await batchStrategy.evaluate(dataset);
+  console.log(`Batch evaluation complete: ${summary.passingRate}% passing`);
 }
 ```
 
 ## The Factory and Registry Bridge
 
-To integrate the evaluation system with NeuroLink's core provider model, we use the `EvaluatorFactory` and `EvaluatorRegistry`. This pattern mirrors how we manage providers across the platform, as seen in our [adapter catalog](/posts/twenty-four-providers-one-baseprovider-the-adapter-catalog/).
+The RAGAS-style `Evaluator` track has its own factory and registry — `EvaluatorFactory` and `EvaluatorRegistry` — following the same singleton-factory pattern we use for providers, as seen in our [adapter catalog](/posts/twenty-four-providers-one-baseprovider-the-adapter-catalog/).
 
-The `EvaluatorRegistry` is a singleton that holds named evaluation strategies and pipeline presets (`default`, `strict`, `rag`). The `EvaluatorFactory` resolves these names, selects the appropriate backing LLM for scorers via environment variables like `NEUROLINK_RAGAS_EVALUATION_PROVIDER`, and instantiates the fully configured `EvaluationPipeline`. This decouples the pipeline definition from the specific runtime environment.
+`EvaluatorFactory.getInstance()` resolves named configuration presets (`default`, `strict`, `lenient`, `fast`, `premium`, or a custom one registered with `registerPreset`) into a configured `Evaluator`, selecting the backing LLM via environment variables like `NEUROLINK_RAGAS_EVALUATION_PROVIDER`. `EvaluatorRegistry.getInstance()` is a separate singleton holding pluggable evaluation *strategies* (the built-in `ragas` strategy, plus any custom one you register) rather than pipeline presets. `BatchEvaluator`, covered above, is built on this same `Evaluator`, not on `EvaluationPipeline`.
+
+The scorer/pipeline hierarchy has its own, simpler preset mechanism instead: `getPreset(name)` returns a `PipelineConfig` for `safety`, `rag`, `quality`, `codeGeneration`, and the other `PipelinePresets`, which you pass to `new EvaluationPipeline(config)` or build the same shape with `PipelineBuilder`.
 
 ```typescript
-// Using the factory to get a pre-configured evaluator
-async function getPipelineForEnvironment() {
-  const factory = new EvaluatorFactory(EvaluatorRegistry.getInstance());
+// Getting a pre-configured evaluator for the current environment
+async function getEvaluatorForEnvironment() {
+  const factory = EvaluatorFactory.getInstance();
 
-  // Resolves the 'rag' preset and configures its LLM scorers
+  // Resolves the 'strict' preset and configures its backing LLM
   // based on environment variables.
-  const ragEvaluator = await factory.create('rag');
+  const strictEvaluator = await factory.create('strict');
 
-  return ragEvaluator;
+  return strictEvaluator;
 }
 ```
 
@@ -243,17 +247,19 @@ A black-box evaluation pipeline is a blind spot. We built `ObservabilityHooks` t
 You can subscribe to these events to log performance, trace execution, or collect metrics. We ship a `MetricsCollector` that does exactly this. The `createMetricsCollectorHook` adapter wires the collector to the pipeline's events, automatically tracking per-scorer latency, success rates, and score distributions. For external systems, we also provide adapters like `LangfuseAdapter` to stream evaluation data to third-party observability platforms. Finally, `ReportGenerator` can consume the aggregated data to produce human-readable quality reports.
 
 ```typescript
-// Subscribing to pipeline events for custom logging
+// Subscribing to lifecycle events for custom logging
 const pipeline = await new PipelineBuilder().addScorer('toxicity').buildAndInitialize();
 
 const hooks = new ObservabilityHooks();
-hooks.on('scorer:start', ({ id }) => console.log(`Scorer ${id} started.`));
-hooks.on('scorer:end', ({ id, result }) => {
-  console.log(`Scorer ${id} finished with score ${result.score}.`);
+hooks.on('scorer:start', ({ scorerName }) => console.log(`Scorer ${scorerName} started.`));
+hooks.on('scorer:end', ({ scorerName, result }) => {
+  console.log(`Scorer ${scorerName} finished with score ${result.score}.`);
 });
 
-pipeline.setHooks(hooks);
-// Now, running pipeline.evaluate() will trigger the log messages.
+// The pipeline doesn't wire itself to a hooks instance automatically — emit
+// lifecycle events yourself around the calls you want observed, e.g.:
+// await hooks.emit('scorer:start', { scorerId, scorerName, timestamp: Date.now() });
+const result = await pipeline.execute(myScorerInput);
 ```
 
 ## Structured Error Handling
@@ -262,9 +268,9 @@ Reliable automation depends on predictable error handling. Every potential failu
 
 ```typescript
 try {
-  await pipeline.evaluate(input);
+  await pipeline.execute(input);
 } catch (e) {
-  if (e.code === EvaluationErrorCodes.PROVIDER_UNAVAILABLE) {
+  if (e.code === EvaluationErrorCodes.PROVIDER_ERROR) {
     // Specific logic for when the evaluation model is down
     console.error("Evaluation provider is unavailable. Retrying later.");
   } else {

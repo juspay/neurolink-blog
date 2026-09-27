@@ -148,7 +148,7 @@ async function detectBiasInResponses(
       const result = await neurolink.generate({
         input: { text: testCase.input },
         provider: 'openai',
-        model: 'gpt-4o',
+        model: 'gpt-5.4',
       });
 
       return {
@@ -180,7 +180,7 @@ async function detectBiasInResponses(
         }`
     },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     systemPrompt: `You are a bias detection expert. Analyze AI responses
       for fairness and equity across demographic groups. Be thorough and
       objective in your analysis.`
@@ -419,7 +419,7 @@ Technical approaches can enable AI development while protecting individual priva
 
 The most effective way to implement ethical guardrails in NeuroLink is through well-designed system prompts that guide AI behavior. This approach works with the model's natural language understanding capabilities rather than requiring external filtering systems.
 
-> **Note:** The guardrails implementation pattern shown below is a conceptual example demonstrating how to structure safety checks and ethical guidelines. You would implement this pattern in your application code using NeuroLink's `generate()` API—this is not a built-in MiddlewareFactory API.
+> **Note:** The guardrails implementation pattern shown below is a conceptual example demonstrating how to structure safety checks and ethical guidelines using application-level system prompts and pre-checks. NeuroLink also ships a built-in `MiddlewareFactory` (guardrails, auto-evaluation) that you configure per-call via the `generate()` `middleware` option -- see [The Middleware System](/posts/middleware-system/) for that API.
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -544,7 +544,7 @@ async function processFinancialRequest(request: string) {
   const result = await neurolink.generate({
     input: { text: request },
     provider: 'openai',
-    model: 'gpt-4o',
+    model: 'gpt-5.4',
     systemPrompt: `You are a financial assistant. For any actions involving
       money transfers, account changes, or financial commitments, you must
       use the appropriate tool which will require human approval.

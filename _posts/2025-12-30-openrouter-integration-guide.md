@@ -5,7 +5,10 @@ date: 2025-12-30 10:00:00 +0530
 categories: [Tutorials, Providers]
 tags: [openrouter, providers, integration, api, models]
 author: neurolink
-description: "Complete guide to integrating OpenRouter with NeuroLink SDK. Access Claude, GPT-4, Gemini, and 300+ models from dozens of providers through a single API."
+description: >-
+  Complete guide to integrating OpenRouter with NeuroLink SDK. Access Claude,
+  GPT-5, Gemini, and 300+ models from dozens of providers through a single
+  API.
 image:
   path: /assets/img/posts/openrouter-integration-guide/hero.png
   alt: OpenRouter Integration Guide
@@ -25,7 +28,7 @@ This guide walks you through complete OpenRouter integration with NeuroLink. You
 ```mermaid
 flowchart TB
     subgraph App["Your Application"]
-        NL["NeuroLink SDK<br/>(TypeScript)"]
+        NL["NeuroLink SDK<br/>TypeScript"]
     end
 
     subgraph OR["OpenRouter"]
@@ -34,10 +37,10 @@ flowchart TB
         Cache["Response Cache"]
     end
 
-    subgraph Providers["AI Providers (300+ Models)"]
-        ANT["Anthropic<br/>Claude 3.5"]
-        OAI["OpenAI<br/>GPT-4o"]
-        GOO["Google<br/>Gemini 2.0"]
+    subgraph Providers["AI Providers – 300+ Models"]
+        ANT["Anthropic<br/>Claude Sonnet 5"]
+        OAI["OpenAI<br/>GPT-5.4"]
+        GOO["Google<br/>Gemini 2.5"]
         MORE["60+ More<br/>Providers"]
     end
 
@@ -79,7 +82,7 @@ Streaming works identically across all 300+ models. No provider-specific handlin
 
 | Capability | OpenRouter Alone | NeuroLink Alone | OpenRouter + NeuroLink |
 |------------|------------------|-----------------|------------------------|
-| Model Access | 300+ models | 13 native providers | 300+ models |
+| Model Access | 300+ models | 14 native providers | 300+ models |
 | TypeScript Types | Partial coverage | Full type safety | Full type safety |
 | CLI Tool | Not available | Full-featured | Full-featured |
 | HITL/Guardrails | Not available | Enterprise-ready | Enterprise-ready |
@@ -151,7 +154,7 @@ const ai = new NeuroLink();
 const result = await ai.generate({
   input: { text: "Explain quantum computing in simple terms" },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-sonnet",
+  model: "anthropic/claude-sonnet-5",
 });
 
 console.log(result.content);
@@ -199,16 +202,16 @@ For code tasks, these models consistently deliver excellent results:
 
 ```typescript
 // Best overall for code - exceptional reasoning and accuracy
-const codeModel = "anthropic/claude-3-5-sonnet";
+const codeModel = "anthropic/claude-sonnet-5";
 
 // Strong alternative - great for complex refactoring
-const altCodeModel = "openai/gpt-4o";
+const altCodeModel = "openai/gpt-5.4";
 
 // Fast with massive context - ideal for large codebases
-const fastCodeModel = "google/gemini-2.0-flash";
+const fastCodeModel = "google/gemini-2.5-flash";
 ```
 
-Claude 3.5 Sonnet excels at understanding complex codebases. GPT-4o handles intricate refactoring tasks well. Gemini 2.0 Flash processes million-token contexts quickly.
+Claude Sonnet 5 excels at understanding complex codebases. GPT-5.4 handles intricate refactoring tasks well. Gemini 2.5 Flash processes million-token contexts quickly.
 
 **CLI equivalent:**
 
@@ -216,7 +219,7 @@ Claude 3.5 Sonnet excels at understanding complex codebases. GPT-4o handles intr
 # Test code generation with different models
 npx @juspay/neurolink generate "Write a TypeScript function to debounce API calls" \
   --provider openrouter \
-  --model "anthropic/claude-3-5-sonnet"
+  --model "anthropic/claude-sonnet-5"
 ```
 
 #### Creative Writing
@@ -225,13 +228,13 @@ Creative tasks benefit from models with strong language generation:
 
 ```typescript
 // Most capable for creative work
-const creativeModel = "anthropic/claude-3-opus";
+const creativeModel = "anthropic/claude-opus-5";
 
 // Excellent for long-form content
-const longFormModel = "google/gemini-1.5-pro";
+const longFormModel = "google/gemini-2.5-pro";
 ```
 
-Claude 3 Opus produces the most nuanced creative writing. Gemini 1.5 Pro handles long-form content generation effectively.
+Claude Opus 5 produces the most nuanced creative writing. Gemini 2.5 Pro handles long-form content generation effectively.
 
 #### Cost-Optimized Tasks
 
@@ -239,10 +242,10 @@ For high-volume, simpler tasks, use efficient models:
 
 ```typescript
 // Fast and affordable - great for classification and extraction
-const budgetModel = "anthropic/claude-3-5-haiku";
+const budgetModel = "anthropic/claude-haiku-4.5";
 
-// Budget-friendly GPT-4 alternative
-const gptBudgetModel = "openai/gpt-4o-mini";
+// Budget-friendly GPT-5.4 nano alternative
+const gptBudgetModel = "openai/gpt-5.4-nano";
 ```
 
 These models cost a fraction of their larger siblings. They handle classification, extraction, and simple generation tasks well.
@@ -253,7 +256,7 @@ These models cost a fraction of their larger siblings. They handle classificatio
 # Use budget models for simple tasks
 npx @juspay/neurolink generate "Classify this text as positive or negative: Great product!" \
   --provider openrouter \
-  --model "anthropic/claude-3-5-haiku"
+  --model "anthropic/claude-haiku-4.5"
 ```
 
 #### Long Context Processing (100K+ Tokens)
@@ -262,13 +265,13 @@ Some tasks require processing massive documents:
 
 ```typescript
 // 1 million token context window
-const longContextModel = "google/gemini-2.0-flash";
+const longContextModel = "google/gemini-2.5-flash";
 
-// 200K context with excellent comprehension
-const comprehensionModel = "anthropic/claude-3-5-sonnet";
+// 1M token context with excellent comprehension
+const comprehensionModel = "anthropic/claude-sonnet-5";
 ```
 
-Gemini 2.0 Flash leads with a 1 million token context window. Claude 3.5 Sonnet offers 200K tokens with superior comprehension.
+Gemini 2.5 Flash leads with a 1 million token context window. Claude Sonnet 5 offers 1M tokens with superior comprehension.
 
 **Related:** [Multimodal Processing Tutorial](/posts/multimodal-document-processing/) - Add PDFs, CSVs, and more to your AI workflows - [Examples](https://docs.neurolink.ink/features/multimodal/)
 
@@ -276,52 +279,48 @@ Gemini 2.0 Flash leads with a 1 million token context window. Claude 3.5 Sonnet 
 
 | Model | Context Window | Speed | Best For |
 |-------|----------------|-------|----------|
-| `anthropic/claude-3-5-sonnet` | 200K | Fast | General purpose, code |
-| `openai/gpt-4o` | 128K | Fast | Complex reasoning |
-| `google/gemini-2.0-flash` | 1M | Fastest | Long documents |
-| `meta-llama/llama-3.1-405b-instruct` | 128K | Medium | Open source preference |
-| `anthropic/claude-3-5-haiku` | 200K | Fastest | High-volume tasks |
-| `openai/gpt-4o-mini` | 128K | Fast | Budget applications |
-| `anthropic/claude-3-opus` | 200K | Slower | Maximum capability |
-| `mistralai/mistral-large` | 128K | Fast | EU compliance |
+| `anthropic/claude-sonnet-5` | 1M | Fast | General purpose, code |
+| `openai/gpt-5.4` | 1M | Fast | Complex reasoning |
+| `google/gemini-2.5-flash` | 1M | Fastest | Long documents |
+| `meta-llama/llama-4-maverick` | 1M | Fast | Open source preference |
+| `anthropic/claude-haiku-4.5` | 200K | Fastest | High-volume tasks |
+| `openai/gpt-5.4-nano` | 400K | Fast | Budget applications |
+| `anthropic/claude-opus-5` | 1M | Slower | Maximum capability |
+| `mistralai/mistral-large-2512` | 256K | Fast | EU compliance |
 
 > **Note:** Pricing changes frequently and varies by provider. Always check the [OpenRouter pricing page](https://openrouter.ai/models) for current rates before production deployment.
 
 ### Dynamic Model Variants
 
-OpenRouter supports dynamic variants that modify model behavior:
+OpenRouter supports dynamic variants that modify model or provider behavior. As of today, three of the older suffixes are deprecated in favor of first-class request parameters:
 
-- **`:online`** - Enables web search capabilities (e.g., `anthropic/claude-3-5-sonnet:online`)
-- **`:nitro`** - Optimized for lower latency (e.g., `openai/gpt-4o:nitro`)
-- **`:exacto`** - Routes to providers with higher tool-calling accuracy (e.g., `deepseek/deepseek-v3.1-terminus:exacto`)
-- **`:free`** - Free tier models with rate limits (e.g., `meta-llama/llama-3-8b-instruct:free`)
-- **`:extended`** - Extended context window versions (e.g., `anthropic/claude-3-5-sonnet:extended`)
-- **`:thinking`** - Extended reasoning capabilities for supported models like DeepSeek R1 (e.g., `deepseek/deepseek-r1:thinking`)
+- **`:free`** - Free tier of a model with its own (lower) rate limits (e.g., `google/gemma-4-31b-it:free`)
+- **`:nitro`** - Ranks providers by throughput and allows priority-tier endpoints (e.g., `openai/gpt-5.4:nitro`)
+- **`:exacto`** - Ranks providers by quality signals tuned for tool-calling reliability, useful for agentic workflows (e.g., `moonshotai/kimi-k2-0905:exacto`)
+- **`:floor`** - Ranks providers by lowest price and allows flex-tier endpoints (e.g., `google/gemini-2.5-flash:floor`)
+- **`:online`** *(deprecated)* - Used to inject web search results into the prompt. Use OpenRouter's `web_search` server tool instead.
+- **`:extended`** *(deprecated)* - Used to request a larger context window. No model currently offers it; the base models already ship with their full context length.
+- **`:thinking`** *(deprecated)* - Used to turn on reasoning by default. Use the top-level `reasoning` request parameter (`{ effort: "high" }` or `{ max_tokens: ... }`) instead, which works across providers.
 
-> **Note:** Not all variants are available for all models. Check the [OpenRouter models page](https://openrouter.ai/models) for current availability.
+> **Note:** Not all variants are available for all models, and OpenRouter continues to retire and add suffixes over time. Check the [OpenRouter model variants docs](https://openrouter.ai/docs/guides/routing/model-variants/overview) for current availability before shipping a suffix to production.
 
 ```typescript
-// Use web-enabled variant for current information
-const result = await ai.generate({
-  input: { text: "What are today's top tech news?" },
+// Use the free variant for zero-cost experimentation (own rate limits apply)
+const freeResult = await ai.generate({
+  input: { text: "Summarize this paragraph in one sentence..." },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-sonnet:online",
+  model: "google/gemma-4-31b-it:free",
 });
 
-// Use exacto variant for better tool-calling accuracy
+// Use exacto variant when tool-calling reliability matters more than cost
 const toolResult = await ai.generate({
   input: { text: "Use the search tool to find..." },
   provider: "openrouter",
-  model: "deepseek/deepseek-v3.1-terminus:exacto",
-});
-
-// Use thinking variant for complex reasoning (supported models only)
-const reasoningResult = await ai.generate({
-  input: { text: "Solve this step by step: If a train..." },
-  provider: "openrouter",
-  model: "deepseek/deepseek-r1:thinking",  // Note: :thinking is for reasoning models like DeepSeek R1
+  model: "moonshotai/kimi-k2-0905:exacto",
 });
 ```
+
+The `:thinking` suffix shown in older guides is deprecated and no new models will carry it - OpenRouter now recommends its top-level `reasoning` request field for controlling reasoning depth. NeuroLink does not yet expose a typed wrapper for that OpenRouter-specific field, so if you need it today, check the [reasoning tokens guide](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens) for the raw request shape.
 
 ```mermaid
 flowchart TD
@@ -330,10 +329,10 @@ flowchart TD
     START --> BUDGET{"Budget<br/>Constrained?"}
     START --> LONG{"Long<br/>Context?"}
 
-    CODE -->|"Yes"| C1["claude-3-5-sonnet<br/>or gpt-4o"]
-    CREATIVE -->|"Yes"| C2["claude-3-opus<br/>or gemini-1.5-pro"]
-    BUDGET -->|"Yes"| C3["claude-3-5-haiku<br/>or gpt-4o-mini"]
-    LONG -->|"Yes"| C4["gemini-2.0-flash<br/>(1M context)"]
+    CODE -->|"Yes"| C1["claude-sonnet-5<br/>or gpt-5.4"]
+    CREATIVE -->|"Yes"| C2["claude-opus-5<br/>or gemini-2.5-pro"]
+    BUDGET -->|"Yes"| C3["Claude Haiku 4.5<br/>or gpt-5.4-nano"]
+    LONG -->|"Yes"| C4["gemini-2.5-flash<br/>1M context"]
 
     style START fill:#6366f1,stroke:#4f46e5,color:#fff
     style C1 fill:#22c55e,stroke:#16a34a,color:#fff
@@ -358,7 +357,7 @@ Streaming delivers response chunks as they generate. Users see results immediate
 const result = await ai.stream({
   input: { text: "Write a short story about AI" },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-sonnet",
+  model: "anthropic/claude-sonnet-5",
 });
 
 for await (const chunk of result.stream) {
@@ -374,7 +373,7 @@ The streaming interface works identically across all OpenRouter models. No provi
 # Stream output to terminal in real-time
 npx @juspay/neurolink stream "Tell me a story about a robot learning to paint" \
   --provider openrouter \
-  --model "anthropic/claude-3-5-sonnet"
+  --model "anthropic/claude-sonnet-5"
 ```
 
 ### Model Comparison Pattern
@@ -384,9 +383,9 @@ Test the same prompt across multiple models. Compare quality, speed, and cost to
 ```typescript
 async function compareModels(prompt: string) {
   const models = [
-    "openai/gpt-4o",
-    "anthropic/claude-3-5-sonnet",
-    "google/gemini-2.0-flash"
+    "openai/gpt-5.4",
+    "anthropic/claude-sonnet-5",
+    "google/gemini-2.5-flash"
   ];
 
   const results = await Promise.all(
@@ -417,13 +416,13 @@ This pattern helps you choose the optimal model for specific tasks. Run it durin
 ```bash
 # Test same prompt across models manually
 npx @juspay/neurolink generate "Explain machine learning briefly" \
-  --provider openrouter --model "openai/gpt-4o"
+  --provider openrouter --model "openai/gpt-5.4"
 
 npx @juspay/neurolink generate "Explain machine learning briefly" \
-  --provider openrouter --model "anthropic/claude-3-5-sonnet"
+  --provider openrouter --model "anthropic/claude-sonnet-5"
 
 npx @juspay/neurolink generate "Explain machine learning briefly" \
-  --provider openrouter --model "google/gemini-2.0-flash"
+  --provider openrouter --model "google/gemini-2.5-flash"
 ```
 
 ### Cost-Optimized Generation
@@ -435,7 +434,7 @@ Select budget-friendly models for simple tasks to optimize costs:
 const result = await ai.generate({
   input: { text: "Summarize this document..." },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-haiku",  // Budget model for simple tasks
+  model: "anthropic/claude-haiku-4.5",  // Budget model for simple tasks
 });
 
 console.log(`Model used: ${result.model}`);
@@ -445,11 +444,11 @@ console.log(`Tokens: ${result.usage?.total}`);
 const complexResult = await ai.generate({
   input: { text: "Analyze this code and suggest architectural improvements..." },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-sonnet",  // Full model for complex reasoning
+  model: "anthropic/claude-sonnet-5",  // Full model for complex reasoning
 });
 ```
 
-Match model capability to task complexity. Simple summarization, classification, and extraction tasks work well with Haiku or GPT-4o-mini. Reserve Sonnet and Opus for complex reasoning tasks. This approach typically saves 70-90% on high-volume workloads.
+Match model capability to task complexity. Simple summarization, classification, and extraction tasks work well with Claude Haiku 4.5 or GPT-5.4 nano. Reserve Sonnet and Opus for complex reasoning tasks. Based on OpenRouter's listed input-token pricing today, this approach can save roughly 75-90% on high-volume workloads - check the [OpenRouter pricing page](https://openrouter.ai/models) for current rates before sizing the savings for your own traffic mix.
 
 **CLI equivalent:**
 
@@ -457,7 +456,7 @@ Match model capability to task complexity. Simple summarization, classification,
 # Use budget models for simple tasks
 npx @juspay/neurolink generate "Summarize: The quick brown fox..." \
   --provider openrouter \
-  --model "anthropic/claude-3-5-haiku"
+  --model "anthropic/claude-haiku-4.5"
 ```
 
 ### Provider Configuration Options
@@ -476,7 +475,7 @@ const ai = new NeuroLink();
 // OPENROUTER_APP_NAME="Your App Name"
 
 // Optional: Set a default model
-// OPENROUTER_MODEL=anthropic/claude-3-5-sonnet
+// OPENROUTER_MODEL=anthropic/claude-sonnet-5
 ```
 
 You can also pass request-level options like `timeout` directly in the `generate()` call:
@@ -485,7 +484,7 @@ You can also pass request-level options like `timeout` directly in the `generate
 const result = await ai.generate({
   input: { text: "Your prompt" },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-sonnet",
+  model: "anthropic/claude-sonnet-5",
   timeout: 30000,  // 30 seconds
 });
 ```
@@ -508,12 +507,12 @@ The two primary CLI commands cover most use cases:
 # Simple generation with OpenRouter
 npx @juspay/neurolink generate "Explain this code: function debounce(fn, ms) {...}" \
   --provider openrouter \
-  --model "anthropic/claude-3-5-sonnet"
+  --model "anthropic/claude-sonnet-5"
 
 # Switch models easily for comparison
 npx @juspay/neurolink generate "Explain this code: function debounce(fn, ms) {...}" \
   --provider openrouter \
-  --model "openai/gpt-4o"
+  --model "openai/gpt-5.4"
 ```
 
 **Stream (`stream`)** - Watch responses arrive in real-time for longer outputs:
@@ -522,12 +521,12 @@ npx @juspay/neurolink generate "Explain this code: function debounce(fn, ms) {..
 # Stream longer responses to see output as it generates
 npx @juspay/neurolink stream "Write a detailed guide on TypeScript best practices" \
   --provider openrouter \
-  --model "anthropic/claude-3-5-sonnet"
+  --model "anthropic/claude-sonnet-5"
 
 # Stream creative content
 npx @juspay/neurolink stream "Write a short story about AI learning to paint" \
   --provider openrouter \
-  --model "anthropic/claude-3-opus"
+  --model "anthropic/claude-opus-5"
 ```
 
 Both commands support all OpenRouter models. Use `generate` for quick queries and `stream` when you want immediate visual feedback.
@@ -540,12 +539,12 @@ Quick commands for common testing workflows:
 # Quick test different models
 npx @juspay/neurolink generate "Write a haiku about programming" \
   --provider openrouter \
-  --model "openai/gpt-4o"
+  --model "openai/gpt-5.4"
 
 # Stream output for longer responses
 npx @juspay/neurolink stream "Tell me a detailed story about space exploration" \
   --provider openrouter \
-  --model "anthropic/claude-3-5-sonnet"
+  --model "anthropic/claude-sonnet-5"
 
 # List available models from OpenRouter
 npx @juspay/neurolink models list --provider openrouter
@@ -554,7 +553,7 @@ npx @juspay/neurolink models list --provider openrouter
 npx @juspay/neurolink models search "claude" --provider openrouter
 
 # Compare models
-npx @juspay/neurolink models compare "anthropic/claude-3-5-sonnet" "openai/gpt-4o"
+npx @juspay/neurolink models compare "anthropic/claude-sonnet-5" "openai/gpt-5.4"
 
 # View model statistics
 npx @juspay/neurolink models stats --provider openrouter
@@ -628,17 +627,17 @@ Review this dashboard weekly. Identify expensive patterns early.
 
 ### Use Efficient Models for Simple Tasks
 
-Not every request needs GPT-4 or Claude Opus. Match model capability to task complexity:
+Not every request needs GPT-5.4 or Claude Opus. Match model capability to task complexity:
 
-| Task Type | Recommended Model | Est. Cost Savings vs. Flagship |
+| Task Type | Recommended Model | Est. Cost Savings vs. same-provider flagship* |
 |-----------|-------------------|-------------------------------|
-| Classification | claude-3-5-haiku | ~92% cheaper* |
-| Extraction | gpt-4o-mini | ~97% cheaper* |
-| Simple Q&A | claude-3-5-haiku | ~92% cheaper* |
-| Summarization | gemini-2.0-flash | ~98% cheaper* |
-| Complex reasoning | claude-3-5-sonnet | Baseline |
+| Classification | Claude Haiku 4.5 | ~80% cheaper than Claude Opus 5 |
+| Extraction | gpt-5.4-nano | ~92% cheaper than GPT-5.4 |
+| Simple Q&A | Claude Haiku 4.5 | ~80% cheaper than Claude Opus 5 |
+| Summarization | gemini-2.5-flash | ~76% cheaper than Gemini 2.5 Pro |
+| Complex reasoning | claude-sonnet-5 / gpt-5.4 / gemini-2.5-pro | Baseline |
 
-> **\*Disclaimer:** Cost savings percentages are estimates based on published pricing at time of writing and may vary. Actual savings depend on token usage, provider routing, and current pricing. Always check the [OpenRouter pricing page](https://openrouter.ai/models) for up-to-date rates.
+> **\*Basis:** Savings are computed from each model's listed input-token price on [OpenRouter's model pages](https://openrouter.ai/models) as of 2026-09-27 (e.g. Claude Haiku 4.5 vs. Claude Opus 5, GPT-5.4 nano vs. GPT-5.4, Gemini 2.5 Flash vs. Gemini 2.5 Pro). Output-token pricing and your actual prompt/completion mix will shift real-world savings, and prices change frequently - always check the [OpenRouter pricing page](https://openrouter.ai/models) for current rates before estimating production costs.
 
 ### Enable Request Caching
 
@@ -683,7 +682,7 @@ const result = await ai.generate({
     5. Time zone`
   },
   provider: "openrouter",
-  model: "anthropic/claude-3-5-haiku",
+  model: "anthropic/claude-haiku-4.5",
 });
 ```
 
@@ -711,9 +710,9 @@ const ai = new NeuroLink();
 // Implement model fallback with try/catch
 async function generateWithFallback(prompt: string) {
   const fallbackModels = [
-    "anthropic/claude-3-5-sonnet",
-    "openai/gpt-4o",
-    "google/gemini-2.0-flash"
+    "anthropic/claude-sonnet-5",
+    "openai/gpt-5.4",
+    "google/gemini-2.5-flash"
   ];
 
   for (const model of fallbackModels) {
@@ -753,12 +752,12 @@ You now have everything needed to build with 300+ AI models through one unified 
 - **[Multimodal Processing Tutorial](/posts/multimodal-document-processing/)** - Add PDF, CSV, and image processing to your AI workflows
 - **[Enterprise HITL & Guardrails Guide](https://docs.neurolink.ink/features/hitl/)** - Implement governance and safety controls
 - **[Redis Memory Configuration](https://docs.neurolink.ink/conversation-memory/)** - Set up persistent conversation memory for production
-- **[MCP Tools Integration](https://docs.neurolink.ink/advanced/mcp-integration/)** - Add 58+ external tool capabilities to your AI applications
+- **[MCP Tools Integration](https://docs.neurolink.ink/advanced/mcp-integration/)** - Connect any MCP server (9 one-command configs included) to your AI applications
 
 ### Reference documentation
 
 - **[Full SDK API Reference](https://docs.neurolink.ink/sdk/api-reference/)** - Complete TypeScript API documentation
-- **[Provider Configuration Options](https://docs.neurolink.ink/getting-started/provider-setup/)** - Detailed setup for all 13 supported providers
+- **[Provider Configuration Options](https://docs.neurolink.ink/getting-started/provider-setup/)** - Detailed setup for all 14 supported providers
 - **[CLI Command Reference](https://docs.neurolink.ink/cli/commands/)** - Every CLI command with examples
 
 ### Get started now
@@ -821,10 +820,10 @@ flowchart LR
     end
 
     subgraph Models["300+ Models"]
-        M1["Claude 3.5"]
-        M2["GPT-4o"]
-        M3["Gemini 2.0"]
-        M4["LLaMA 3.1"]
+        M1["Claude Sonnet 5"]
+        M2["GPT-5.4"]
+        M3["Gemini 2.5"]
+        M4["LLaMA 4"]
         M5["..."]
     end
 

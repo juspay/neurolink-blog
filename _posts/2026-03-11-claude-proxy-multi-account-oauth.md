@@ -26,7 +26,7 @@ image:
   alt: 'Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale'
 ---
 
-A single Anthropic API key hits rate limits fast. When your entire engineering organization depends on Claude Code for daily work -- code review, architecture exploration, bug triage -- one key is a bottleneck, and two keys managed manually is a headache. At Juspay, we had 30+ engineers hitting Claude simultaneously. The math did not work.
+A single Anthropic API key hits rate limits fast. When your entire engineering organization depends on Claude Code for daily work -- code review, architecture exploration, bug triage -- one key is a bottleneck, and two keys managed manually is a headache. Picture an engineering org with dozens of developers hitting Claude simultaneously: the math does not work.
 
 So we built a proxy. NeuroLink's Claude Proxy sits between Claude Code and the Anthropic API, pooling multiple accounts with automatic OAuth token refresh, exponential-backoff failover on rate limits, and a fallback chain to alternative providers when every Claude account is exhausted. This post traces the architecture from request ingestion to response delivery, with the actual TypeScript that powers it.
 
@@ -131,11 +131,9 @@ sequenceDiagram
 **Layer 2 -- On-401 retry.** If Anthropic returns a 401 despite the pre-request check (clock skew, token revocation, race condition), the proxy refreshes the token and retries up to 5 times. If all retries fail, the account enters a 5-minute cooldown and the proxy moves to the next account.
 
 ```typescript
-// Token refresh logic from tokenRefresh.ts
-import { TokenStore } from "@juspay/neurolink/auth";
-
+// Illustrative refresh logic (not a literal excerpt from a single file)
 const REFRESH_BUFFER_MS = 60 * 60 * 1000; // 1 hour
-const MAX_AUTH_RETRIES = 5;
+const MAX_AUTH_RETRIES = 5; // matches claudeProxyRoutes.ts
 const MAX_CONSECUTIVE_REFRESH_FAILURES = 15;
 
 function needsRefresh(expiresAt: number): boolean {
@@ -194,9 +192,8 @@ Accounts are discovered on every request (not cached across requests) from three
 This priority ordering means OAuth accounts always take precedence. API keys are a last resort, used only when no OAuth accounts have been configured.
 
 ```typescript
-// Account pool loading from claudeProxyRoutes.ts
-import { TokenStore } from "@juspay/neurolink/auth";
-
+// Illustrative account pool loading, modeled on claudeProxyRoutes.ts
+// (TokenStore itself is an internal type, not part of the public @juspay/neurolink API)
 interface ProxyAccount {
   label: string;
   type: "oauth" | "api_key";
@@ -205,7 +202,19 @@ interface ProxyAccount {
   expiresAt?: number;
 }
 
-async function loadAccounts(tokenStore: TokenStore): Promise<ProxyAccount[]> {
+interface TokenStoreLike {
+  listProviders(): Promise<string[]>;
+  loadTokens(key: string): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+  } | null>;
+  isDisabled(key: string): Promise<boolean>;
+}
+
+async function loadAccounts(
+  tokenStore: TokenStoreLike,
+): Promise<ProxyAccount[]> {
   const accounts: ProxyAccount[] = [];
 
   // Priority 1: TokenStore compound keys
@@ -373,7 +382,7 @@ Not every request needs to go to Anthropic. The Model Router resolves incoming m
 
 ```mermaid
 flowchart TD
-    Req["Incoming Request\nmodel: claude-sonnet-4-20250514"] --> MM{"Model Mappings\ncheck"}
+    Req["Incoming Request\nmodel: claude-sonnet-5"] --> MM{"Model Mappings\ncheck"}
 
     MM -->|"Match found"| Map["Route to mapped\nprovider + model"]
     MM -->|"No match"| PT{"Passthrough\nlist check"}
@@ -400,13 +409,13 @@ routing:
 
   # Remap specific models to other providers
   model-mappings:
-    - from: claude-3-haiku-20240307
+    - from: claude-haiku-4-5-20251001
       to: gemini-2.5-flash
       provider: google-ai
 
   # These always go directly to Anthropic
   passthrough-models:
-    - claude-opus-4-20250514
+    - claude-opus-5
     - claude-sonnet-4-5-20250929
 
   # When all Claude accounts are exhausted
@@ -414,10 +423,10 @@ routing:
     - provider: google-ai
       model: gemini-2.5-pro
     - provider: openai
-      model: gpt-4o
+      model: gpt-5.4
 ```
 
-This configuration routes Haiku requests to Gemini Flash (cheaper), ensures Opus and Sonnet 4.5 always use Anthropic directly, and falls back through Gemini Pro then GPT-4o when all Claude accounts are rate-limited.
+This configuration routes Haiku requests to Gemini Flash (cheaper), ensures Opus and Sonnet 4.5 always use Anthropic directly, and falls back through Gemini Pro then GPT-5.4 when all Claude accounts are rate-limited.
 
 ## Fallback Chain Execution
 
@@ -634,7 +643,7 @@ routing:
     - provider: google-ai
       model: gemini-2.5-flash
     - provider: openai
-      model: gpt-4o
+      model: gpt-5.4
 
 cloaking:
   mode: auto

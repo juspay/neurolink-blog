@@ -8,7 +8,8 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Four MCP transports: stdio, http, sse, websocket — picking the right one — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  A practical comparison of NeuroLink's four MCP transports -- stdio, HTTP, SSE,
+  and WebSocket -- and how to pick the right one for a tool's architecture.
 toc: true
 mermaid: true
 pin: false
@@ -16,7 +17,7 @@ image:
   path: /assets/img/posts/four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one/hero.png
   alt: 'Four MCP transports: stdio, http, sse, websocket — picking the right one'
 ---
-We built the first NeuroLink MCP server manager to run external tools as subprocesses, communicating over `stdio`. It was simple, self-contained, and it worked perfectly for tools that were packaged with the main application. Then we deployed a new tool at Juspay, a Python-based document analyzer running in its own Docker container. The `stdio` transport failed instantly. The parent NeuroLink process couldn't spawn a process inside a separate container, and even if it could, we had no way to monitor the tool's health, manage its lifecycle, or scale it independently. That failure forced us to decouple the tool from the agent, leading to the four-transport architecture MCP uses today: `stdio` for simple cases, and HTTP, Server-Sent Events (SSE), and WebSockets for robust, networked tool execution.
+NeuroLink's first MCP server manager ran external tools as subprocesses, communicating over `stdio`. That's simple and self-contained, and it works well for tools packaged with the main application. But picture a tool that has to run in its own container — a Python-based document analyzer, say, deployed independently of the agent process. The `stdio` transport can't reach it: the parent process can't spawn a process inside a separate container, and even if it could, there'd be no way to monitor the tool's health, manage its lifecycle, or scale it independently. That kind of constraint is exactly what MCP's four-transport architecture is built to handle: `stdio` for simple cases, and HTTP, Server-Sent Events (SSE), and WebSockets for robust, networked tool execution.
 
 ## The Problem with Tight Coupling
 
@@ -47,7 +48,7 @@ The problem is that this creates a rigid parent-child relationship.
 
 ## HTTP: Stateless, Scalable, and Standard
 
-To solve the containerization problem we saw at Juspay, we introduced the HTTP transport. An MCP server using the `http` transport is just a standard web server that exposes a specific endpoint for tool calls.
+To solve that containerization problem, NeuroLink introduces the HTTP transport. An MCP server using the `http` transport is just a standard web server that exposes a specific endpoint for tool calls.
 
 NeuroLink's `ExternalServerManager` doesn't spawn this process. It simply needs to know the URL.
 
@@ -216,8 +217,6 @@ There's no single "best" transport; the right choice depends entirely on the too
 - **`websocket`**: Reserve WebSockets for tools that are truly conversational. If the tool needs to ask questions, get clarifications, or have a low-latency, back-and-forth exchange with the agent, the full-duplex nature of WebSockets is what you need. This is the most powerful but also the most complex transport to manage.
 
 By supporting all four, NeuroLink's MCP allows you to `executeTool` against any kind of tool, from a local script to a globally distributed service, without changing your application-level code. You just point the `ExternalServerManager` at a new `MCPServerInfo`, and it handles the rest.
-
----
 
 ---
 

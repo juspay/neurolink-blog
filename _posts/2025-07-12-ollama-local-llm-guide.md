@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Running Local LLMs with NeuroLink and Ollama
+title: 'Running Local LLMs with NeuroLink and Ollama'
 date: '2025-07-12 10:00:00 +0530'
 categories:
   - Tutorial
@@ -189,13 +189,13 @@ With Ollama running, pull a model to get started:
 
 ```bash
 # Pull Llama 3.1 - great balance of capability and speed
-ollama pull llama3.1:latest
+ollama pull llama3.1:8b
 
 # Pull Mistral - excellent for general tasks
 ollama pull mistral:latest
 
 # Pull CodeLlama for programming tasks
-ollama pull codellama:latest
+ollama pull codellama:13b
 ```
 
 Verify the model is available:
@@ -207,7 +207,7 @@ ollama list
 Test it with a quick prompt:
 
 ```bash
-ollama run llama3.1:latest "Explain quantum computing in simple terms"
+ollama run llama3.1:8b "Explain quantum computing in simple terms"
 ```
 
 ## Configuring NeuroLink for Ollama
@@ -227,7 +227,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Explain quantum computing in simple terms' },
   provider: 'ollama',
-  model: 'llama3.1:latest',
+  model: 'llama3.1:8b',
 });
 
 console.log(result.content);
@@ -239,12 +239,11 @@ Configure Ollama connection via environment variables:
 
 ```bash
 export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=llama3.1:latest
+export OLLAMA_MODEL=llama3.1:8b
 export OLLAMA_TIMEOUT=240000
-export OLLAMA_OPENAI_COMPATIBLE=true  # Use OpenAI-compatible API mode (optional)
 ```
 
-When `OLLAMA_OPENAI_COMPATIBLE` is set to `true`, NeuroLink will use Ollama's OpenAI-compatible endpoint (`/v1/chat/completions`) instead of the native Ollama API (`/api/generate`). This can be useful for compatibility with tools or workflows designed for the OpenAI API format.
+NeuroLink talks to Ollama through its OpenAI-compatible `/v1` API, so `OLLAMA_BASE_URL` is normalized to that endpoint automatically — you don't need to add a `/v1` suffix or set any extra flag to enable it.
 
 ### Using Ollama with NeuroLink
 
@@ -260,7 +259,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: 'Write a TypeScript function to calculate fibonacci numbers' },
   provider: 'ollama',
-  model: 'llama3.1:latest',
+  model: 'llama3.1:8b',
 });
 
 console.log(response.content);
@@ -279,14 +278,14 @@ const neurolink = new NeuroLink();
 const quickResponse = await neurolink.generate({
   input: { text: 'What is 2 + 2?' },
   provider: 'ollama',
-  model: 'llama3.1:latest',
+  model: 'llama3.1:8b',
 });
 
 // Code-specialized model for programming tasks
 const codeResponse = await neurolink.generate({
   input: { text: 'Write a binary search function in TypeScript' },
   provider: 'ollama',
-  model: 'codellama:latest',
+  model: 'codellama:13b',
 });
 
 // Large model for complex reasoning
@@ -312,7 +311,7 @@ Choosing the right model for your use case is crucial for balancing capability w
 
 **Llama 3.1 70B** (40GB)
 
-- Best for: Complex reasoning, nuanced tasks, near-GPT-4 quality
+- Best for: Complex reasoning, nuanced tasks, near-flagship-model quality
 - VRAM: 48GB+ (or CPU with 64GB+ RAM)
 - Speed: Slower, better for batch processing
 - Quality: State-of-the-art open source
@@ -336,7 +335,7 @@ Choosing the right model for your use case is crucial for balancing capability w
 
 - Best for: Complex programming tasks, multi-file contexts
 - VRAM: 24GB minimum
-- Quality: Approaches GPT-4 for coding
+- Quality: Approaches flagship cloud models for coding
 
 ### Specialized Models
 
@@ -460,7 +459,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: 'Explain machine learning in detail' },
   provider: 'ollama',
-  model: 'llama3.1:latest',
+  model: 'llama3.1:8b',
 });
 
 for await (const chunk of result.stream) {
@@ -484,7 +483,7 @@ async function batchInference(prompts: string[]): Promise<string[]> {
     neurolink.generate({
       input: { text: prompt },
       provider: 'ollama',
-      model: 'llama3.1:latest',
+      model: 'llama3.1:8b',
     })
   );
 
@@ -524,7 +523,7 @@ async function generateWithFallback(prompt: string): Promise<string> {
       const result = await neurolink.generate({
         input: { text: prompt },
         provider,
-        model: provider === 'ollama' ? 'llama3.1:latest' : undefined
+        model: provider === 'ollama' ? 'llama3.1:8b' : undefined
       });
       return result.content;
     } catch (error) {
@@ -557,10 +556,10 @@ interface TaskConfig {
 }
 
 const taskRoutes: Record<TaskType, TaskConfig> = {
-  simple_qa: { provider: 'ollama', model: 'llama3.1:latest' },
-  code_generation: { provider: 'ollama', model: 'codellama:latest' },
-  complex_reasoning: { provider: 'anthropic', model: 'claude-3-opus' },
-  creative_writing: { provider: 'openai', model: 'gpt-4' },
+  simple_qa: { provider: 'ollama', model: 'llama3.1:8b' },
+  code_generation: { provider: 'ollama', model: 'codellama:13b' },
+  complex_reasoning: { provider: 'anthropic', model: 'claude-opus-5' },
+  creative_writing: { provider: 'openai', model: 'gpt-5.4' },
 };
 
 async function routedGenerate(prompt: string, taskType: TaskType): Promise<string> {
@@ -599,10 +598,12 @@ interface ProviderConfig {
   qualityScore: number;
 }
 
+// Costs and quality scores below are illustrative placeholders for this
+// routing pattern -- check each provider's pricing page for current rates.
 const providers: ProviderConfig[] = [
-  { provider: 'ollama', model: 'llama3.1:latest', costPerToken: 0, qualityScore: 0.85 },
-  { provider: 'openai', model: 'gpt-4', costPerToken: 0.00003, qualityScore: 0.95 },
-  { provider: 'anthropic', model: 'claude-3-opus', costPerToken: 0.000025, qualityScore: 0.94 }
+  { provider: 'ollama', model: 'llama3.1:8b', costPerToken: 0, qualityScore: 0.85 },
+  { provider: 'openai', model: 'gpt-5.4', costPerToken: 0.00003, qualityScore: 0.95 },
+  { provider: 'anthropic', model: 'claude-opus-5', costPerToken: 0.000025, qualityScore: 0.94 }
 ];
 
 async function costOptimizedGenerate(
@@ -681,7 +682,7 @@ async function privacyAwareGenerate(prompt: string): Promise<string> {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: useLocal ? 'ollama' : 'openai',
-    model: useLocal ? 'llama3.1:latest' : 'gpt-4'
+    model: useLocal ? 'llama3.1:8b' : 'gpt-5.4'
   });
 
   if (useLocal) {
@@ -732,14 +733,14 @@ async function trackedGenerate(prompt: string): Promise<string> {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'ollama',
-    model: 'llama3.1:latest',
+    model: 'llama3.1:8b',
   });
 
   const latencyMs = Date.now() - startTime;
 
   metricsLog.push({
     provider: 'ollama',
-    model: 'llama3.1:latest',
+    model: 'llama3.1:8b',
     latencyMs,
     inputTokens: result.usage?.input ?? 0,
     outputTokens: result.usage?.output ?? 0,
@@ -790,7 +791,7 @@ async function checkOllamaHealth(): Promise<HealthStatus> {
     await neurolink.generate({
       input: { text: 'Hello' },
       provider: 'ollama',
-      model: 'llama3.1:latest',
+      model: 'llama3.1:8b',
     });
 
     return {
@@ -862,7 +863,7 @@ async function loggedGenerate(prompt: string): Promise<string> {
     const result = await neurolink.generate({
       input: { text: prompt },
       provider: 'ollama',
-      model: 'llama3.1:latest',
+      model: 'llama3.1:8b',
     });
 
     logger.info('Inference completed', {
@@ -895,8 +896,8 @@ async function loggedGenerate(prompt: string): Promise<string> {
 ollama list
 
 # Re-pull if corrupted
-ollama rm llama3.1:latest
-ollama pull llama3.1:latest
+ollama rm llama3.1:8b
+ollama pull llama3.1:8b
 
 # Check disk space
 df -h ~/.ollama
@@ -909,8 +910,9 @@ df -h ~/.ollama
 **Solutions**:
 
 ```bash
-# Use smaller quantized model
-ollama pull llama3.1:latest
+# Use a smaller quantized variant instead of the full-precision model
+# (check `ollama.com/library/llama3.1` for the current tag list)
+ollama pull llama3.1:8b-instruct-q4_K_M
 
 # Reduce context window per-model via Modelfile:
 #   PARAMETER num_ctx 2048
@@ -967,7 +969,7 @@ async function safeGenerate(prompt: string): Promise<string | null> {
     const result = await neurolink.generate({
       input: { text: prompt },
       provider: 'ollama',
-      model: 'llama3.1:latest',
+      model: 'llama3.1:8b',
     });
     return result.content;
   } catch (error) {
@@ -975,7 +977,7 @@ async function safeGenerate(prompt: string): Promise<string | null> {
       if (error.message.includes('ECONNREFUSED')) {
         console.error('Ollama server is not running. Start with: ollama serve');
       } else if (error.message.includes('model not found')) {
-        console.error('Model not found. Pull with: ollama pull llama3.1:latest');
+        console.error('Model not found. Pull with: ollama pull llama3.1:8b');
       } else {
         console.error('Inference error:', error.message);
       }
@@ -1075,7 +1077,7 @@ async function secureGenerate(prompt: string, maxTokens: number = 1000): Promise
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'ollama',
-    model: 'llama3.1:latest',
+    model: 'llama3.1:8b',
   });
 
   return result.content;
@@ -1093,7 +1095,7 @@ You now have local LLMs running with Ollama and NeuroLink. Here is what you buil
 5. Hybrid cloud-local deployment patterns
 6. Monitoring and troubleshooting
 
-Your next step: install Ollama, pull `llama3.1:latest`, and run your first local generation with NeuroLink. Then add it as a fallback provider behind your primary cloud provider for zero-cost resilience.
+Your next step: install Ollama, pull `llama3.1:8b`, and run your first local generation with NeuroLink. Then add it as a fallback provider behind your primary cloud provider for zero-cost resilience.
 
 ---
 

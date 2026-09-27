@@ -154,13 +154,13 @@ async function runLatencyBenchmark() {
 
   // Warm-up
   console.log('Warming up...');
-  await measureSingleRequestLatency('vertex', 'gemini-2.0-flash', testPrompt, 10);
+  await measureSingleRequestLatency('vertex', 'gemini-2.5-flash', testPrompt, 10);
 
   // Measurement
   console.log('Measuring...');
   const latencies = await measureSingleRequestLatency(
     'vertex',
-    'gemini-2.0-flash',
+    'gemini-2.5-flash',
     testPrompt,
     100
   );
@@ -290,7 +290,7 @@ async function runThroughputBenchmark() {
 
     const result = await measureThroughput(
       'vertex',
-      'gemini-2.0-flash',
+      'gemini-2.5-flash',
       testPrompt,
       concurrency,
       testDuration
@@ -469,9 +469,9 @@ async function compareProviders(
 // Example: Compare multiple providers
 async function runProviderComparison() {
   const configs = [
-    { provider: 'vertex', model: 'gemini-2.0-flash' },
-    { provider: 'openai', model: 'gpt-4o-mini' },
-    { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+    { provider: 'vertex', model: 'gemini-2.5-flash' },
+    { provider: 'openai', model: 'gpt-5.4-mini' },
+    { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
   ];
 
   const results = await compareProviders(

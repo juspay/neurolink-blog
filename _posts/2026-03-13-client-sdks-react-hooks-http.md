@@ -161,7 +161,7 @@ The client exposes typed methods for each API surface:
 const result = await client.generate({
   input: { text: "Explain TCP in two sentences" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   temperature: 0.7,
 });
 console.log(result.data.content);
@@ -254,7 +254,7 @@ await client.stream(
   {
     input: { text: "Explain quantum computing" },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
   },
   {
     onText: (text) => process.stdout.write(text),
@@ -413,26 +413,34 @@ const streaming = createStreamingClient({
   transport: "sse", // or "websocket"
 });
 
-// Convert callbacks to an AsyncIterable
+// Wrap a raw fetch response in an AsyncIterable
 import { createAsyncStream } from "@juspay/neurolink/client";
 
-const iterable = createAsyncStream((callbacks) => {
-  client.stream(
-    { input: { text: "Tell me a story" }, provider: "anthropic", model: "claude-3-5-sonnet" },
-    callbacks,
-  );
-});
+const iterable = createAsyncStream(
+  fetch("https://api.neurolink.example.com/api/generate/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": process.env.NEUROLINK_API_KEY! },
+    body: JSON.stringify({ input: { text: "Tell me a story" }, provider: "anthropic", model: "claude-sonnet-5" }),
+  }),
+);
 
-for await (const chunk of iterable) {
-  process.stdout.write(chunk.content ?? "");
+for await (const event of iterable) {
+  if (event.type === "text") {
+    process.stdout.write(event.content ?? "");
+  }
 }
 
-// Or collect the entire stream into a single string
-const fullText = await collectStream(
-  { input: { text: "Write a haiku" }, provider: "openai", model: "gpt-4o" },
-  client,
+// Or collect the entire stream into a single result
+const result = await collectStream(
+  createAsyncStream(
+    fetch("https://api.neurolink.example.com/api/generate/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": process.env.NEUROLINK_API_KEY! },
+      body: JSON.stringify({ input: { text: "Write a haiku" }, provider: "openai", model: "gpt-5.4" }),
+    }),
+  ),
 );
-console.log(fullText);
+console.log(result.content);
 ```
 
 ---
@@ -605,14 +613,14 @@ const neurolink = createNeuroLinkProvider({
 
 // Non-streaming generation
 const result = await generateText({
-  model: neurolink("gpt-4o"),
+  model: neurolink("gpt-5.4"),
   prompt: "Explain recursion in one sentence",
 });
 console.log(result.text);
 
 // Streaming generation
 const stream = await streamText({
-  model: neurolink("claude-3-5-sonnet"),
+  model: neurolink("claude-sonnet-5"),
   prompt: "Write a short poem about TypeScript",
 });
 
@@ -621,7 +629,7 @@ for await (const chunk of stream.textStream) {
 }
 ```
 
-The provider automatically infers the upstream AI provider from the model ID: `gpt-4o` maps to OpenAI, `claude-3-5-sonnet` to Anthropic, `gemini-2.5-flash` to Google AI. No explicit provider configuration needed.
+The provider automatically infers the upstream AI provider from the model ID: `gpt-5.4` maps to OpenAI, `claude-sonnet-5` to Anthropic, `gemini-2.5-flash` to Google AI. No explicit provider configuration needed.
 
 ### createNeuroLinkModel
 
@@ -634,7 +642,7 @@ import { generateText } from "ai";
 const model = createNeuroLinkModel({
   baseUrl: "https://api.neurolink.example.com",
   apiKey: process.env.NEUROLINK_API_KEY,
-  modelId: "gpt-4o",
+  modelId: "gpt-5.4",
   provider: "openai",
 });
 
@@ -657,7 +665,7 @@ export async function POST(req: Request) {
     apiKey: process.env.NEUROLINK_API_KEY!,
     input: { text: prompt },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
   });
 }
 ```
@@ -887,14 +895,14 @@ The error classes form a hierarchy:
 
 | Error Class           | Code                      | Typical Cause                     |
 |-----------------------|---------------------------|-----------------------------------|
-| `HttpError`           | mapped from status        | HTTP 4xx/5xx responses            |
-| `RateLimitError`      | `RATE_LIMITED`            | 429 Too Many Requests             |
-| `ValidationError`     | `VALIDATION_ERROR`        | 400 with validation details       |
-| `AuthenticationError` | `UNAUTHORIZED`            | 401 invalid credentials           |
-| `NetworkError`        | `NETWORK_ERROR`           | Connection failures               |
-| `TimeoutError`        | `TIMEOUT`                 | Request exceeded timeout          |
-| `StreamError`         | `STREAM_ERROR`            | Stream processing failure         |
-| `ProviderError`       | `PROVIDER_ERROR`          | Upstream AI provider error        |
+| `HttpError`                 | mapped from status        | HTTP 4xx/5xx responses            |
+| `ClientRateLimitError`      | `RATE_LIMITED`            | 429 Too Many Requests             |
+| `ClientValidationError`     | `VALIDATION_ERROR`        | 400 with validation details       |
+| `ClientAuthenticationError` | `UNAUTHORIZED`            | 401 invalid credentials           |
+| `ClientNetworkError`        | `NETWORK_ERROR`           | Connection failures               |
+| `ClientTimeoutError`        | `TIMEOUT`                 | Request exceeded timeout          |
+| `StreamError`               | `STREAM_ERROR`            | Stream processing failure         |
+| `ClientProviderError`       | `PROVIDER_ERROR`          | Upstream AI provider error        |
 | `ContextLengthError`  | `CONTEXT_LENGTH_EXCEEDED` | Input exceeds model context       |
 | `ContentFilterError`  | `CONTENT_FILTERED`        | Response blocked by safety filter |
 | `AbortError`          | `ABORT_ERROR`             | Request cancelled via signal      |

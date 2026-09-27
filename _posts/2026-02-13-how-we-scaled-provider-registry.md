@@ -75,7 +75,7 @@ Two providers, two developers, a simple codebase. Direct imports at the top of t
 
 ### Version 2: Switch Statement for 5 Providers
 
-Growth came fast. We added OpenAI for teams that wanted GPT-4, Anthropic for Claude, and Azure OpenAI for customers with Azure commitments. The factory grew into a switch statement.
+Growth came fast. We added OpenAI for teams that wanted direct access to OpenAI's models, Anthropic for Claude, and Azure OpenAI for customers with Azure commitments. The factory grew into a switch statement.
 
 ```typescript
 switch (name) {
@@ -202,7 +202,7 @@ ProviderFactory.registerProvider(
     const { OpenAIProvider } = await import('./providers/openAI.js');
     return new OpenAIProvider(modelName, providerName);
   },
-  'gpt-4o',                                    // default model
+  'gpt-5.4',                                   // default model
   ['gpt', 'chatgpt', 'openai-api'],           // aliases
 );
 
@@ -273,10 +273,10 @@ The `normalizeProviderName()` function checks the registration map first, then s
 import { ProviderFactory } from '@juspay/neurolink';
 
 // Create provider by name
-const openai = await ProviderFactory.createProvider('openai', 'gpt-4o');
+const openai = await ProviderFactory.createProvider('openai', 'gpt-5.4');
 
 // Create provider by alias
-const same = await ProviderFactory.createProvider('gpt', 'gpt-4o');
+const same = await ProviderFactory.createProvider('gpt', 'gpt-5.4');
 
 // Auto-detect from environment
 const auto = await ProviderFactory.createProvider(); // uses NEUROLINK_PROVIDER or 'vertex'
@@ -312,7 +312,7 @@ Each provider follows the same registration template:
 ProviderFactory.registerProvider(
   'openai',
   (modelName) => new OpenAIProvider(modelName),
-  'gpt-4o',
+  'gpt-5.4',
   ['gpt', 'chatgpt']
 );
 ```
@@ -340,13 +340,22 @@ The result: importing `@juspay/neurolink` does not load all 13 provider implemen
 
 Every provider extends `BaseProvider`, which implements the `AIProvider` interface. This contract is the reason adding a new provider takes days, not weeks.
 
-### Three Required Methods
+### Four Required Methods
+
+`BaseProvider` (`src/lib/core/baseProvider.ts`) is internal to the package -- it
+is not one of `@juspay/neurolink`'s exports. The snippet below is illustrative:
+it shows the internal contract every bundled provider implements by extending
+`BaseProvider`, not code you can import and extend from outside the package. A
+provider registered from outside the package instead implements the public
+`AIProvider` interface directly and registers itself with the exported
+`ProviderFactory.registerProvider()`.
 
 ```typescript
-import { BaseProvider } from '@juspay/neurolink';
 import type { AIProviderName } from '@juspay/neurolink';
-import type { LanguageModelV1 } from 'ai';
+import type { LanguageModel } from 'ai';
 
+// Illustrative only -- BaseProvider isn't exported, so this can't be
+// imported and extended from outside the package as written.
 export class MyProvider extends BaseProvider {
   // Required: Default model when none specified
   getDefaultModel(): string {
@@ -358,12 +367,17 @@ export class MyProvider extends BaseProvider {
     return 'my-provider' as AIProviderName;
   }
 
-  // Required: Create the AI SDK language model
-  createModel(modelName: string): LanguageModelV1 {
+  // Required: Return the AI SDK language model instance
+  getAISDKModel(): LanguageModel | Promise<LanguageModel> {
     // Use any AI SDK-compatible language model
-    return mySDK.languageModel(modelName, {
+    return mySDK.languageModel(this.modelName, {
       apiKey: process.env.MY_API_KEY,
     });
+  }
+
+  // Required: Format provider-specific errors
+  formatProviderError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
   }
 
   // Optional: Disable tools if the model doesn't support them
@@ -375,16 +389,16 @@ export class MyProvider extends BaseProvider {
 // That's it. generate(), stream(), tools, telemetry -- all inherited.
 ```
 
-That is the entire contract. Three abstract methods define what makes your provider unique. Everything else -- `generate()`, `stream()`, tool aggregation via `ToolsManager`, telemetry, middleware, analytics, and message building -- is inherited from `BaseProvider` through its composition modules.
+That is the entire contract. Four abstract methods define what makes your provider unique. Everything else -- `generate()`, `stream()`, tool aggregation via `ToolsManager`, telemetry, middleware, analytics, and message building -- is inherited from `BaseProvider` through its composition modules.
 
 ### Inherited Functionality
 
-`BaseProvider` delegates to specialized handlers:
+`BaseProvider` delegates to specialized modules:
 
-- **`GenerationHandler`**: Text generation with tools
+- Text generation with tools is handled directly on `BaseProvider`, with the native tool-calling loop in `nativeGenerateLoop.ts`
 - **`StreamHandler`**: Streaming with tool fallback
 - **`ToolsManager`**: Tool aggregation and registration
-- Telemetry, middleware, analytics, and message building are composed in as well
+- **`MessageBuilder`** and **`TelemetryHandler`** compose in message building, telemetry, and analytics
 
 This composition-over-inheritance approach means a new provider automatically supports every feature the SDK offers, without any additional code.
 
@@ -445,7 +459,7 @@ flowchart TD
 
 **OpenAI**, **Anthropic**, **Mistral**, and **Google AI Studio** use API key authentication with straightforward REST or SDK integration. These are the most commonly used providers for teams that want the latest models without cloud platform lock-in.
 
-Anthropic has a dedicated `AnthropicBaseProvider` that extends the base with support for thinking and reasoning tokens, a capability unique to Claude's extended thinking mode.
+Anthropic's provider (`AnthropicProvider`) has dedicated support for thinking and reasoning tokens, a capability unique to Claude's extended thinking mode.
 
 ### Meta-Providers
 
@@ -457,24 +471,16 @@ Anthropic has a dedicated `AnthropicBaseProvider` that extends the base with sup
 
 ### Provider Exports
 
-All providers are re-exported for direct use when you need to bypass the factory:
+Provider classes are internal to the package -- none of them are re-exported from `@juspay/neurolink`. `ProviderFactory`, `ProviderRegistry`, and `AIProviderFactory` are the parts of this layer that are public. To use a provider directly, go through the factory rather than importing a provider class:
 
 ```typescript
-// All 13 providers, re-exported for direct use
-export { GoogleVertexProvider as GoogleVertexAI } from './googleVertex.js';
-export { AmazonBedrockProvider as AmazonBedrock } from './amazonBedrock.js';
-export { AmazonSageMakerProvider as AmazonSageMaker } from './amazonSagemaker.js';
-export { OpenAIProvider as OpenAI } from './openAI.js';
-export { OpenAICompatibleProvider as OpenAICompatible } from './openaiCompatible.js';
-export { AnthropicProvider } from './anthropic.js';
-export { AzureOpenAIProvider } from './azureOpenai.js';
-export { GoogleAIStudioProvider as GoogleAIStudio } from './googleAiStudio.js';
-export { HuggingFaceProvider as HuggingFace } from './huggingFace.js';
-export { OllamaProvider as Ollama } from './ollama.js';
-export { MistralProvider as MistralAI } from './mistral.js';
-export { LiteLLMProvider as LiteLLM } from './litellm.js';
-// OpenRouter registered via ProviderRegistry (dynamic import)
+import { ProviderFactory } from '@juspay/neurolink';
+
+const openai = await ProviderFactory.createProvider('openai', 'gpt-5.4');
+const anthropic = await ProviderFactory.createProvider('anthropic');
 ```
+
+There is no bypass path to a provider file from outside the package.
 
 ---
 
@@ -488,7 +494,7 @@ From issue to merge: 2 days.
 
 ### What Was Created
 
-1. **`src/lib/providers/openRouter.ts`** -- 150 lines extending `BaseProvider`. Implemented the three required abstract methods, plus OpenRouter-specific configuration for provider preferences and model routing.
+1. **`src/lib/providers/openRouter/`** -- 150 lines extending `BaseProvider`. Implemented the four required abstract methods, plus OpenRouter-specific configuration for provider preferences and model routing.
 
 2. **One line in `ProviderRegistry`** -- Registered the provider with its canonical name, default model, and aliases.
 
@@ -574,7 +580,7 @@ Users think in terms of "gpt" not "openai." Alias resolution costs nothing -- a 
 
 ### 5. The Contract Is Everything
 
-`BaseProvider` with its 3 abstract methods is the reason provider number 13 took 2 days, not 2 weeks. The contract tells you exactly what to implement. Everything else is inherited. A well-designed contract is the highest-leverage investment in an extensible system.
+`BaseProvider` with its 4 abstract methods is the reason provider number 13 took 2 days, not 2 weeks. The contract tells you exactly what to implement. Everything else is inherited. A well-designed contract is the highest-leverage investment in an extensible system.
 
 ### 6. Environment Variables as Configuration
 

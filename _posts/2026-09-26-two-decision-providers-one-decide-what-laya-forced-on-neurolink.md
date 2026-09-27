@@ -31,7 +31,7 @@ This is the second post in that series. The first one ([generate, stream, decide
 
 ## What Laya is
 
-Laya is Convai Innovations' open-weights "System One" decision model, released 2026-09-19 under Apache-2.0. Like Jev, it answers the same three typed question shapes — `boolean`, `choice`, `score` — in a single forward pass, with no text generation anywhere. Unlike Jev, it ships as three checkpoints instead of one hosted model:
+Laya is Convai Innovations' open-weights "System One" decision model, first released on 2026-09-19 under Apache-2.0. Like Jev, it answers the same three typed question shapes — `boolean`, `choice`, `score` — in a single forward pass, with no text generation anywhere. Unlike Jev, it ships as three checkpoints instead of one hosted model:
 
 | Checkpoint | Base | Params | Context | Notes |
 | --- | --- | --- | --- | --- |
@@ -60,13 +60,13 @@ That was a deliberate, late reversal. An earlier internal design draft proposed 
 
 The consequence is a distinct failure mode. With no base URL configured, `decide({ provider: "laya", ... })` throws `invalid_request` — *"Laya requires a base URL. Set LAYA_BASE_URL or pass credentials.laya.baseURL."* — and makes no network call at all. That check runs after the API-key check and before the auth circuit breaker, so a misconfigured Laya call fails at the cheapest possible point, the same way a missing key does for any other provider.
 
-Configuration precedence is environment, then instance, then per-call — narrowest wins:
+Configuration precedence is environment, then instance, then per-call — each narrower SDK layer overrides the one before it:
 
 ```mermaid
 flowchart TD
-    A["LAYA_BASE_URL / LAYA_API_KEY env vars"] --> B["new NeuroLink credentials.laya"]
-    B --> C["decide credentials argument, per call"]
-    C --> D["Effective Laya config for this call"]
+    A["Environment: LAYA_BASE_URL and LAYA_API_KEY"] --> B["Instance: new NeuroLink credentials.laya"]
+    B --> C["Per call: decide credentials.laya"]
+    C --> D["Effective Laya configuration"]
 ```
 
 ## A server that answers wrong instead of refusing
@@ -81,7 +81,7 @@ We re-ran a version of that probe ourselves on 2026-09-26, against the same clas
 
 NeuroLink's local budget is smaller than Laya's raw context window, because part of the window has to be reserved for the questions themselves: 768 tokens of state on `typed-decisions`/`multilingual`, 320 tokens on `english`, `auto`, and any model name NeuroLink doesn't recognize. That last case is deliberate, and it began as a reviewer's minor note that we re-graded to important before merge — an unlisted or aliased model name (Laya's server itself accepts aliases like `en`, `typed`, `ml` that NeuroLink's descriptor doesn't enumerate) gets the *tightest* limit rather than the loosest, so an unrecognized name can't silently under-protect a smaller checkpoint.
 
-The estimator itself went through one real correction. The size check is an estimate — not Laya's own tokenizer — and NeuroLink's existing ~4-characters-per-token heuristic for ASCII text carried over unchanged. Non-ASCII text needed its own rate, and the first pass assumed the same heuristic applied everywhere. A live measurement against the probed server, on 240-character states, showed otherwise: on `typed-decisions`, English ran about 4.9 characters per token, Hindi about 1.02, Arabic about 1.42, and Chinese about 0.71 — nearly 1.4 tokens per character. Against the original four characters per token, that is roughly three to six times denser, depending on the script. The shipped estimator now charges 1.5 tokens per non-ASCII character on `typed-decisions`/`english`/`auto`, and 0.6 on `multilingual` — calibrated to over-refuse rather than under-estimate, which is the safer direction for a check whose job is to stop a request before it leaves the process.
+The estimator itself went through one real correction. The size check is an estimate — not Laya's own tokenizer — and NeuroLink's existing ~4-characters-per-token heuristic for ASCII text carried over unchanged. Non-ASCII text needed its own rate, and the first pass assumed the same heuristic applied everywhere. A live measurement against the probed server, on 240-character states, showed otherwise: on `typed-decisions`, English ran about 4.9 characters per token, Hindi about 1.02, Arabic about 1.42, and Chinese about 0.71 — nearly 1.4 tokens per character. Against the original four-characters-per-token estimate, that is roughly three to six times denser, depending on the script. The shipped estimator now charges 1.5 tokens per non-ASCII character on `typed-decisions`/`english`/`auto`, and 0.6 on `multilingual` — calibrated to over-refuse rather than under-estimate, which is the safer direction for a check whose job is to stop a request before it leaves the process.
 
 ## Measured numbers (2026-09-26, our own run)
 
@@ -170,6 +170,8 @@ export LAYA_MODEL=typed-decisions                         # optional: english | 
 **SDK credentials**, equivalent, and overridable per call:
 
 ```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
 const neurolink = new NeuroLink({
   credentials: {
     laya: {

@@ -26,7 +26,7 @@ image:
 > **Implementation Note**: You will implement these patterns on top of NeuroLink's core API. They are not built-in SDK features but represent recommended approaches you can build yourself.
 {: .prompt-info }
 
-In this guide, you will build three caching layers for NeuroLink applications: exact-match, normalized-key, and semantic caching. By the end, you will have a production-ready caching system that reduces LLM costs by 40-70% and delivers sub-100ms response times for cached queries.
+In this guide, you will build three caching layers for NeuroLink applications: exact-match, normalized-key, and semantic caching. By the end, you will have a practical caching system plus the measurements needed to evaluate hit rate, latency, and savings on your own workload.
 
 **Important Note**: The NeuroLink SDK does not include built-in response caching. This is intentional---caching strategies vary significantly based on application requirements, data sensitivity, and infrastructure. You will implement external caching that integrates cleanly with NeuroLink's `generate()` API.
 
@@ -40,18 +40,18 @@ flowchart TB
     Request --> Normalize[Normalize Query]
     Normalize --> L1{L1: In-Memory<br/>Exact Match?}
 
-    L1 -->|Hit| L1Response[Return Cached<br/>~1ms]
+    L1 -->|Hit| L1Response[Return Cached]
     L1 -->|Miss| L2{L2: Redis<br/>Exact Match?}
 
     L2 -->|Hit| PromoteL1[Promote to L1]
-    PromoteL1 --> L2Response[Return Cached<br/>~5ms]
+    PromoteL1 --> L2Response[Return Cached]
     L2 -->|Miss| Embed[Generate Query<br/>Embedding]
 
     Embed --> L3{L3: Semantic<br/>Search}
-    L3 -->|Similar Found<br/>≥ 0.92| SemanticResponse[Return Similar<br/>~20ms]
+    L3 -->|Similar Found<br/>≥ 0.92| SemanticResponse[Return Similar]
     L3 -->|No Match| LLM[Call NeuroLink<br/>generate]
 
-    LLM --> Response[LLM Response<br/>500-5000ms]
+    LLM --> Response[LLM Response]
     Response --> StoreAll[Store in All Tiers]
     StoreAll --> L1Cache[("L1 Cache")]
     StoreAll --> L2Cache[("L2 Cache")]
@@ -72,9 +72,9 @@ flowchart TB
 
 ## Why Caching Matters for LLM Applications
 
-LLM API calls are fundamentally different from traditional API calls. They're expensive (often $0.01-0.10 per request), slow (500ms-5s latency), and frequently return identical or nearly identical responses for similar inputs.
+LLM API calls can cost more and take longer than a cache lookup, with both cost and latency varying by provider, model, token counts, region, and workload. Similar inputs may also be able to reuse the same response when the application's correctness and freshness requirements permit it.
 
-Consider a customer support chatbot handling 10,000 queries daily. Analysis typically reveals that 30-40% of questions are variations of the same underlying query:
+Consider a customer support chatbot where questions include variations of the same underlying query:
 
 - "What's your return policy?"
 - "How do I return an item?"
@@ -83,28 +83,28 @@ Consider a customer support chatbot handling 10,000 queries daily. Analysis typi
 
 Without caching, each variant triggers a full LLM inference. With intelligent caching, you answer once and serve cached responses for semantically similar queries.
 
-### The Cost Mathematics
+### An Illustrative Cost Scenario
 
-Examine real numbers for a production application:
+The following arithmetic is hypothetical, not a benchmark or forecast. It assumes 10,000 daily queries, an estimated average LLM inference cost of $0.02 per query, a measured 45% cache hit rate, 30 days per month, and excludes cache infrastructure and operations costs. Replace every assumption with measurements and current provider pricing from your own workload:
 
 ```text
-Daily queries: 10,000
-Average cost per query: $0.02
-Cache hit rate (achievable): 45%
+Assumed daily queries: 10,000
+Assumed average LLM inference cost per query: $0.02
+Assumed measured cache hit rate: 45%
 
-Without caching:
-- Daily cost: $200
-- Monthly cost: $6,000
+Without caching under these assumptions:
+- Daily LLM inference cost: $200
+- Monthly LLM inference cost: $6,000
 
-With caching:
-- Cached queries: 4,500 x $0.00 = $0
+With caching under these assumptions:
+- Cached queries: 4,500 with no additional LLM inference
 - Fresh queries: 5,500 x $0.02 = $110
-- Daily cost: $110
-- Monthly cost: $3,300
-- Monthly savings: $2,700
+- Daily LLM inference cost: $110
+- Monthly LLM inference cost: $3,300
+- Difference in LLM inference cost: $2,700 per month
 ```
 
-Beyond cost savings, cached responses return in milliseconds rather than seconds, fundamentally improving user experience.
+Caching can avoid model inference on a hit, but total savings and response latency depend on cache infrastructure, lookup behavior, invalidation, and workload. Measure end-to-end latency and total operating cost before deciding whether a cache tier is worthwhile.
 
 ## Basic Caching Pattern with NeuroLink
 
@@ -170,7 +170,7 @@ async function main() {
   const response = await cachedGenerate({
     input: { text: 'What is the capital of France?' },
     provider: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
     temperature: 0, // Deterministic for better caching
   });
 
@@ -201,18 +201,18 @@ class NormalizedLLMCache {
   private normalizePrompt(prompt: string): string {
     return prompt
       .toLowerCase()
-      .trim()
-      // Remove extra whitespace
-      .replace(/\s+/g, ' ')
       // Standardize punctuation
-      .replace(/[""]/g, '"')
-      .replace(/['']/g, "'")
-      // Remove common filler words that don't change meaning
-      .replace(/\b(please|kindly|could you|can you|would you)\b/gi, '')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      // Remove common filler phrases that don't change meaning
+      .replace(/\b(could you please tell me|please tell me|tell me|could you|can you|would you|please|kindly)\b/gi, '')
       // Standardize question endings
       .replace(/\?+$/, '?')
       // Remove trailing periods before question marks
-      .replace(/\.\s*\?/, '?');
+      .replace(/\.\s*\?/, '?')
+      // Collapse whitespace left by phrase removal
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private generateKey(options: GenerateOptions): string {
@@ -277,7 +277,7 @@ class NormalizedLLMCache {
 // Usage
 const cache = new NormalizedLLMCache();
 
-// These will likely hit the same cache entry due to normalization
+// These normalize to the same prompt and therefore use the same cache entry
 await cache.generate({
   input: { text: 'What is machine learning?' },
   provider: 'vertex',
@@ -291,7 +291,7 @@ await cache.generate({
 });
 ```
 
-Normalization increases hit rates by 15-25% for most applications without requiring additional infrastructure.
+Normalization can improve hit rates when superficial prompt variations are common. Measure the effect on your own query distribution and test that each normalization preserves meaning.
 
 ## Redis Integration for Production Caching
 
@@ -513,8 +513,9 @@ class SemanticLLMCache {
   }
 
   private async generateEmbedding(text: string): Promise<number[]> {
-    // For production, use a proper embedding API like OpenAI's text-embedding-3-small
-    // via neurolink.embed() or the provider's embedding endpoint directly.
+    // For production, create an OpenAI provider with the root-exported
+    // createAIProvider('openai'), then call
+    // provider.embed(text, 'text-embedding-3-small').
     // This simplified example uses content hashing as a pseudo-embedding.
     return this.textToSimpleEmbedding(text);
   }
@@ -1153,12 +1154,12 @@ class CacheMetrics {
 You have built a complete multi-tier caching system for NeuroLink applications. Here is the recommended implementation order:
 
 1. **Start with the basic caching wrapper** -- wrap `neurolink.generate()` with the exact-match pattern and measure your baseline hit rate
-2. **Add normalization** -- implement the `NormalizedLLMCache` to capture query variations and increase hit rates by 15-25%
+2. **Add normalization** -- implement the `NormalizedLLMCache`, then measure whether it safely captures common query variations
 3. **Deploy Redis** -- move to the `RedisLLMCache` for distributed caching across multiple application instances
 4. **Add semantic caching** -- once you understand your query patterns, implement embedding-based matching for the highest hit rates
 5. **Monitor everything** -- use the `CacheMetrics` class to track hit rates, latencies, and cost savings
 
-With proper implementation, you will achieve 40-70% cost reduction while delivering sub-100ms response times for cached queries.
+Use the resulting metrics to determine the hit rate, end-to-end latency, and total cost savings your implementation actually delivers.
 
 ---
 

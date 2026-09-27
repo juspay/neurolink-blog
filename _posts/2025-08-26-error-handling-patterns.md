@@ -80,7 +80,7 @@ async function generateResponse(prompt: string): Promise<string> {
     const result = await neurolink.generate({
       input: { text: prompt },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
     });
     return result.content;
   } catch (error) {
@@ -293,7 +293,7 @@ async function generateWithRetry(prompt: string): Promise<string> {
       const result = await neurolink.generate({
         input: { text: prompt },
         provider: 'openai',
-        model: 'gpt-4o',
+        model: 'gpt-5.4',
       });
       return result.content;
     },
@@ -596,7 +596,7 @@ async function callAIService(prompt: string): Promise<string> {
     const result = await neurolink.generate({
       input: { text: prompt },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
     });
     return result.content;
   });
@@ -614,9 +614,9 @@ interface ProviderConfig {
 }
 
 const providers: ProviderConfig[] = [
-  { provider: 'openai', model: 'gpt-4o' },
+  { provider: 'openai', model: 'gpt-5.4' },
   { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-  { provider: 'google-ai', model: 'gemini-1.5-pro' },
+  { provider: 'google-ai', model: 'gemini-2.5-pro' },
 ];
 
 async function generateWithFailover(prompt: string): Promise<string> {
@@ -858,14 +858,14 @@ async function generateWithLogging(prompt: string, requestId: string): Promise<s
     const result = await neurolink.generate({
       input: { text: prompt },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
     });
     return result.content;
   } catch (error) {
     logError(error, {
       requestId,
       operation: 'generate',
-      model: 'openai/gpt-4o',
+      model: 'openai/gpt-5.4',
     });
     throw error;
   }
@@ -1042,7 +1042,7 @@ async function createAIAnalysis(requestId: string, data: string): Promise<string
     neurolink.generate({
       input: { text: `Analyze: ${data}` },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
     }).then((r) => r.content)
   );
 }
@@ -1070,7 +1070,7 @@ class ResilientAIClient {
 
   constructor(
     providers: ProviderConfig[] = [
-      { provider: 'openai', model: 'gpt-4o' },
+      { provider: 'openai', model: 'gpt-5.4' },
       { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
     ]
   ) {

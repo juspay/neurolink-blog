@@ -31,18 +31,18 @@ image:
 ---
 
 
-We designed NeuroLink's audit infrastructure around a hard constraint: in regulated industries, every AI decision must produce a trace, every action must have an approval record, and every output must pass validation. "The AI did it" is not an acceptable audit response under HIPAA, SOX, Basel III, or GDPR.
+Auditable AI infrastructure starts with a hard constraint: every consequential AI decision should produce a trace, every sensitive action should have an approval record, and every output should pass the validation required by its domain. "The AI did it" is not an adequate audit response in regulated settings.
 
 > **Note:** HIPAA (healthcare), SOX (financial reporting/public companies), and Basel III (banking capital requirements) have distinct compliance requirements. The patterns shown here address common cross-regulatory concerns but each regulation requires domain-specific implementation. Consult qualified legal counsel for your specific regulatory obligations.
 {: .prompt-info }
 
 The architecture addresses three distinct stakeholder needs simultaneously. Compliance teams need to see who approved what, when, and why. Security teams need proof that sensitive data was filtered before it reached the LLM. Operations teams need full request tracing for incident diagnosis.
 
-This deep dive covers the three pillars we built: HITL for action confirmation with audit logging, guardrails middleware for content filtering and policy enforcement, and OpenTelemetry-based observability for complete request tracing. We explore the trade-offs in each design decision and how the pillars compose into a unified compliance pipeline.
+This deep dive covers three pillars: HITL for action confirmation with audit logging, guardrails middleware for content filtering and policy enforcement, and OpenTelemetry-based observability for complete request tracing. It explores the trade-offs in each design decision and how the pillars compose into a unified audit pipeline.
 
 ## Architecture: The Auditable AI Pipeline
 
-We designed the pipeline so that every stage produces evidence -- a log entry, a trace span, an approval record -- retrievable months later during an audit. Here is how the stages compose.
+The pipeline is designed so every stage produces evidence -- a log entry, a trace span, or an approval record -- that the application can retain under its audit policy. Here is how the stages compose.
 
 ```mermaid
 flowchart TB
@@ -61,7 +61,7 @@ Every request enters through guardrails that filter content against policy rules
 
 ## Pillar 1: Human-in-the-Loop (HITL)
 
-We made HITL a first-class SDK primitive rather than an application-level concern. The rationale: when an AI system can approve insurance claims or execute financial trades, the approval mechanism must be reliable, auditable, and impossible to accidentally bypass. Building it at the SDK level eliminates an entire class of implementation errors.
+NeuroLink exposes HITL as an SDK primitive rather than leaving it entirely to application code. When an AI system can propose sensitive actions, the approval mechanism should be reliable, auditable, and difficult to bypass accidentally. Centralizing it in the SDK reduces the chance that each integration implements confirmation differently.
 
 ### HITL Configuration
 
@@ -78,7 +78,7 @@ const neurolink = new NeuroLink({
     confirmationMethod: 'event', // Event-based confirmation
     allowArgumentModification: true,  // Allow reviewer to modify parameters
     autoApproveOnTimeout: false,      // NEVER auto-approve in regulated contexts
-    auditLogging: true,               // Log every decision for compliance
+    auditLogging: true,               // Emit confirmation lifecycle audit entries
     customRules: [
       {
         name: 'high-value-transaction',
@@ -106,38 +106,57 @@ Key configuration points for regulated environments:
 The HITL system is event-driven. When the AI triggers a dangerous action, a confirmation request is emitted. Your application subscribes to these events and presents them to human reviewers through whatever UI your organization uses.
 
 ```typescript
-const hitlManager = neurolink.getHITLManager();
-
-// Listen for confirmation requests
-hitlManager.on('hitl:confirmation-request', (event) => {
+// NeuroLink has no getHITLManager() accessor -- the HITL manager it creates
+// from the `hitl:` config is private. Subscribe through the shared event
+// emitter instead; it forwards confirmation-request, confirmation-response,
+// and timeout events from that internal manager.
+neurolink.getEventEmitter().on('hitl:confirmation-request', async (event) => {
   const { confirmationId, toolName, arguments: args, timeoutMs } = event.payload;
+  const requestedAt = Date.parse(event.payload.metadata.timestamp);
 
-  // Present to reviewer with full context
-  showReviewUI({
+  // Present to reviewer with full context and await the decision
+  const review = await showReviewUI({
     confirmationId,
     toolName,
     args,
     timeoutMs,
     triggeredKeywords: event.payload.metadata.dangerousKeywords,
   });
-});
 
-// Submit reviewer response
-hitlManager.processUserResponse(confirmationId, {
-  approved: true,
-  reason: 'Reviewed and approved per policy 4.2.1',
-  modifiedArguments: modifiedArgs, // Optional: reviewer can adjust parameters
-  userId: 'reviewer-jane-doe',
+  // Submit the reviewer's response by emitting it back on the same emitter
+  neurolink.getEventEmitter().emit('hitl:confirmation-response', {
+    type: 'hitl:confirmation-response',
+    payload: {
+      confirmationId, // Must match the request
+      approved: review.approved,
+      reason: review.reason,
+      modifiedArguments: review.modifiedArguments,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        responseTime: Date.now() - requestedAt, // elapsed milliseconds
+        userId: review.userId,
+      },
+    },
+  });
 });
 ```
 
-Every confirmation request includes the full context: which tool is being called, with what arguments, what triggered the review (the `dangerousKeywords` metadata), and how long the reviewer has to respond. The reviewer's response includes their identity, their decision, and a mandatory reason field -- all of which become part of the permanent audit record.
+Every confirmation request includes the tool, arguments, triggering `dangerousKeywords`, and response timeout. The response can include reviewer identity, decision, reason, modified arguments, and elapsed response time; persist those fields in your approved audit store when your policy requires a durable record.
 
 ### HITL Statistics and Audit
 
-The HITL system maintains running statistics that are invaluable for compliance reporting:
+Two capabilities do not reach `neurolink.getEventEmitter()`: running statistics and the `hitl:audit` stream for confirmation workflow events. Both live only on the standalone `HITLManager` class that `new NeuroLink({ hitl: {...} })` builds and keeps private. If your compliance reporting needs them directly, instantiate `HITLManager` yourself instead of going through the `hitl:` constructor option -- the confirmation-request/response event contract is identical, so the rest of your integration is unchanged:
 
 ```typescript
+import { HITLManager } from '@juspay/neurolink';
+
+const hitlManager = new HITLManager({
+  enabled: true,
+  dangerousActions: ['delete', 'transfer', 'approve_claim', 'prescribe', 'execute_trade'],
+  timeout: 30000,
+  auditLogging: true,
+});
+
 // Access real-time statistics
 const stats = hitlManager.getStatistics();
 console.log(`Total requests: ${stats.totalRequests}`);
@@ -146,14 +165,18 @@ console.log(`Rejected: ${stats.rejectedRequests}`);
 console.log(`Timed out: ${stats.timedOutRequests}`);
 console.log(`Avg response time: ${stats.averageResponseTime}ms`);
 
-// Audit events are emitted for external logging
+// hitl:audit fires on the manager for request/decision/timeout lifecycle events
 hitlManager.on('hitl:audit', (auditLog) => {
   // Send to compliance logging system
   complianceLogger.log(auditLog);
 });
+
+hitlManager.on('hitl:confirmation-request', (event) => {
+  /* present to reviewer, then call hitlManager.processUserResponse(...) */
+});
 ```
 
-The `hitl:audit` event fires for every decision -- approvals, rejections, and timeouts. Each audit log entry contains the full context of the decision: who requested it, who reviewed it, what they decided, why, and when. These logs are designed to be ingested by compliance platforms like Splunk, Datadog, or purpose-built audit systems.
+Each audit log entry contains the full context of the decision: who requested it, what they decided, why, and when. These logs are designed to be ingested by compliance platforms like Splunk, Datadog, or purpose-built audit systems.
 
 ```mermaid
 sequenceDiagram
@@ -178,18 +201,17 @@ Guardrails are your first line of defense. They filter content before it reaches
 
 ### Content Filtering Configuration
 
-NeuroLink's guardrails middleware is configured through the `MiddlewareFactory`, separate from the core NeuroLink constructor:
+NeuroLink's guardrails middleware is configured separately from the core NeuroLink constructor, as a plain `MiddlewareFactoryOptions` object passed to `generate()`/`stream()` via the `middleware` field (not a `MiddlewareFactory` instance -- see the note at the end of this section):
 
 ```typescript
 const neurolink = new NeuroLink();
 
-// Guardrails middleware is configured separately through the MiddlewareFactory:
-const guardrailsMiddleware = new MiddlewareFactory({
+const guardrailsMiddleware = {
   middlewareConfig: {
     guardrails: {
       enabled: true,
       config: {
-        badWords: ['confidential', 'SSN', 'password'],
+        badWords: { enabled: true, list: ['confidential', 'SSN', 'password'] },
         modelFilter: {
           enabled: true,
           filterModel: guardianModel, // Secondary model for safety checks
@@ -200,6 +222,11 @@ const guardrailsMiddleware = new MiddlewareFactory({
       },
     },
   },
+};
+
+await neurolink.generate({
+  input: { text: userPrompt },
+  middleware: guardrailsMiddleware,
 });
 ```
 
@@ -209,13 +236,13 @@ The guardrails middleware operates at multiple stages of the request lifecycle:
 
 1. **`transformParams` (pre-call):** Before the prompt reaches the LLM, `precallEvaluation` analyzes it for policy violations. A prompt asking for a customer's SSN would be blocked here, before any tokens are consumed.
 
-2. **`wrapGenerate` (post-generation):** After the LLM responds, content filtering runs against the bad word list and the model-based safety checker. Any response containing sensitive data is replaced with `<REDACTED BY AI GUARDRAIL>` and an audit event is logged.
+2. **`wrapGenerate` (post-generation):** After the LLM responds, bad-word filtering replaces matching terms with the configured `replacementText` (`[REDACTED]` by default). When enabled, the model-based checker can separately classify the generated text as safe or unsafe.
 
-3. **`wrapStream` (real-time streaming):** For streaming responses, guardrails perform chunk-level content inspection. This is more complex than batch filtering because sensitive content might span multiple chunks, but the middleware handles reassembly and detection.
+3. **`wrapStream` (real-time streaming):** For streaming responses, guardrails buffer contiguous text runs before applying the bad-word filter, so a prohibited term split across adjacent deltas is still detected. This trades incremental delivery of that text run for reliable filtering.
 
-Every blocking action is logged with the reason for blocking, the content that triggered it, and the guardrail rule that fired. This creates a compliance trail showing that your system actively prevented data leakage.
+The guardrails middleware logs filter activity through NeuroLink's logger, but those debug/warning logs are not a durable compliance audit trail by themselves. Export the relevant telemetry and application decision records to your approved audit store, applying your redaction and retention policy.
 
-> **Tip:** We recommend configuring both `badWords` and `modelFilter` for defense in depth. Bad word lists catch known patterns with zero latency; model-based filtering catches novel phrasings that a static word list would miss. The trade-off is added latency from the secondary model call.
+> **Tip:** Configure both `badWords` and `modelFilter` for defense in depth. Bad-word matching catches known patterns without an additional model call; model-based filtering can catch novel phrasings that a static word list would miss. The trade-off is added latency from the secondary model call.
 {: .prompt-tip }
 
 ## Pillar 3: Observability with OpenTelemetry
@@ -259,22 +286,20 @@ Every AI request becomes a trace span with attributes for the provider, model, o
 
 ### Health Monitoring
 
-Real-time health monitoring catches issues before they impact compliance:
+`TelemetryService` itself is an internal class -- it is not exported from the package. The public surface is two wrapper functions, `initializeTelemetry()` and `getTelemetryStatus()`:
 
 ```typescript
-import { TelemetryService } from '@juspay/neurolink';
+import { initializeTelemetry, getTelemetryStatus } from '@juspay/neurolink';
 
-const telemetry = TelemetryService.getInstance();
-const health = await telemetry.getHealthMetrics();
+await initializeTelemetry(); // bootstraps the OTel tracer/exporter if one is configured
 
-console.log(`Memory usage: ${(health.memoryUsage.heapUsed / 1024 / 1024).toFixed(1)} MB`);
-console.log(`Uptime: ${health.uptime}s`);
-console.log(`Active connections: ${health.activeConnections}`);
-console.log(`Error rate: ${health.errorRate}%`);
-console.log(`Avg response time: ${health.averageResponseTime}ms`);
+const status = await getTelemetryStatus();
+console.log(`Telemetry enabled: ${status.enabled}`);
+console.log(`Initialized: ${status.initialized}`);
+console.log(`Exporter endpoint: ${status.endpoint ?? 'not configured'}`);
 ```
 
-A rising error rate might indicate a provider issue. Increasing memory usage might signal a context window leak. Slow response times might mean your rate limits are being hit. All of these are signals that something in your auditable pipeline needs attention.
+For the finer-grained signals -- error rate, memory usage, per-provider response time -- query the counters and histograms from "What Gets Traced" (`ai_provider_errors_total`, `ai_request_duration_ms`, and friends) on your OTLP backend rather than polling the SDK directly; that is where this pipeline already sends them. A rising error rate might indicate a provider issue. Slow response times might mean your rate limits are being hit. All of these are signals that something in your auditable pipeline needs attention.
 
 ## Putting it all together: A Compliant Pipeline
 
@@ -291,16 +316,20 @@ const neurolink = new NeuroLink({
   },
 });
 
-// Middleware is configured separately through the MiddlewareFactory:
-const complianceMiddleware = new MiddlewareFactory({
+// Middleware is a plain options object, passed via the `middleware` field
+// on generate()/stream() -- not a MiddlewareFactory instance:
+const complianceMiddleware = {
   middlewareConfig: {
     analytics: { enabled: true },
-    guardrails: { enabled: true, config: { badWords: ['SSN'] } },
+    guardrails: { enabled: true, config: { badWords: { enabled: true, list: ['SSN'] } } },
     autoEvaluation: { enabled: true, config: { threshold: 8 } },
   },
+};
+
+await neurolink.generate({
+  input: { text: userPrompt },
+  middleware: complianceMiddleware,
 });
-// Note: Pass middleware via options in generate()/stream() calls:
-// await neurolink.generate({ ..., middleware: complianceMiddleware })
 
 // Every request now has:
 // 1. Pre-call guardrail filtering
@@ -343,12 +372,12 @@ Before going to production with an AI pipeline in a regulated industry, verify e
 - Audit logs include reviewer identity, decision, reason, and timestamp
 - Guardrail blocking events include the triggering content and the rule that fired
 
-> **Warning:** Audit log retention periods vary by regulation. HIPAA requires six years, SOX requires seven years, and GDPR requires documentation for the life of the processing. Misconfiguring retention is a compliance violation in itself. These regulations apply to different industries -- verify which apply to your organization and consult qualified legal counsel.
+> **Warning:** Audit-log retention requirements vary by regulation, record type, jurisdiction, and institutional policy; HIPAA, SOX, and GDPR do not impose one interchangeable retention period on every AI audit record. Define a retention schedule with qualified legal and compliance teams, and verify which rules apply to your organization and data.
 {: .prompt-warning }
 
 ## Design decisions and Trade-offs
 
-We chose to embed these primitives at the SDK level rather than requiring external infrastructure for three reasons: lower integration cost for teams adopting AI in regulated environments, guaranteed consistency across all AI calls (no accidental bypass), and composability through middleware chains. The trade-off is SDK surface area -- NeuroLink's API is larger than a minimal AI client. For teams that only need basic generation without compliance requirements, this is unnecessary overhead.
+Embedding these primitives at the SDK level can lower integration cost, make policy consistent across AI calls, and compose controls through middleware chains. It does not replace external audit storage, identity systems, retention policies, or compliance review. The trade-off is SDK surface area -- NeuroLink's API is larger than a minimal AI client, and teams that only need basic generation may not need these controls.
 
 For teams building in regulated industries, the three-pillar approach -- HITL, guardrails, observability -- provides the primitives to satisfy auditors while maintaining developer velocity. Explore [advanced HITL configurations](/posts/hitl-guardrails-guide/) and the [AI security checklist](/posts/ai-security-checklist-owasp-top-10-llm/) for deeper coverage of each pillar.
 

@@ -23,16 +23,16 @@ image:
   alt: 'Conversation Memory: Building Stateful AI Applications'
 ---
 
-By the end of this guide, you will have conversation memory working in your NeuroLink application -- from simple in-memory session tracking to persistent cross-session recall with Mem0 integration.
+By the end of this guide, you will have conversation memory working in your NeuroLink application -- from simple in-memory session tracking to persistent cross-session recall with NeuroLink's Hippocampus integration.
 
-You will implement three approaches: manual conversation history management for full control, NeuroLink's built-in session memory for automatic context tracking, and Mem0-backed persistent memory for applications that need to remember users across sessions. Each approach includes working TypeScript examples you can deploy today.
+You will implement three approaches: manual conversation history management for full control, NeuroLink's built-in session memory for automatic context tracking, and Hippocampus-backed persistent memory for applications that need to remember users across sessions. Each approach includes working TypeScript examples you can deploy today.
 
 ```mermaid
 flowchart TD
     subgraph Memory Approaches
         A[Manual History] --> B[Array-based Storage]
         C[SDK Built-in Memory] --> D[Session-based Context]
-        E[Mem0 Integration] --> F[Vector-based Persistence]
+        E[Hippocampus Integration] --> F[Condensed Persistent Storage]
     end
 
     I[User Message] --> J{Memory Strategy}
@@ -108,7 +108,7 @@ async function chat(userMessage: string): Promise<string> {
     },
     systemPrompt: `You are a helpful assistant. Here is the conversation so far:\n${contextSummary}\n\nRespond to the user's latest message.`,
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   // Add assistant response to history
@@ -166,7 +166,7 @@ class ConversationManager {
       input: { text: userMessage },
       systemPrompt: context,
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
 
     // Store assistant response
@@ -258,7 +258,7 @@ const response1 = await neurolink.generate({
     userId: "alice",
   },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 // Follow-up message - AI automatically remembers previous context
@@ -269,7 +269,7 @@ const response2 = await neurolink.generate({
     userId: "alice",
   },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 
 console.log(response2.content);
@@ -397,13 +397,17 @@ const summary = await neurolink.generate({
 // Response includes both software engineering and AI development details
 ```
 
-## Approach 3: Persistent Memory with Mem0 Integration
+## Approach 3: Persistent Memory with Hippocampus Integration
 
-For applications requiring memory that persists across sessions and process restarts, NeuroLink integrates with Mem0 for vector-based semantic memory.
+For applications requiring memory that persists across sessions and process restarts, NeuroLink integrates with `@juspay/hippocampus`: an LLM-condensation memory layer keyed per user, not a vector/semantic search store.
 
-### Mem0 Configuration
+### Hippocampus Configuration
 
-Mem0 uses a Cloud API for persistent memory storage. Configure it with your Mem0 API credentials:
+`@juspay/hippocampus` ships as an optional peer dependency, so install it explicitly, then point it at a storage backend (SQLite, Redis, or S3):
+
+```bash
+pnpm add @juspay/hippocampus
+```
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
@@ -411,21 +415,28 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    mem0Enabled: true,
-    mem0Config: {
-      apiKey: process.env.MEM0_API_KEY,
-      organizationId: 'your-org-id',  // optional
-      projectId: 'your-project-id'     // optional
-    }
-  }
+    memory: {
+      enabled: true,
+      storage: {
+        type: 's3',
+        bucket: 'my-memory-bucket',
+        prefix: 'memory/condensed/',
+      },
+      neurolink: {
+        provider: 'google-ai',
+        model: 'gemini-2.5-flash',
+      },
+      maxWords: 50,
+    },
+  },
 });
 ```
 
-You can obtain your Mem0 API key from the [Mem0 dashboard](https://app.mem0.ai). The `organizationId` and `projectId` are optional and can be used to organize memories across different projects or teams.
+`storage.type` also accepts `sqlite` (local file) or `redis`. `neurolink` picks the provider/model used to condense conversation turns into the stored summary, and `maxWords` caps that summary's length. If you configure `memory` without installing `@juspay/hippocampus`, NeuroLink logs a warning and continues with memory disabled rather than throwing.
 
 ### Cross-Session Memory
 
-With Mem0, memory persists across different sessions:
+With Hippocampus configured, memory persists across different sessions. Memory condensation and persistence run in the background, so the second call below illustrates eventual recall after that work has completed; it is not a deterministic sequential test:
 
 ```typescript
 // Store user context in first session
@@ -438,13 +449,10 @@ const response1 = await neurolink.generate({
     sessionId: "onboarding_session",
   },
   provider: "google-ai",
-  model: "gemini-2.0-flash-001",
+  model: "gemini-2.5-flash",
 });
 
-// Wait for memory indexing (in production, use appropriate delays)
-await new Promise(resolve => setTimeout(resolve, 30000));
-
-// Later conversation in DIFFERENT session - memory persists!
+// In a genuinely later request, after background persistence has completed
 const response2 = await neurolink.generate({
   input: {
     text: "What programming languages do I work with? And remind me where I work?",
@@ -462,7 +470,7 @@ console.log(response2.content);
 
 ### User Isolation in Multi-Tenant Applications
 
-Mem0 ensures complete memory isolation between users:
+Hippocampus ensures complete memory isolation between users -- memory is read and written keyed by `context.userId`:
 
 ```typescript
 // User Alice's conversation
@@ -605,7 +613,7 @@ ${olderMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
     const response = await this.neurolink.generate({
       input: { text: summaryPrompt },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
       maxTokens: maxLength * 2,
     });
 
@@ -669,7 +677,7 @@ await neurolink.generate({
 When building memory-intensive applications, keep these performance tips in mind:
 
 1. **Use appropriate memory limits**: Set `tokenThreshold` based on your use case
-2. **Consider memory indexing time**: Mem0 requires time for vector indexing — performance varies by backend configuration, so benchmark your specific deployment
+2. **Condensation adds an LLM call**: Hippocampus writes happen in the background and don't block the response, but condensing a turn costs an extra generate call -- performance varies by backend and condensation model, so benchmark your specific deployment
 3. **Session cleanup**: Regularly clear unused sessions to prevent memory bloat
 4. **Async operations**: Memory storage operations are non-blocking by design
 5. **User ID consistency**: Always use consistent user IDs for proper isolation
@@ -696,19 +704,19 @@ const performanceNotes = {
 
 - Verify different `sessionId` values are being used
 - Check for session ID conflicts or duplicates
-- Ensure user ID is included when using Mem0
+- Ensure `context.userId` is included when using Hippocampus-backed memory
 
 ## Conclusion
 
-By now you have three working memory approaches: manual history management for full control, built-in session memory for automatic context within sessions, and Mem0 integration for persistent cross-session memory with semantic search.
+By now you have three working memory approaches: manual history management for full control, built-in session memory for automatic context within sessions, and Hippocampus integration for persistent cross-session memory via LLM-condensed, per-user summaries.
 
 The right choice depends on your application:
 
 - **One-shot queries:** No memory needed
 - **Multi-turn conversations:** Built-in session memory with Redis (when configured with AOF or RDB persistence)
-- **Persistent agents:** Mem0 for cross-session semantic recall
+- **Persistent agents:** Hippocampus for cross-session recall
 
-Start with session memory for most applications and graduate to Mem0 when you need memory that spans sessions or semantic retrieval. For the complete API reference and additional examples, see the [NeuroLink documentation](https://github.com/juspay/neurolink).
+Start with session memory for most applications and graduate to Hippocampus when you need memory that spans sessions or process restarts. For the complete API reference and additional examples, see the [NeuroLink documentation](https://github.com/juspay/neurolink).
 
 ---
 

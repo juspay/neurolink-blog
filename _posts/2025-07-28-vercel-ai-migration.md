@@ -50,7 +50,7 @@ NeuroLink's cost optimization features can significantly reduce costs through:
 
 ### Enhanced Streaming
 
-NeuroLink provides consistent streaming behavior across all providers, including those that don't natively support streaming. You get the same streaming API whether you're using GPT-4, Claude, or Llama.
+NeuroLink provides consistent streaming behavior across all providers, including those that don't natively support streaming. You get the same streaming API whether you're using GPT-5.4, Claude, or Llama.
 
 ### Production Features
 
@@ -93,7 +93,7 @@ const openai = createOpenAI({
 
 // Direct provider coupling
 const result = await generateText({
-  model: openai('gpt-4'),
+  model: openai('gpt-5.4'),
   prompt: 'Hello, world!',
 });
 ```
@@ -112,7 +112,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Hello, world!' },
   provider: 'openai',
-  model: 'gpt-4',
+  model: 'gpt-5.4',
 });
 ```
 
@@ -162,7 +162,7 @@ import { openai } from '@ai-sdk/openai';
 
 async function generateResponse(prompt: string) {
   const { text } = await generateText({
-    model: openai('gpt-4'),
+    model: openai('gpt-5.4'),
     prompt,
     maxTokens: 1000,
     temperature: 0.7,
@@ -181,7 +181,7 @@ async function generateResponse(prompt: string) {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
     maxTokens: 1000,
     temperature: 0.7,
   });
@@ -202,7 +202,7 @@ import { openai } from '@ai-sdk/openai';
 
 async function streamResponse(prompt: string) {
   const result = await streamText({
-    model: openai('gpt-4'),
+    model: openai('gpt-5.4'),
     prompt,
   });
 
@@ -221,7 +221,7 @@ async function streamResponse(prompt: string) {
   const result = await neurolink.stream({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   for await (const chunk of result.stream) {
@@ -247,7 +247,7 @@ type Message = {
 
 async function chat(messages: Message[]) {
   const { text } = await generateText({
-    model: openai('gpt-4'),
+    model: openai('gpt-5.4'),
     messages,
   });
 
@@ -266,7 +266,7 @@ async function chat(messages: ChatMessage[]) {
     input: { text: messages[messages.length - 1].content },
     conversationMessages: messages,
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   return result.content;
@@ -288,7 +288,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = await streamText({
-    model: openai('gpt-4'),
+    model: openai('gpt-5.4'),
     messages,
   });
 
@@ -310,7 +310,7 @@ export async function POST(req: Request) {
   const result = await neurolink.stream({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   // Convert to ReadableStream for Response
@@ -350,7 +350,7 @@ export async function POST(req: Request) {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   return Response.json({ result });
@@ -372,7 +372,7 @@ import { openai } from '@ai-sdk/openai';
 
 export async function generateContent(prompt: string) {
   const { text } = await generateText({
-    model: openai('gpt-4'),
+    model: openai('gpt-5.4'),
     prompt,
   });
 
@@ -394,7 +394,7 @@ export async function generateContent(prompt: string) {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   return result.content;
@@ -405,7 +405,7 @@ export async function generateContentCheap(prompt: string) {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'anthropic',
-    model: 'claude-3-5-haiku-20241022', // Cost-optimized model
+    model: 'claude-haiku-4-5-20251001', // Cost-optimized model
   });
 
   return result.content;
@@ -429,7 +429,7 @@ async function streamWithProgress(prompt: string, onChunk: (chunk: string) => vo
   const result = await neurolink.stream({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   for await (const chunk of result.stream) {
@@ -466,7 +466,7 @@ export async function POST(req: Request) {
       const result = await neurolink.stream({
         input: { text: prompt },
         provider: 'openai',
-        model: 'gpt-4',
+        model: 'gpt-5.4',
       });
 
       for await (const chunk of result.stream) {
@@ -564,9 +564,9 @@ interface ProviderConfig {
 
 async function generateWithFallback(prompt: string) {
   const providers: ProviderConfig[] = [
-    { provider: 'openai', model: 'gpt-4' },
+    { provider: 'openai', model: 'gpt-5.4' },
     { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-    { provider: 'google-ai', model: 'gemini-2.0-flash' },
+    { provider: 'google-ai', model: 'gemini-2.5-flash' },
   ];
 
   for (const { provider, model } of providers) {
@@ -601,7 +601,7 @@ const neurolink = new NeuroLink();
 
 async function generateMultiple(prompt: string) {
   const providers = [
-    { provider: 'openai', model: 'gpt-4' },
+    { provider: 'openai', model: 'gpt-5.4' },
     { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
   ];
 
@@ -655,7 +655,7 @@ export async function generateWithMiddleware(userId: string, prompt: string) {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   // Log usage
@@ -676,7 +676,7 @@ async function streamWithAbort(prompt: string, signal: AbortSignal) {
   const streamResult = await neurolink.stream({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4',
+    model: 'gpt-5.4',
   });
 
   let result = '';
@@ -718,7 +718,7 @@ describe('NeuroLink Migration', () => {
     const result = await neurolink.generate({
       input: { text: 'Say hello' },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
 
     expect(result).toBeTruthy();
@@ -732,7 +732,7 @@ describe('NeuroLink Migration', () => {
     const result = await neurolink.stream({
       input: { text: 'Count to 5' },
       provider: 'openai',
-      model: 'gpt-4',
+      model: 'gpt-5.4',
     });
 
     for await (const chunk of result.stream) {
@@ -746,7 +746,7 @@ describe('NeuroLink Migration', () => {
 
   it('should handle provider switching', async () => {
     const providers = [
-      { provider: 'openai', model: 'gpt-4' },
+      { provider: 'openai', model: 'gpt-5.4' },
       { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
     ];
 
@@ -855,7 +855,7 @@ Use this checklist to ensure a complete migration:
 | Vercel AI SDK | NeuroLink |
 |---------------|-----------|
 | `import { generateText } from 'ai'` | `import { NeuroLink } from '@juspay/neurolink'` |
-| `generateText({ model: openai('gpt-4'), prompt })` | `neurolink.generate({ input: { text: prompt }, provider: 'openai', model: 'gpt-4' })` |
+| `generateText({ model: openai('gpt-5.4'), prompt })` | `neurolink.generate({ input: { text: prompt }, provider: 'openai', model: 'gpt-5.4' })` |
 | `streamText({ model, prompt })` | `neurolink.stream({ input: { text: prompt }, provider, model })` |
 | `result.textStream` | `result.stream` (async iterable) |
 | `result.toAIStreamResponse()` | Custom `ReadableStream` response |

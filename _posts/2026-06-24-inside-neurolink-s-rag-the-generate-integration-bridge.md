@@ -23,7 +23,7 @@ image:
   alt: 'Inside NeuroLink''s RAG: The generate() Integration Bridge'
 ---
 
-We designed NeuroLink's RAG integration because developers needed to ground generation in a set of documents without wiring up a whole pipeline. A simple call to `generate()` or `stream()` with a list of files should just work. The problem was that our powerful, standalone `RAGPipeline` was overkill for one-off questions over a handful of uploaded PDFs or Markdown files. Developers faced a choice: either commit to a full-scale RAG setup or manually Frankenstein file content into a prompt. The gap between a persistent, multi-stage pipeline and a single, in-context query is where `prepareRAGTool` lives.
+NeuroLink's RAG integration exists to ground generation in a set of documents without wiring up a whole pipeline. A simple call to `generate()` or `stream()` with a list of files should just work. The standalone `RAGPipeline` is powerful, but it can be overkill for a one-off question over a handful of uploaded PDFs or Markdown files. Without a lighter path, the alternative is committing to a full-scale RAG setup or manually stitching file content into a prompt. The gap between a persistent, multi-stage pipeline and a single, in-context query is where `prepareRAGTool` lives.
 
 This post dives deep into the integration layer that makes RAG a zero-setup feature of `generate()` and `stream()`. For a walkthrough of building a standalone application with our RAG components, see our earlier post, [Building a RAG Application with TypeScript: Complete Tutorial](/posts/rag-application-typescript-tutorial/). Here, we focus on the magic that happens behind the scenes.
 
@@ -206,6 +206,8 @@ const results = fileContents.length > 1
   ? diversifyResults(rawResults, topK)
   : rawResults.slice(0, topK);
 ```
+
+(The real gate in `search_knowledge_base` also counts loaded image chunks — `fileContents.length + imageChunks.length > 1` — for multi-modal RAG; it's simplified to file count alone above since this section focuses on text-file RAG.)
 
 `diversifyResults` takes a flat results array and a plain integer `topK`. It groups results by source file, then performs a **round-robin selection**: it walks the groups in order, taking one result from each in turn, cycling until `topK` items have been collected. This ensures that if five source files are loaded, the first five results will each come from a different file — prioritizing coverage over pure similarity score. This step is crucial for providing the model with a balanced and comprehensive view of the knowledge base.
 

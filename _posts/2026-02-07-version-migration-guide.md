@@ -83,7 +83,7 @@ If you are on a very old version, you may need to upgrade incrementally rather t
 npm install @juspay/neurolink@latest
 
 # Upgrade to specific version
-npm install @juspay/neurolink@3.1.0
+npm install @juspay/neurolink@12
 
 # Check for peer dependency issues
 npm ls @juspay/neurolink
@@ -113,62 +113,78 @@ NeuroLink validates configuration on startup using Zod schemas. If your configur
 
 ### Constructor Changes
 
-The NeuroLink constructor accepts a focused set of options. If you are upgrading from an older version, some fields may have moved:
+Current NeuroLink configuration separates provider credentials, end-user authentication, observability, HITL, tools, memory, and fallback policy. Provider and model remain per-call fields:
 
 ```typescript
-// Before: Older config format
+// Before: legacy constructor defaults
 const neurolink = new NeuroLink({
-  defaultProvider: 'openai',
-  model: 'gpt-4',
+  defaultProvider: "openai",
+  model: "gpt-4",
 });
 
-// After: Current config format
+// After: current constructor and request shape
 const neurolink = new NeuroLink({
-  hitl: {
-    enabled: true,
-    dangerousActions: ['delete', 'deploy'],
+  credentials: {
+    openai: { apiKey: process.env.OPENAI_API_KEY },
   },
   conversationMemory: { enabled: true },
-});
-
-// Configure middleware separately via MiddlewareFactory
-const middleware = new MiddlewareFactory({
-  middlewareConfig: {
-    analytics: { enabled: true },
-    guardrails: { enabled: true },
+  hitl: {
+    enabled: true,
+    dangerousActions: ["delete", "deploy"],
+  },
+  observability: {
+    openTelemetry: {
+      enabled: true,
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      serviceName: "my-ai-service",
+    },
   },
 });
+
+const result = await neurolink.generate({
+  input: { text: "Summarize the release notes." },
+  provider: "openai",
+  model: "gpt-5.4",
+});
+
+console.log(result.content);
 ```
 
 Key changes to note:
 
-- **Provider and model** are now specified per `generate()` call, not in the constructor. This enables per-request provider selection.
-- **Middleware** is configured through `MiddlewareFactory`, not the constructor. This separates concerns and allows middleware to be shared across multiple NeuroLink instances.
-- **HITL** is configured via the `hitl` constructor field with `dangerousActions` (not `requireApproval`).
-- **Observability** is configured via the `observability` constructor field.
+- **Provider and model** are specified per `generate()` or `stream()` call.
+- **LLM API keys** belong under `credentials`; the `auth` field is for end-user authentication providers such as Auth0, Clerk, JWT, or OAuth2.
+- **Input text** belongs under `input: { text }`, not a top-level `prompt` field.
+- **Generated text** is returned as `result.content`, not `result.text`.
+- **Middleware** can be supplied per call through the `middleware` option.
+- **HITL** uses the constructor's `hitl` field and `dangerousActions` list.
 
 ### Valid Constructor Fields
 
-The current NeuroLink constructor accepts only these fields:
+The v12 constructor type includes these public fields:
 
-| Field | Type | Description |
-|---|---|---|
-| `conversationMemory` | `object` | Enable conversation memory with session management |
-| `enableOrchestration` | `boolean` | Enable multi-step orchestration |
-| `hitl` | `object` | Human-in-the-loop configuration |
-| `toolRegistry` | `object` | Tool registration and management |
-| `observability` | `object` | OpenTelemetry and tracing configuration |
+| Field | Purpose |
+|---|---|
+| `conversationMemory` | Conversation-memory settings |
+| `enableOrchestration` | Multi-step orchestration switch |
+| `hitl` | Human-in-the-loop configuration |
+| `tools` / `toolRegistry` | Tool policy and tool registry |
+| `observability` | OpenTelemetry and Langfuse configuration |
+| `credentials` | Per-provider LLM credentials |
+| `auth` | End-user authentication configuration |
+| `providerFallback` / `modelChain` | Fallback policy |
+| `mcp`, `artifacts`, `tasks` | MCP enhancements, artifact storage, and task management |
 
-If you pass unrecognized fields, NeuroLink's Zod validation will throw an error with a message indicating which field is invalid and suggesting the correct alternative.
+Use TypeScript against the installed release as the final authority; additional fields may be added over time.
 
 ## Provider Changes
 
-Provider names are stable across versions. The following provider identifiers have remained consistent:
+Use NeuroLink's documented provider IDs and re-check them when crossing a major version. Common current IDs include:
 
 ```typescript
-// Provider names remain stable across versions:
 // 'openai', 'anthropic', 'bedrock', 'vertex', 'azure',
-// 'google-ai', 'huggingface', 'ollama', 'mistral'
+// 'google-ai', 'huggingface', 'ollama', 'mistral',
+// 'openrouter', 'openai-compatible'
 ```
 
 > **Note:** The provider name for Google's Vertex AI is `"vertex"`, not `"google-vertex"`. This is a common source of confusion when migrating from other SDKs.
@@ -176,7 +192,7 @@ Provider names are stable across versions. The following provider identifiers ha
 
 ### Model Name Changes
 
-Model IDs track upstream provider changes. When a provider deprecates a model (like `gpt-4` being replaced by `gpt-4o`), NeuroLink's model resolver can help:
+Model IDs track upstream provider changes. When a provider deprecates a model, inspect the catalog bundled with the upgraded release:
 
 ```bash
 # Always check available models after upgrading
@@ -186,66 +202,43 @@ neurolink models list --provider openai
 neurolink models resolve gpt4
 ```
 
-Use `ModelResolver.resolveModel()` programmatically to handle model alias changes without code updates:
-
-```typescript
-import { ModelResolver } from '@juspay/neurolink';
-
-// Resolves aliases to current model IDs
-const resolvedModel = ModelResolver.resolveModel('gpt4'); // Returns 'gpt-4o'
-```
+For application code, prefer explicit model IDs in configuration and update them deliberately after testing. `ModelResolver` is an internal source module rather than a root package export, so do not import it from `@juspay/neurolink`. The CLI resolver can identify aliases and return catalog metadata; after resolving an alias, test the returned provider/model pair for access, latency, tool support, and output quality before changing production configuration.
 
 New providers are added in minor versions, so upgrading to a new minor version may give you access to new providers without any code changes.
 
 ## Middleware Migration
 
-The middleware system has been stable since v3.0. The registration pattern uses `MiddlewareFactory`:
+The current registration pattern uses `MiddlewareFactory`:
 
 ```typescript
-// Middleware system is stable since v3.0
-// Registration pattern:
+// Current registration pattern:
 const factory = new MiddlewareFactory({
   middleware: [customMiddleware],
   middlewareConfig: {
     analytics: { enabled: true },
-    guardrails: { enabled: true, config: { badWords: ['secret'] } },
+    guardrails: {
+      enabled: true,
+      config: { badWords: { enabled: true, list: ['secret'] } },
+    },
     autoEvaluation: { enabled: false },
   },
-  preset: 'default',  // 'default', 'all', 'security'
+  preset: 'default',  // 'default', 'all', or 'security'
 });
 ```
 
 ### Custom Middleware Interface
 
-If you have written custom middleware, verify it implements the `NeuroLinkMiddleware` interface:
-
-```typescript
-// Custom middleware must implement NeuroLinkMiddleware interface:
-interface NeuroLinkMiddleware {
-  metadata: {
-    id: string;
-    name: string;
-    description: string;
-    priority: number;
-    defaultEnabled: boolean;
-  };
-  wrapGenerate?: (params: GenerateParams) => Promise<GenerateResult>;
-  wrapStream?: (params: StreamParams) => Promise<StreamResult>;
-  transformParams?: (params: Params) => Promise<Params>;
-}
-```
-
-The interface has been stable across versions. If your custom middleware implements these methods, it will continue to work after upgrading.
+Custom middleware is advanced integration work. Import the published middleware types from `@juspay/neurolink/types`, implement the current `NeuroLinkMiddleware` contract, and let TypeScript report signature changes during an upgrade. Avoid copying an old interface definition into application code because the underlying AI SDK middleware types can evolve.
 
 ### Middleware Presets
 
-NeuroLink offers three middleware presets for common configurations:
+NeuroLink currently includes these presets:
 
 | Preset | Includes | Best For |
 |---|---|---|
-| `default` | Analytics | Most applications |
-| `all` | Analytics, guardrails, auto-evaluation | Production with full observability |
-| `security` | Guardrails, precall evaluation | Security-sensitive applications |
+| `default` | Analytics | Baseline request metrics |
+| `all` | Analytics and guardrails | Enabling all built-in middleware |
+| `security` | Guardrails | Security-focused configuration |
 
 ## ProcessorRegistry Changes
 
@@ -253,14 +246,13 @@ The `ProcessorRegistry` is a singleton. If you are using it directly, always use
 
 ```typescript
 // ProcessorRegistry is a singleton -- reset between tests
-import { ProcessorRegistry } from '@juspay/neurolink';
+import { ProcessorRegistry } from '@juspay/neurolink/processors';
 
 // Always use getInstance(), never construct directly
 const registry = ProcessorRegistry.getInstance();
 
-// New processors added in minor versions
-// Custom processors remain compatible across versions
-// Priority system is stable: lower number = higher priority
+// Verify custom registrations against the installed processor types
+// after every major-version upgrade.
 ```
 
 In test environments, use `resetInstance()` between tests to avoid state leakage:
@@ -271,22 +263,11 @@ afterEach(() => {
 });
 ```
 
-New file processors are added in minor versions. Custom processors you have registered will continue to work across upgrades because the registration interface is stable.
+New file processors may be added over time. Compile and run tests for each custom registration after upgrading; do not assume an implementation built against an older major version remains source-compatible.
 
 ## HITL Changes
 
-The HITLManager API has been stable since v3.0:
-
-```typescript
-// HITLManager API is stable since v3.0
-// Key interfaces:
-// - HITLConfig: enabled, dangerousActions, timeout, customRules, auditLogging
-// - ConfirmationRequest/Result: confirmationId, approved, reason, modifiedArguments
-// - HITLStatistics: totalRequests, approvedRequests, rejectedRequests, timedOutRequests
-
-// Custom rules condition signature is stable:
-// condition: (toolName: string, args: unknown) => boolean
-```
+The current HITL configuration uses `dangerousActions`, optional `customRules`, a timeout, and audit logging. Confirm the event payload types from your installed release when integrating a reviewer UI.
 
 If you are upgrading from an older version that used `requireApproval`, migrate to `dangerousActions`:
 
@@ -310,12 +291,9 @@ const neurolink = new NeuroLink({
 
 ## CLI Command Changes
 
-CLI commands are additive across versions -- existing commands remain stable, and new subcommands may be added in minor versions:
+CLI commands can change across major versions, and minor releases may add subcommands. Re-check help output after every upgrade:
 
 ```bash
-# CLI commands are additive -- existing commands remain stable
-# New subcommands may be added in minor versions
-
 # Check available commands
 neurolink --help
 
@@ -329,26 +307,9 @@ If you have scripts that parse CLI output, check the changelog for any output fo
 
 ## Telemetry Changes
 
-The telemetry system is backward compatible. New metrics may be added in minor versions, but existing metric names remain stable:
+Treat telemetry names, attributes, and exporter behavior as an integration contract that needs regression tests. Before upgrading, capture the metrics and spans your dashboards and alerts depend on. After upgrading, verify them in staging with representative `generate()`, `stream()`, tool-call, error, and fallback paths.
 
-```typescript
-// TelemetryService is backward compatible
-// New metrics may be added in minor versions
-// Existing metric names are stable:
-// - ai_requests_total
-// - ai_request_duration_ms
-// - ai_tokens_used_total
-// - ai_provider_errors_total
-// - mcp_tool_calls_total
-
-// Environment variables remain stable:
-// NEUROLINK_TELEMETRY_ENABLED
-// OTEL_EXPORTER_OTLP_ENDPOINT
-// OTEL_SERVICE_NAME
-// OTEL_SERVICE_VERSION
-```
-
-If you have dashboards or alerts based on NeuroLink metrics, they will continue to work after upgrading. New metrics will appear automatically if you are using metric auto-discovery.
+Common environment-based OpenTelemetry settings include `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, and `OTEL_SERVICE_VERSION`; constructor `observability.openTelemetry` settings provide the equivalent application-level configuration.
 
 ## Token Usage Fields
 
@@ -359,7 +320,7 @@ If your code reads token usage from response objects, note the correct field nam
 const result = await neurolink.generate({
   input: { text: "Hello" },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 console.log(result.usage.total);   // Total tokens
@@ -378,12 +339,14 @@ If your code uses streaming, verify you are using the correct property name:
 const result = await neurolink.stream({
   input: { text: "Generate a report" },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 // Correct: use result.stream
 for await (const chunk of result.stream) {
-  process.stdout.write(chunk.content);
+  if ("content" in chunk) {
+    process.stdout.write(chunk.content);
+  }
 }
 
 // NOT: result.textStream (incorrect)
@@ -428,8 +391,8 @@ Check for peer dependency issues:
 # Check dependency tree
 npm ls @juspay/neurolink
 
-# If there are peer dependency warnings
-npm install --legacy-peer-deps
+# Inspect the installed tree and resolve the reported version conflict
+npm explain @juspay/neurolink
 ```
 
 ### Provider Authentication Errors
@@ -448,13 +411,13 @@ neurolink setup --provider openai
 
 | From Version | To Version | Effort | Key Changes |
 |---|---|---|---|
-| v3.x patch | v3.x patch | 5 minutes | Bug fixes only, no code changes |
-| v3.x minor | v3.x minor | 15 minutes | New features, check for deprecation warnings |
-| v2.x to v3.x | Major | 30-60 minutes | Config migration, middleware separation |
+| Patch release | Same major | Low | Run tests and review release notes |
+| Minor release | Same major | Low to medium | Test new defaults and deprecations |
+| Earlier major | v12 | High | Migrate constructor, request/result shapes, middleware, and public import paths |
 
 ## What's Next
 
-We built this because our community asked for it, and we are proud of what we have delivered. Try it out, push the boundaries, and tell us what you think. Your feedback directly shapes our roadmap, and the best features in this release started as community suggestions. We cannot wait to see what you build next.
+A safe migration is evidence-driven: capture a green baseline, upgrade in a branch, let TypeScript expose API mismatches, run integration tests against every configured provider, and compare telemetry before deploying to staging. Keep legacy model IDs only where they are migration sources; use current in-catalog IDs in the final code.
 
 ---
 

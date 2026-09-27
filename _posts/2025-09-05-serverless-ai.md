@@ -50,7 +50,7 @@ ProviderFactory.registerProvider(
   AIProviderName.OPENAI,
   async (modelName?, _providerName?, sdk?) => {
     // This import only happens when OpenAI is actually used
-    const { OpenAIProvider } = await import("../providers/openAI.js");
+    const { OpenAIProvider } = await import("../providers/openAI/index.js");
     return new OpenAIProvider(modelName, sdk as NeuroLink | undefined);
   },
   OpenAIModels.GPT_4O_MINI,
@@ -187,7 +187,7 @@ app.post('/generate', async (c) => {
   const result = await neurolink.generate({
     input: { text: prompt },
     provider: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
   });
 
   return c.json({
@@ -215,7 +215,7 @@ Cold starts are the Achilles heel of serverless AI. NeuroLink initialization, pr
 
 ### Strategy 1: Provider Pre-Selection
 
-Only register the providers you actually use. If you only need OpenAI, there is no need to register all 13 providers. While NeuroLink's lazy loading prevents unused providers from being imported, the registration overhead itself is non-zero.
+Only register the providers you actually use. If you only need OpenAI, there is no need to register every supported provider. While NeuroLink's lazy loading prevents unused providers from being imported, the registration overhead itself is non-zero.
 
 ### Strategy 2: Skip Dynamic Model Resolution
 
@@ -239,7 +239,7 @@ private static async initializeDynamicProviderWithTimeout(): Promise<void> {
 const result = await neurolink.generate({
   input: { text: prompt },
   provider: 'openai',
-  model: 'gpt-4o-mini', // Explicit model = no dynamic resolution
+  model: 'gpt-5.4-mini', // Explicit model = no dynamic resolution
 });
 ```
 

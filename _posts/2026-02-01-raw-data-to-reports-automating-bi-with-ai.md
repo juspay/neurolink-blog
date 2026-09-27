@@ -27,7 +27,7 @@ image:
 
 In this guide, you will build an automated business intelligence pipeline that transforms raw data into formatted reports using NeuroLink. You will implement data ingestion, AI-powered analysis, chart generation, and report assembly -- turning CSV files and database queries into executive-ready summaries with a single API call.
 
-NeuroLink provides the building blocks for an end-to-end AI-powered BI pipeline: file processors for ingesting CSV, JSON, Excel, and other tabular formats; RAG chunking for datasets too large for a single context window; LLM generation with domain-specific prompts for analysis; auto-evaluation for report quality assurance; and streaming output for real-time dashboards.
+NeuroLink provides the building blocks for an end-to-end AI-powered BI pipeline: file processors for ingesting JSON, Excel, and other formats; a RAG CSV loader and chunking for datasets too large for a single context window; LLM generation with domain-specific prompts for analysis; per-call evaluation for report quality checks; and streaming output for real-time dashboards.
 
 This tutorial walks through building a complete BI pipeline from scratch. By the end, you will have a system that takes raw data files, runs them through AI analysis, and produces quality-evaluated reports -- on a schedule, without human intervention.
 
@@ -40,7 +40,7 @@ flowchart LR
     DATA(["Raw Data<br/>CSV, JSON, Excel"]) --> PROC["File Processor<br/>Registry"]
     PROC --> CHUNK["RAG Chunking<br/>for large datasets"]
     CHUNK --> LLM["LLM Analysis<br/>with domain prompts"]
-    LLM --> EVAL["Auto-Evaluation<br/>Accuracy + completeness"]
+    LLM --> EVAL["Evaluation<br/>Accuracy + completeness"]
     EVAL --> REPORT(["Formatted Report<br/>Markdown / JSON"])
 
     style DATA fill:#3b82f6,stroke:#2563eb,color:#fff
@@ -53,29 +53,20 @@ Each stage is independent and testable. You can swap the file processor for a di
 
 ## Step 1: Ingesting Data with File Processors
 
-NeuroLink's `ProcessorRegistry` handles over 50 file types out of the box. For BI pipelines, the key formats are CSV, Excel, JSON, and XML. The registry automatically selects the right processor based on the file's MIME type.
+NeuroLink's file-processing stack supports more than 260 file extensions. For BI pipelines, `ProcessorRegistry` can auto-select processors for Excel, JSON, XML, and other registered formats from a file's MIME type and name; CSV and TSV ingestion is available through the RAG `CSVLoader`.
 
 ```typescript
-import { getProcessorRegistry } from '@juspay/neurolink';
+import { getProcessorRegistry } from '@juspay/neurolink/processors';
 
-const registry = getProcessorRegistry();
-
-// Process CSV sales data
-const salesData = await registry.processFile({
-  id: 'sales-q4',
-  name: 'q4-sales.csv',
-  mimetype: 'text/csv',
-  size: 250000,
-  content: csvBuffer,
-});
+const registry = await getProcessorRegistry();
 
 // Process Excel financial report
 const financialData = await registry.processFile({
   id: 'financials',
   name: 'annual-financials.xlsx',
   mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  size: 1500000,
-  content: excelBuffer,
+  size: excelBuffer.length,
+  buffer: excelBuffer,
 });
 
 // Process JSON API response
@@ -83,12 +74,20 @@ const apiData = await registry.processFile({
   id: 'metrics',
   name: 'metrics.json',
   mimetype: 'application/json',
-  size: 80000,
-  content: jsonBuffer,
+  size: jsonBuffer.length,
+  buffer: jsonBuffer,
 });
+
+if (!financialData?.success || !financialData.data) {
+  throw new Error(financialData?.error?.userMessage ?? 'Excel processing failed');
+}
+
+if (!apiData?.success || !apiData.data) {
+  throw new Error(apiData?.error?.userMessage ?? 'JSON processing failed');
+}
 ```
 
-The processor extracts structured data from each file format and normalizes it into a consistent representation. CSV files become row-column arrays, Excel files are parsed sheet by sheet, and JSON data is traversed and flattened as needed.
+The registry returns a common `{ success, data, error }` envelope while each successful processor keeps a format-specific payload. Excel data exposes worksheets and rows, JSON exposes parsed and formatted content, and XML exposes parsed text and metadata. Handle CSV separately through NeuroLink's RAG `CSVLoader`, as shown in the chunking stage below.
 
 > **Note:** For large Excel files with multiple sheets, the processor handles each sheet independently. You can target specific sheets by name or index if you only need a subset of the data.
 {: .prompt-info }
@@ -111,14 +110,18 @@ When a dataset exceeds the LLM's context window, you need to split it into manag
 // For datasets too large for a single LLM context window
 // neurolink rag chunk sales-data.csv --strategy recursive --maxSize 2000
 
-import { ChunkerRegistry } from '@juspay/neurolink';
+import { ChunkerRegistry, CSVLoader } from '@juspay/neurolink';
 
+const salesDocument = await new CSVLoader().load('sales-data.csv', {
+  outputFormat: 'text',
+});
 const chunker = ChunkerRegistry.get('recursive');
-const chunks = await chunker.chunk(salesDataContent, {
+const chunks = await chunker.chunk(salesDocument.getContent(), {
   maxSize: 2000,
   overlap: 200,
-  metadata: { source: 'q4-sales.csv', type: 'sales-data' },
+  metadata: { source: 'sales-data.csv', type: 'sales-data' },
 });
+const salesDataContent = chunks.map((chunk) => chunk.text).join('\n\n');
 
 console.log(`Split into ${chunks.length} chunks for analysis`);
 ```
@@ -146,7 +149,7 @@ import { NeuroLink } from '@juspay/neurolink';
 const neurolink = new NeuroLink();
 
 const analysisResult = await neurolink.generate({
-  input: { text: `Analyze this sales data and identify key trends, anomalies, and actionable insights:\n\n${salesData?.data?.content}` },
+  input: { text: `Analyze this sales data and identify key trends, anomalies, and actionable insights:\n\n${salesDataContent}` },
   provider: 'anthropic',
   model: 'claude-sonnet-4-5-20250929',
   systemPrompt: `You are a senior business analyst. When analyzing data:
@@ -243,38 +246,36 @@ Produce a single, coherent executive summary.`,
 
 ## Step 4: Quality Evaluation
 
-AI-generated reports must meet quality standards before distribution. NeuroLink's auto-evaluation middleware scores reports on relevance, accuracy, and completeness.
+AI-generated reports must meet quality standards before distribution. NeuroLink's per-call evaluation scores reports on relevance, accuracy, and completeness.
 
 ```typescript
-// Enable auto-evaluation to ensure report quality
-const neurolink = new NeuroLink();
-
-// Auto-evaluation middleware is configured separately through the MiddlewareFactory:
-const evalMiddleware = new MiddlewareFactory({
-  middlewareConfig: {
-    autoEvaluation: {
-      enabled: true,
-      config: {
-        threshold: 7,
-        blocking: true,
-      },
-    },
-  },
+// Enable evaluation for this report-generation call
+const evaluatedReport = await neurolink.generate({
+  input: { text: `Analyze this sales data:\n\n${salesDataContent}` },
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-5-20250929',
+  enableEvaluation: true,
+  evaluationDomain: 'business intelligence',
 });
 
-// The evaluation checks:
-// - relevanceScore: Does the report address the data?
-// - accuracyScore: Are the numbers and claims correct?
-// - completenessScore: Does it cover all key aspects?
-// - finalScore: Overall quality (0-10)
+if (!evaluatedReport.evaluation) {
+  throw new Error('Evaluation data was not returned');
+}
+
+const { relevance, accuracy, completeness, overall } =
+  evaluatedReport.evaluation;
+
+if (overall < 7) {
+  throw new Error(`Report quality score ${overall} is below the threshold`);
+}
 ```
 
-> **Note:** For financial reports, set the threshold to 8 or higher. Inaccurate financial data can have serious business consequences. For internal dashboards, a threshold of 6-7 is usually sufficient.
+> **Note:** Choose quality thresholds from your own validation set and risk tolerance. Financial reports should require human review and independent verification; an evaluation score is not a substitute for checking the underlying calculations.
 {: .prompt-warning }
 
 ### Domain-Specific Evaluation Criteria
 
-NeuroLink supports domain-specific evaluation criteria. For analytics, the default criteria are:
+With `evaluationDomain` set for analytics, review the returned scores using criteria such as:
 
 - **Accuracy**: Are the numbers correct? Are calculations verifiable?
 - **Relevance**: Does the analysis address the business questions?
@@ -295,7 +296,7 @@ For dashboards that need to display AI insights as they are generated, use Neuro
 const result = await neurolink.stream({
   input: { text: `Generate a real-time executive summary from: ${latestMetrics}` },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 for await (const chunk of result.stream) {
@@ -323,7 +324,7 @@ wss.on('connection', (ws) => {
     const result = await neurolink.stream({
       input: { text: `${query}\n\nData:\n${data}` },
       provider: 'openai',
-      model: 'gpt-4o',
+      model: 'gpt-5.4',
       systemPrompt: salesAnalysisPrompt,
     });
 
@@ -369,9 +370,9 @@ Production BI pipelines often combine data from multiple sources. Here is a patt
 async function generateAggregatedReport(
   dataSources: Array<{ id: string; name: string; buffer: Buffer; mimetype: string }>
 ): Promise<string> {
-  const registry = getProcessorRegistry();
+  const registry = await getProcessorRegistry();
 
-  // Process all data sources in parallel
+  // Process all registered formats in parallel
   const processedData = await Promise.all(
     dataSources.map(source =>
       registry.processFile({
@@ -379,14 +380,19 @@ async function generateAggregatedReport(
         name: source.name,
         mimetype: source.mimetype,
         size: source.buffer.length,
-        content: source.buffer,
+        buffer: source.buffer,
       })
     )
   );
 
-  // Combine processed data with source labels
+  // Combine successful payloads with source labels
   const combinedContext = processedData
-    .map((data, i) => `### Source: ${dataSources[i].name}\n${data?.data?.content}`)
+    .map((result, i) => {
+      if (!result?.success || !result.data) {
+        throw new Error(result?.error?.userMessage ?? `Could not process ${dataSources[i].name}`);
+      }
+      return `### Source: ${dataSources[i].name}\n${JSON.stringify(result.data)}`;
+    })
     .join('\n\n---\n\n');
 
   // Generate unified analysis
@@ -499,15 +505,7 @@ interface StoredReport {
 
 ### Cost Management
 
-For recurring daily reports, monitor your monthly AI spend:
-
-| Report Type | Frequency | Est. Tokens/Report | Monthly Cost |
-|---|---|---|---|
-| Daily Dashboard | 30x | 5K | ~$4.50 |
-| Weekly Summary | 4x | 15K | ~$1.80 |
-| Monthly Executive | 1x | 30K | ~$0.90 |
-| Ad-Hoc Analysis | ~20x | 10K | ~$6.00 |
-| **Total** | | | **~$13.20/month** |
+For recurring reports, log input/output tokens, model, provider, and current unit pricing for each run. Aggregate those records by report type and schedule rather than relying on a static estimate, because provider prices and model choices change over time.
 
 ## What's Next
 

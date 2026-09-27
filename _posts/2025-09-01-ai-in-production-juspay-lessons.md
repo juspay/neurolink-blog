@@ -17,8 +17,8 @@ tags:
   - observability
 author: neurolink
 description: >-
-  Hard-won lessons from serving millions of AI requests at Juspay. Error
-  handling, fallback strategies, cost management, and observability patterns.
+  Production patterns for AI at scale: typed errors, explicit fallback,
+  cost-aware routing, observability, memory, HITL, and middleware boundaries.
 toc: true
 mermaid: false
 pin: false
@@ -29,33 +29,49 @@ image:
 
 The gap between "AI works in my notebook" and "AI works in production serving millions of requests" is not a gap -- it is a chasm. It is the most underestimated challenge in AI adoption, and most teams fall in.
 
-Juspay processes millions of payment transactions daily. When we added AI to that pipeline, every assumption from the prototyping phase broke. Providers went down during peak traffic. A single model change doubled our monthly costs overnight. Debugging a bad response required correlating logs across three services with no trace IDs. We learned every lesson the hard way.
+Juspay processes millions of payment transactions daily. Adding AI to high-volume production systems exposes assumptions that are easy to miss in a prototype: providers can degrade, model changes can alter cost, and responses are difficult to trace when logs do not share a request ID.
 
-NeuroLink was extracted from this production infrastructure. Every feature exists because we needed it at 3 AM during an incident. This post shares seven of those lessons -- the problem we faced, the approach that failed, the solution that worked, and how it became a reusable pattern in the SDK.
+NeuroLink was built at Juspay, where it also powers products like Tara, Yama, and Clairvoyance. This post presents seven production patterns -- the problem, the approach that fails, and the reusable NeuroLink features that can support a solution.
 
 ## Lesson 1: Every provider will go down
 
 ### The Problem
 
-In our first month of production AI deployment, we experienced outages from three different providers. OpenAI had a 45-minute degradation. Anthropic went fully down for 20 minutes. Google Vertex had intermittent 503s for an hour. Each outage was a customer-facing incident because our architecture assumed the provider would always be available.
+Every AI provider can fail or degrade. A deployment may encounter timeouts, intermittent server errors, rate limits, or a wider provider outage. If your architecture assumes a provider will always be available, each failure can become customer-facing.
 
 ### The Failed Approach
 
-Our initial response was manual: monitoring dashboards, Slack alerts, and an engineer on call who would switch the configuration to a backup provider. Response time was 15-30 minutes. For a payment platform, 15 minutes of degraded AI service means thousands of affected transactions.
+A team relying on manual failover must wait for monitoring to detect a problem and for an operator to switch configuration to a backup provider. That adds human response time to an already-failing request path.
 
-### The Solution: Automatic Failover with Circuit Breakers
+### The Solution: Application-Controlled Failover
 
-We built three patterns that now ship as NeuroLink core utilities:
+Use separate resilience mechanisms deliberately:
 
 **Circuit Breaker**: After N consecutive failures, stop trying the primary provider for a cooldown period. This prevents cascading failures where a down provider causes timeout storms that affect your entire application.
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import { createAIProviderWithFallback } from '@juspay/neurolink';
 
-const neurolink = new NeuroLink();
+const { primary, fallback } = await createAIProviderWithFallback(
+  'vertex',
+  'bedrock'
+);
+
+const options = { input: { text: 'Analyze this transaction' } };
+
+const generateWithFallback = async () => {
+  try {
+    return await primary.generate(options);
+  } catch (error) {
+    console.warn('Primary provider failed; trying fallback', error);
+    return fallback.generate(options);
+  }
+};
+
+const result = await generateWithFallback();
 ```
 
-The `CircuitBreaker` class in `src/lib/utils/errorHandling.ts` implements this pattern with configurable failure thresholds (`CIRCUIT_BREAKER` constant) and cooldown periods (`CIRCUIT_BREAKER_RESET_MS`).
+`createAIProviderWithFallback()` constructs the two provider instances. The application decides when to call the fallback. A circuit breaker can separately wrap the primary operation to stop sending requests during a sustained failure; it does not switch providers by itself.
 
 **Retry with Exponential Backoff**: The `withRetry()` utility retries failed requests with increasing delays. Constants `RETRY_ATTEMPTS` and `RETRY_DELAYS` from `src/lib/constants/retry.ts` control the behavior. Retries only happen for retriable errors (timeouts, rate limits, server errors) -- not for authentication failures or invalid model errors.
 
@@ -63,24 +79,24 @@ The `CircuitBreaker` class in `src/lib/utils/errorHandling.ts` implements this p
 
 ### The Result
 
-Automatic failover reduced our incident response time from 15 minutes to under 500 milliseconds. The circuit breaker detects the failure, the retry logic confirms it is not transient, and the fallback provider takes over. No human intervention required.
+Explicit fallback keeps the switching policy visible in application code. Retry transient failures before switching when that matches your latency budget, and add circuit-breaking separately so repeated primary failures do not create timeout storms.
 
-> **Note:** Use `createAIProviderWithFallback()` from `@juspay/neurolink` to set up primary/fallback provider pairs with a single function call. The circuit breaker and retry logic are built in.
+> **Note:** `createAIProviderWithFallback()` creates a primary/fallback provider pair; it does not perform the request switch. If you prefer centralized fallback policy, configure NeuroLink's `providerFallback` callback to return the next `{ provider, model }` for a failed generation.
 {: .prompt-info }
 
 ## Lesson 2: You will use more than one model
 
 ### The Problem
 
-We started with a single model for everything -- GPT-4 for fraud detection, customer support, transaction classification, and reporting. The result was predictable: expensive and slow. A simple "Is this a credit card transaction?" classification does not need a frontier model. But complex fraud pattern analysis absolutely does.
+Using a single flagship model for everything -- classification, extraction, customer support, and complex analysis -- can be unnecessarily expensive and slow. A simple "Is this a credit card transaction?" classification does not need a frontier model, while a nuanced multi-step analysis may benefit from one.
 
 ### The Solution: Task-Based Routing
 
-We categorized our AI tasks by complexity and mapped them to appropriate model tiers:
+Categorize AI tasks by complexity and map them to appropriate model tiers:
 
-- **Simple queries** (classification, extraction, formatting) -> cheap, fast models (Claude Haiku, GPT-4o-mini)
-- **Complex analysis** (multi-step reasoning, nuanced interpretation) -> frontier models (Claude Sonnet, GPT-4o)
-- **Deep reasoning tasks** (mathematical proofs, complex planning) -> specialized reasoning models (o3, extended thinking)
+- **Simple queries** (classification, extraction, formatting) -> cheap, fast models (Claude Haiku, GPT-5.4-mini)
+- **Complex analysis** (multi-step reasoning, nuanced interpretation) -> frontier models (Claude Sonnet, GPT-5.4)
+- **Deep reasoning tasks** (mathematical proofs, complex planning) -> specialized reasoning models (GPT-5.4 Pro, extended thinking)
 
 This lesson drove the development of two NeuroLink components:
 
@@ -92,7 +108,7 @@ This lesson drove the development of two NeuroLink components:
 
 ### The Result
 
-Task-based routing reduced our AI costs by over 60% while maintaining quality for high-value tasks. The cheap, fast models handle 80% of requests. The expensive models handle the 20% that actually need their capabilities.
+Task-based routing can reduce cost and latency while reserving frontier-model capacity for work that benefits from it. Measure quality by task category before changing routes; the right distribution depends on your workload.
 
 ## Lesson 3: Structured error handling saves hours of debugging
 
@@ -105,82 +121,74 @@ Worse, different providers return errors in completely different formats. OpenAI
 ### The Solution: Typed Error Classification
 
 ```typescript
-import { NeuroLink } from '@juspay/neurolink';
+import {
+  AuthenticationError,
+  InvalidModelError,
+  NetworkError,
+  RateLimitError,
+} from '@juspay/neurolink';
 
 try {
   const result = await neurolink.generate({
-    input: { text: "Analyze this transaction" },
-    provider: "openai",
-    model: "gpt-4o",
+    input: { text: 'Analyze this transaction' },
+    provider: 'openai',
+    model: 'gpt-5.4',
   });
 } catch (error) {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error);
-
-  if (message.includes('rate limit') || message.includes('429')) {
-    // Rate limit — exponential backoff
-    await delay(Math.pow(2, attempt) * 1000);
-    continue;
-  } else if (message.includes('authentication') || message.includes('401') || message.includes('api key')) {
-    // Auth error — no retry
-    logger.error('Authentication failed — check API key');
+  if (error instanceof RateLimitError || error instanceof NetworkError) {
+    // A retry loop can catch these types and apply a bounded backoff policy.
     throw error;
-  } else if (message.includes('model') || message.includes('not found')) {
-    // Invalid model — no retry
-    logger.error(`Model not available: ${error}`);
-    throw error;
-  } else if (message.includes('network') || message.includes('ECONNREFUSED') || message.includes('timeout')) {
-    // Network error — retry with backoff
-    await delay(Math.pow(2, attempt) * 1000);
-    continue;
   }
+
+  if (error instanceof AuthenticationError) {
+    console.error('Authentication failed -- check provider credentials');
+    throw error;
+  }
+
+  if (error instanceof InvalidModelError) {
+    console.error('Configured model is unavailable', error);
+    throw error;
+  }
+
   throw error;
 }
 ```
 
-> **Note:** NeuroLink throws standard JavaScript `Error` objects from provider calls. Use message-based inspection (checking `error.message` for keywords) rather than `instanceof` checks, as the SDK's internal error classes are not currently exported from the public API.
+> **Note:** `ProviderError`, `AuthenticationError`, `RateLimitError`, `InvalidModelError`, and `NetworkError` are public root exports from `@juspay/neurolink`, so callers can narrow failures with `instanceof`.
 {: .prompt-info }
 
-The `ErrorFactory` in `src/lib/utils/errorHandling.ts` normalizes raw provider errors into typed exceptions. Each provider's `handleProviderError()` method translates provider-specific error formats into a consistent type hierarchy.
-
-Supporting utilities include:
-
-- **`logStructuredError()`**: Produces consistent, searchable log output with provider, model, error type, and request context.
-- **`isRetriableError()`**: Determines whether automatic retry is appropriate for a given error type.
+Provider implementations classify raw failures into this public type hierarchy. Handle the most specific types first, retry only transient categories, and log the request ID, provider, and model alongside the typed error.
 
 ### The Result
 
-Structured errors turned "API error" into actionable information. Rate limit errors trigger backoff. Auth errors page the ops team. Invalid model errors trigger fallback to an alternative model. Debugging time dropped from hours to minutes.
+Structured errors turn an ambiguous provider failure into a category the application can act on. Rate-limit and network failures may enter a bounded retry path; authentication and invalid-model failures should surface immediately for configuration repair.
 
 ## Lesson 4: Observability is not optional
 
 ### The Problem
 
-In the early days, we had no visibility into our AI pipeline. Token usage was a monthly surprise on the invoice. Latency was "it feels slow." Error rates were "users are complaining." Cost attribution across teams was pure guesswork.
+Without instrumentation, teams discover token usage on invoices, describe latency subjectively, and infer error rates from user reports. Cost attribution across features or teams becomes guesswork.
 
-You cannot optimize what you cannot measure. And in a regulated environment, "we do not know how many tokens we consumed" is not an acceptable answer.
+You cannot optimize what you cannot measure. In a regulated environment, incomplete operational records also make internal review harder.
 
 ### The Solution: Built-in Observability
 
-We built observability into the SDK at three levels:
+NeuroLink exposes observability at three levels:
 
 **OpenTelemetry Integration**: Distributed tracing for every AI request, integrated with your existing observability stack.
 
 ```typescript
 import {
-  initializeOpenTelemetry,
-  shutdownOpenTelemetry,
   flushOpenTelemetry,
+  initializeTelemetry,
+  shutdownOpenTelemetry,
 } from '@juspay/neurolink';
 
-await initializeOpenTelemetry({
-  serviceName: 'my-ai-service',
-  endpoint: 'http://jaeger:4318',
-});
-
-// Analytics automatically track latency, tokens, costs, errors
+// Configure OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_SERVICE_NAME in the environment.
+await initializeTelemetry();
 ```
 
-Functions like `initializeOpenTelemetry()`, `getTracer()`, and `getTracerProvider()` from `src/lib/services/server/ai/observability/instrumentation.ts` provide full OTLP compatibility. Export traces to Jaeger, Grafana Tempo, Datadog, or any OTLP-compatible backend.
+For OTLP-only setup, `initializeTelemetry()` reads `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME`. Export traces to Jaeger, Grafana Tempo, Datadog, or another OTLP-compatible backend. The lower-level `initializeOpenTelemetry()` API accepts Langfuse configuration rather than `{ serviceName, endpoint }`.
 
 **Langfuse Integration**: AI-specific monitoring that goes beyond generic tracing. `setLangfuseContext()` and `getLangfuseHealthStatus()` provide prompt versioning, evaluation tracking, and cost breakdowns per prompt template.
 
@@ -188,7 +196,7 @@ Functions like `initializeOpenTelemetry()`, `getTracer()`, and `getTracerProvide
 
 ### The Result
 
-Full observability transformed our operations. We could attribute costs to specific features, identify slow prompts, detect model quality degradation over time, and provide audit trails for regulatory compliance.
+Consistent telemetry lets a team attribute usage to features, identify slow prompts, monitor error trends, and retain operational evidence for its own audit and compliance processes.
 
 ## Lesson 5: Memory management is critical at scale
 
@@ -202,28 +210,33 @@ Conversation context grows unbounded. A customer support session that lasts 20 t
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    redis: { url: 'redis://localhost:6379' },
+    enableSummarization: true,
+    tokenThreshold: 50_000,
+    redisConfig: {
+      url: 'redis://localhost:6379',
+      ttl: 86_400,
+    },
   },
 });
 ```
 
 The `ConversationMemoryManager` in `src/lib/core/conversationMemoryManager.ts` handles in-memory conversations. The `RedisConversationMemoryManager` in `src/lib/core/redisConversationMemoryManager.ts` provides persistent, shared storage that survives restarts and scales across multiple server instances.
 
-`MEMORY_THRESHOLDS` constants control automatic cleanup: conversations that exceed token limits are truncated (preserving the system prompt and most recent turns), and abandoned sessions are expired after a configurable timeout.
+Set `enableSummarization` with `tokenThreshold` to compact long conversations before they exhaust the model's context window. `maxSessions` bounds only the in-process memory manager; for Redis-backed sessions, `redisConfig.ttl` controls expiration of inactive session keys.
 
-For applications that need intelligent, long-term memory -- remembering user preferences, past decisions, and context across sessions -- NeuroLink integrates with Mem0 via `initializeMem0()` in `src/lib/memory/mem0Initializer.ts`.
+For applications that need intelligent, long-term memory -- remembering user preferences, past decisions, and context across sessions -- NeuroLink integrates with Juspay's own Hippocampus memory SDK (`@juspay/hippocampus`), initialized via the `memory` field of `conversationMemory` (`src/lib/memory/hippocampusInitializer.ts`).
 
 ### The Result
 
-Redis-backed memory eliminated the "my server restarted and lost all conversations" class of incidents. Mem0 integration enabled truly intelligent agents that remember context across days and weeks.
+Redis-backed memory preserves conversation state across server restarts and shares it across instances. Hippocampus can add longer-term memory for applications that need context across sessions.
 
 ## Lesson 6: Human-in-the-loop for regulated industries
 
 ### The Problem
 
-In fintech, AI cannot autonomously execute high-risk operations. A model that decides to refund a transaction, update an account balance, or transfer funds without human approval is a compliance violation. Regulatory requirements mandate human oversight for certain action categories.
+In fintech, an application may prohibit AI from autonomously executing high-risk operations. Whether an action requires human approval depends on the organization's policies and applicable regulation, but refunds, balance changes, or transfers are common candidates for tighter control.
 
-We needed the ability to pause AI execution mid-flow, present the proposed action to a human reviewer, wait for approval or rejection, and then resume or abort.
+The required application pattern is to pause execution mid-flow, present the proposed action to a human reviewer, wait for approval or rejection, and then resume or abort.
 
 ### The Solution: HITL Manager
 
@@ -243,42 +256,45 @@ The `HITLManager` in `src/lib/hitl/hitlManager.ts` intercepts tool execution cal
 
 ### The Result
 
-HITL enabled us to deploy AI agents in regulated environments. Auditors could verify that high-risk actions were reviewed. Compliance teams had a clear paper trail. And the engineering team did not need to build a custom approval system -- it shipped with the SDK.
+HITL provides an approval point for actions the application marks as dangerous. The host application remains responsible for reviewer identity, durable records, policy enforcement, and any audit or compliance requirements.
 
 ## Lesson 7: The middleware pattern saves you from code spaghetti
 
 ### The Problem
 
-As we added cross-cutting concerns -- logging, rate limiting, input validation, PII detection, response caching, analytics -- each new feature added more if-statements to the request pipeline. The `generate()` call was wrapped in try-catch blocks inside timing functions inside validation checks inside caching logic. Business logic was invisible under layers of infrastructure code.
+As cross-cutting concerns accumulate, each feature can add more branches to the request pipeline. A `generate()` call wrapped in error handling, timing, validation, caching, and analytics quickly obscures business logic.
 
 ### The Solution: Middleware Pipeline
 
 ```typescript
-import { MiddlewareFactory } from '@juspay/neurolink';
-
-const middleware = MiddlewareFactory.create({
-  analytics: { enabled: true },
-  guardrails: { enabled: true },
+const result = await neurolink.generate({
+  input: { text: 'Analyze this transaction' },
+  middleware: {
+    middlewareConfig: {
+      analytics: { enabled: true },
+      guardrails: { enabled: true },
+    },
+  },
 });
 ```
 
-The `MiddlewareFactory` in `src/lib/middleware/factory.ts` provides a clean pipeline architecture. Built-in middleware (analytics, guardrails, auto-evaluation) handles the most common concerns. Custom middleware extends the pipeline for domain-specific needs. Priority ordering ensures middleware execute in the right sequence.
+The `MiddlewareFactory` in `src/lib/middleware/factory.ts` provides a pipeline behind this per-call `middleware` option. This sample enables analytics and guardrails only; auto-evaluation is another built-in middleware, but it must be enabled separately. Custom model middleware can extend the pipeline for domain-specific needs, and priority ordering controls execution order.
 
-The middleware wraps the language model itself (via `wrapLanguageModel`), so it applies transparently to both `generate()` and `stream()` calls. Your business logic stays clean -- it just calls `neurolink.generate()` and the middleware handles everything else.
+This middleware wraps the language model (via `wrapLanguageModel`), so it can apply to both `generate()` and `stream()` calls. HTTP and application concerns -- rate limiting, request validation, PII handling, authentication, and response caching -- still belong in the surrounding server or application middleware.
 
 ### The Result
 
-Middleware separated infrastructure concerns from business logic. Adding a new cross-cutting concern went from "modify 20 endpoints" to "register one middleware." For a detailed walkthrough of the middleware system, see [The Middleware System: Analytics, Guardrails, and Custom Pipelines](/posts/middleware-system/).
+Model middleware keeps analytics and guardrail logic out of individual generation calls, while the HTTP layer retains responsibility for request-level controls. For a detailed walkthrough of the middleware system, see [The Middleware System: Analytics, Guardrails, and Custom Pipelines](/posts/middleware-system/).
 
 ## Key takeaways
 
 | Lesson | Pattern | NeuroLink Feature |
 |--------|---------|-------------------|
-| Providers go down | Automatic failover | CircuitBreaker + fallback |
+| Providers go down | Explicit fallback policy | Provider pair + application orchestration |
 | One model is not enough | Task-based routing | ModelRouter + workflows |
-| Debug needs structure | Typed error handling | ErrorFactory + classification |
+| Debug needs structure | Typed error handling | Public provider error classes |
 | You need visibility | Built-in observability | OpenTelemetry + Langfuse |
-| Memory must be managed | External persistence | Redis + Mem0 |
+| Memory must be managed | External persistence | Redis + Hippocampus |
 | Regulation needs humans | HITL workflows | HITLManager |
 | Cross-cutting concerns | Middleware pipeline | MiddlewareFactory |
 
@@ -288,7 +304,7 @@ Production AI is about reliability, not capability. The most capable model is us
 
 The common thread across all seven lessons: production-grade AI is not about the model -- it is about everything around the model. Error handling. Fallback. Observability. Memory management. Human oversight. Cost management. These are the features that determine whether your AI application survives its first month in production.
 
-We learned every one of these lessons through incidents, cost surprises, and compliance audits. NeuroLink encodes them as reusable components so you do not have to repeat our mistakes.
+NeuroLink exposes reusable components for these production concerns, but each application must choose its own reliability, cost, observability, and governance policies.
 
 For audit and compliance patterns, explore our guide on [enterprise security](/posts/enterprise-security-guide/).
 

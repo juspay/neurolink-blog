@@ -120,7 +120,7 @@ console.log(`Failed: ${failed.length}`);
 
 A few important details:
 
-- **Model choice**: Use `gemini-2.5-flash` or `gpt-4o-mini` for batch workloads. These models are 5-10x cheaper than their full-size counterparts and fast enough for most extraction and classification tasks.
+- **Model choice**: Use `gemini-2.5-flash` or `gpt-5.4-mini` for batch workloads. These models are 5-10x cheaper than their full-size counterparts and fast enough for most extraction and classification tasks.
 - **Temperature**: Set `temperature` to 0.1-0.3 for batch processing. You want consistent, reproducible results across items, not creative variation.
 - **maxTokens**: Cap the output length to the minimum required. This reduces cost and prevents the occasional item that triggers a lengthy response from slowing down the batch.
 - **Error wrapping**: Each item is wrapped in a try/catch so failures return error objects rather than throwing exceptions that would reject the entire `Promise.all`.
@@ -255,7 +255,7 @@ const sentiments = await Promise.all(
         input: { text: `Analyze the sentiment: "${review}"` },
         provider: "google-ai",
         schema: SentimentSchema,
-        disableTools: true, // Required for Google with schemas
+        disableTools: true, // Optional: forces text-mode JSON instead of the automatic fallback
       });
       return JSON.parse(result.content);
     })
@@ -265,7 +265,7 @@ const sentiments = await Promise.all(
 
 Structured output ensures every response in your batch follows the same schema. Without it, you might get "The sentiment is positive" from one item and `{"sentiment": "positive", "score": 0.95}` from another. The Zod schema enforces consistency, and validation catches any malformed responses immediately rather than corrupting downstream data.
 
-> **Note:** When using structured output with Google AI provider, set `disableTools: true` to ensure the schema constraint is applied correctly. This is a provider-specific requirement.
+> **Note:** Gemini models cannot combine function calling with schema-enforced structured output. NeuroLink detects this automatically and falls back to text-mode JSON coercion, so you do not need to set `disableTools` yourself -- it stays available as an explicit override.
 {: .prompt-info }
 
 ## Cost and Performance Optimization
@@ -275,14 +275,14 @@ Batch processing cost scales linearly with item count, so model selection has an
 | Model | Speed | Cost per 1K items | Best For |
 |---|---|---|---|
 | gemini-2.5-flash | Fast | $ | Simple extraction, classification |
-| gpt-4o-mini | Fast | $ | General batch processing |
+| gpt-5.4-mini | Fast | $ | General batch processing |
 | gemini-2.5-pro | Medium | $$ | Complex analysis |
-| gpt-4o | Medium | $$$ | High-quality generation |
-| claude-sonnet-4-20250514 | Medium | $$$ | Nuanced content |
+| gpt-5.4 | Medium | $$$ | High-quality generation |
+| claude-sonnet-5 | Medium | $$$ | Nuanced content |
 
 ### Optimization Strategies
 
-**Use the cheapest model that meets quality**: Run a sample batch (50-100 items) through multiple models. If `gemini-2.5-flash` produces acceptable results for your use case, there is no reason to pay 10x more for `gpt-4o`.
+**Use the cheapest model that meets quality**: Run a sample batch (50-100 items) through multiple models. If `gemini-2.5-flash` produces acceptable results for your use case, there is no reason to pay 10x more for `gpt-5.4`.
 
 **Minimize output tokens**: Set `maxTokens` to the minimum needed. A classification task that returns "positive," "negative," or "neutral" does not need a 500-token budget.
 
@@ -363,7 +363,7 @@ if (deadLetterQueue.length > 0) {
 
 ### Provider Fallback
 
-NeuroLink's `FallbackConfig` enables automatic provider switching when the primary provider fails. For batch workloads, this means a Vertex AI outage automatically reroutes to OpenAI without manual intervention.
+NeuroLink's `providerFallback` callback lets you return a different `{ provider, model }` when a request fails, so subsequent batch items can reroute to a backup provider instead of failing outright. For batch workloads, this means you can catch a Vertex AI outage in the callback and have it return an OpenAI provider/model instead. Note that `modelChain` will not do this on its own -- it keeps the current provider and only swaps the model.
 
 ## What's Next
 

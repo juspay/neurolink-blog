@@ -2,7 +2,7 @@
 layout: post
 title: 'NeuroLink vs Portkey vs Helicone: Choosing the Right LLM Gateway'
 date: '2025-11-18 10:00:00 +0530'
-last_updated: 2026-07-04T00:00:00.000Z
+last_updated: 2026-09-27T00:00:00.000Z
 categories:
   - Comparison
   - Enterprise
@@ -28,10 +28,10 @@ The LLM gateway decision is one of the most consequential infrastructure choices
 
 This comparison examines all three platforms with evidence-based analysis. To be fair, each platform has a genuine sweet spot that the others cannot match. The goal is to give you enough information to choose the right tool for your specific requirements, not to declare a universal winner.
 
-> **Last Updated:** July 4, 2026
-> **Verified Versions:** NeuroLink v9.79.2 | Portkey (as of July 2026, now a Palo Alto Networks company) | Helicone (as of July 2026, in maintenance mode post-Mintlify acquisition)
+> **Last Updated:** September 27, 2026
+> **Verified Versions:** NeuroLink v12.27.x (verified September 27, 2026) | Portkey (externally verified July 4, 2026; now a Palo Alto Networks company) | Helicone (externally verified July 4, 2026; in maintenance mode post-Mintlify acquisition)
 >
-> This comparison reflects our understanding of each platform as of the publication date. Features, pricing, and capabilities change frequently—always consult official documentation for the most current information.
+> NeuroLink facts reflect the September 2026 audit; Portkey and Helicone facts retain their July 2026 external verification date. Features, pricing, and capabilities change frequently—always consult official documentation for the most current information.
 
 ## Understanding LLM Gateways: The Foundation
 
@@ -92,17 +92,17 @@ An LLM gateway sits between your applications and LLM providers, abstracting awa
 
 ### NeuroLink
 
-NeuroLink is an open-source TypeScript SDK from Juspay that provides a unified interface to 30 AI providers (29 exported from the public index plus OpenRouter registered dynamically). It emphasizes developer experience with built-in MCP (Model Context Protocol) integration, enterprise middleware, a full RAG pipeline, voice capabilities, and production-ready patterns extracted from real-world deployments.
+NeuroLink is an open-source TypeScript SDK from Juspay that provides a unified interface to 33 named LLM providers (14 native + 19 JSON-catalog) plus a generic OpenAI-compatible adapter. It emphasizes developer experience with built-in MCP (Model Context Protocol) integration, enterprise middleware, a full RAG pipeline, voice capabilities, and production-ready patterns extracted from real-world deployments.
 
 **Core strengths:**
 
 - Unified TypeScript SDK with consistent API across all providers
-- Built-in MCP tool integration with 3 bundled servers, stdio/SSE/WebSocket transport, and tool batching/caching/routing
+- Built-in MCP tool integration with 9 one-command server configs, stdio/SSE/WebSocket/HTTP transport, and tool batching/caching/routing
 - Human-in-the-Loop (HITL) security workflows
 - Redis-backed or in-memory conversation memory
-- Full RAG pipeline: hybrid search (vector + BM25), GraphRAG, 9 chunkers, reranking
+- Full RAG pipeline: hybrid search (vector + BM25), GraphRAG, 10 chunking strategies, reranking
 - OpenTelemetry-based observability with custom exporters
-- Voice pipeline with 5 TTS providers, 4 STT providers, and 2 realtime (S2S) providers; LiveKit WebRTC, real-time WebSocket server
+- Voice pipeline with 6 TTS providers, 4 STT providers, and 2 realtime (S2S) providers; LiveKit WebRTC, real-time WebSocket server
 
 ### Portkey
 
@@ -138,7 +138,7 @@ Helicone started as an observability-first platform, providing deep insights int
 
 ## Feature Comparison
 
-> **Last verified:** July 4, 2026. Features, pricing, and capabilities may change. Always consult official documentation for the most current information. Portkey is now a Palo Alto Networks company (acquired May 29, 2026). Helicone is in maintenance mode (acquired by Mintlify March 3, 2026).
+> **Last verified:** NeuroLink facts were verified September 27, 2026 against v12.27.x. Portkey and Helicone facts were last externally verified July 4, 2026. Features, pricing, and capabilities may change. Always consult official documentation for the most current information. Portkey is now a Palo Alto Networks company (acquired May 29, 2026). Helicone is in maintenance mode (acquired by Mintlify March 3, 2026).
 {: .prompt-info }
 
 The following table provides a high-level comparison. Each platform has unique strengths—the "best" choice depends on your specific requirements.
@@ -150,7 +150,7 @@ The following table provides a high-level comparison. Each platform has unique s
 | Self-hosted option | Yes | Yes (open-source; VPC/air-gapped is Enterprise) | Yes (Docker/Helm; on-prem managed is Enterprise) |
 | Cloud-hosted | Planned | Yes | Yes |
 | **Provider Support** | | | |
-| Total providers supported | 30 (29 public + OpenRouter) | 1,600+ LLMs, 40+ providers | 100+ models (OpenAI, Anthropic, Azure, Gemini, DeepSeek, Groq, Mistral, and more) |
+| Total providers supported | 33 LLM providers + generic OpenAI-compatible adapter | 1,600+ LLMs, 40+ providers | 100+ models (OpenAI, Anthropic, Azure, Gemini, DeepSeek, Groq, Mistral, and more) |
 | OpenAI | Yes | Yes | Yes |
 | Anthropic | Yes | Yes | Yes |
 | Google AI/Vertex | Yes | Yes | Yes |
@@ -164,17 +164,17 @@ The following table provides a high-level comparison. Each platform has unique s
 | Request caching | Internal tool/model metadata; no HTTP-level LLM response cache | Simple (all tiers) + Semantic (Production+) | Yes (header-based; reported 73% hit-rate example) |
 | Streaming support | Yes | Yes | Yes |
 | Virtual keys | No | Yes (virtual key vault, rotate + revoke) | No |
-| MCP gateway/control plane | Built-in MCP clients + 3 bundled servers | Yes (MCP Gateway — centralized auth, per-tool observability) | No |
+| MCP gateway/control plane | Built-in MCP clients + 9 one-command server configs | Yes (MCP Gateway — centralized auth, per-tool observability) | No |
 | **Observability** | | | |
 | Request logging | Yes (OpenTelemetry) | Yes | Yes |
 | Cost tracking | Yes | Yes | Yes (Model Registry v2, 300+ model coverage) |
 | Custom dashboards | Limited | Yes | Yes |
 | Prompt management | Limited | Yes (templates, versioning, playground; unlimited from Production) | No new development (Experiments deprecated Sep 2025) |
 | **Compliance** | | | |
-| SOC2 certified | TBD | Yes (Enterprise) | Yes (Team tier) |
-| ISO27001 certified | TBD | Yes (Enterprise) | TBD |
-| GDPR compliant | Yes | Yes | TBD |
-| HIPAA compliant | In progress | Yes (Enterprise) | Yes (Team tier) |
+| SOC2 certified | Not certified (self-hosted; deployable in SOC 2 Type II environments) | Yes (Enterprise) | Yes (Team tier) |
+| ISO27001 certified | Not certified (deployable on ISO 27001-certified infrastructure; the cert is your infra's, not NeuroLink's) | Yes (Enterprise) | Not publicly documented |
+| GDPR compliant | Supports GDPR-conscious data handling (EU-region providers selectable; you own compliance) | Yes | Supports (EU data residency option) |
+| HIPAA compliant | Not certified (deployable in HIPAA-aligned configurations; you're responsible for a compliant setup) | Yes (Enterprise) | Yes (Team tier) |
 | **Pricing** | | | |
 | Free tier | Planned | Yes (10k logs/month) | Yes (10k req/month) |
 | Starter/Production tier | — | $49/month (100k logs + $9/100k overage) | — |
@@ -229,7 +229,7 @@ const portkey = new Portkey({
 });
 
 const response = await portkey.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   messages: [
     { role: 'user', content: 'Explain quantum computing in simple terms' }
   ]
@@ -254,7 +254,7 @@ const openai = new OpenAI({
 });
 
 const response = await openai.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   messages: [
     { role: 'user', content: 'Explain quantum computing in simple terms' }
   ]
@@ -276,7 +276,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: 'Write a short story about AI' },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-6',
+  model: 'claude-sonnet-5',
 });
 
 for await (const chunk of result.stream) {
@@ -300,7 +300,7 @@ async function generateWithFallback(prompt: string) {
   const providers = [
     { provider: 'vertex', model: 'gemini-2.5-flash' },
     { provider: 'bedrock', model: 'anthropic.claude-sonnet-4-6' },
-    { provider: 'openai', model: 'gpt-4o' }
+    { provider: 'openai', model: 'gpt-5.4' }
   ] as const;
 
   for (const { provider, model } of providers) {
@@ -321,9 +321,9 @@ const result = await generateWithFallback('Analyze this data...');
 console.log(result.content);
 ```
 
-### MCP Tool Integration (NeuroLink Exclusive)
+### MCP Tool Integration with NeuroLink
 
-NeuroLink includes built-in MCP (Model Context Protocol) integration with 3 bundled servers and support for external servers via stdio, SSE, or WebSocket transport:
+NeuroLink includes built-in MCP (Model Context Protocol) integration with 9 one-command server configs and support for external servers via stdio, SSE, WebSocket, or HTTP transport:
 
 ```json
 // .mcp-config.json
@@ -331,11 +331,11 @@ NeuroLink includes built-in MCP (Model Context Protocol) integration with 3 bund
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-filesystem"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
     },
-    "browser": {
+    "puppeteer": {
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-browser"]
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
     }
   }
 }
@@ -351,7 +351,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'List all TypeScript files in the src directory' },
   provider: 'anthropic',
-  model: 'claude-sonnet-4-6',
+  model: 'claude-sonnet-5',
   // MCP tools from .mcp-config.json are automatically available
 });
 ```
@@ -362,11 +362,11 @@ const result = await neurolink.generate({
 
 - **You prefer open-source solutions** — NeuroLink is fully open-source (MIT license) and can be self-hosted without vendor dependencies
 - **You're building in TypeScript** — NeuroLink is a TypeScript-first SDK with excellent type safety and IDE support
-- **You need MCP tool integration** — Built-in support for Model Context Protocol with 3 bundled servers, tool batching, caching, and routing
+- **You need MCP tool integration** — Built-in support for Model Context Protocol with 9 one-command server configs, tool batching, caching, and routing
 - **You want HITL security workflows** — Human-in-the-Loop approval for sensitive operations in regulated industries
 - **You need conversation memory** — Redis-backed or in-memory persistence for multi-turn conversations
-- **You need RAG out of the box** — Full pipeline with hybrid search, GraphRAG, 9 chunkers, and reranking built in
-- **You need voice capabilities** — 5 TTS providers, 4 STT providers, and 2 realtime (S2S) providers; LiveKit WebRTC and a real-time WebSocket server
+- **You need RAG out of the box** — Full pipeline with hybrid search, GraphRAG, 10 chunking strategies, and reranking built in
+- **You need voice capabilities** — 6 TTS providers, 4 STT providers, and 2 realtime (S2S) providers; LiveKit WebRTC and a real-time WebSocket server
 - **You're coming from Juspay's ecosystem** — Production-tested patterns from Juspay's infrastructure
 
 ### Choose Portkey When
@@ -436,7 +436,7 @@ const neurolink = new NeuroLink({
   // Optional: Redis for conversation memory
   conversationMemory: {
     enabled: true,
-    redis: {
+    redisConfig: {
       url: process.env.REDIS_URL
     }
   }
@@ -446,7 +446,7 @@ const neurolink = new NeuroLink({
 const result = await neurolink.generate({
   input: { text: 'Hello, AI!' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 ```
 
@@ -464,7 +464,7 @@ Choose based on your primary need: orchestration + SDK (NeuroLink), managed gate
 
 ---
 
-*Last verified: July 4, 2026. Have experience with any of these platforms? We welcome community feedback to keep this comparison accurate and helpful.*
+*NeuroLink facts last verified September 27, 2026 against v12.27.x; Portkey and Helicone facts last externally verified July 4, 2026. Have experience with any of these platforms? We welcome community feedback to keep this comparison accurate and helpful.*
 
 ---
 

@@ -60,16 +60,17 @@ NeuroLink sits between SDK and Framework. Its core is lightweight -- a unified p
 - First-class streaming support that works naturally with React Server Components
 - Growing provider ecosystem with community-contributed adapters
 
-**Relationship with NeuroLink:** NeuroLink uses the Vercel AI SDK under the hood. All NeuroLink providers extend a `BaseProvider` that calls the Vercel AI SDK's `streamText()` and `generateText()` methods. NeuroLink adds the enterprise layers on top: multi-provider management, MCP integration, middleware, workflow engine, RAG pipeline, server adapters, and HITL.
+**Relationship with NeuroLink:** NeuroLink uses the Vercel AI SDK under the hood. All NeuroLink providers extend a `BaseProvider` that calls the Vercel AI SDK's `streamText()` and `generateText()` methods. Vercel AI SDK now includes an MCP client and tool bridge, language-model middleware, and provider registries. NeuroLink adds higher-level orchestration around those primitives: MCP transport and configuration management, provider fallback, workflows, RAG, server adapters, observability, and HITL.
 
 **Weaknesses:**
 
-- No built-in multi-provider management, failover, or middleware pipeline -- you build those yourself
+- Provider registries centralize model configuration and namespacing, but automatic failure-triggered cross-provider routing still requires application logic
+- Its MCP client deliberately stays lightweight: applications own approval policy, persistent sessions, interrupted-stream recovery, and notification handling
 - Tightly coupled to the React and Next.js ecosystem; using it outside that context requires more manual wiring
 
-**When to use Vercel AI SDK alone:** Simple chatbot UIs, React and Next.js applications where you need one provider, and situations where you want maximum control with minimum abstraction.
+**When to use Vercel AI SDK alone:** Simple chatbot UIs, React and Next.js applications, and situations where its provider registry, middleware, and MCP tool bridge give you enough control without a higher-level orchestration layer.
 
-**When to graduate to NeuroLink:** When you need multiple providers with failover, content safety guardrails, quality evaluation, server-side deployment outside Next.js, or enterprise features like HITL and audit logging.
+**When to graduate to NeuroLink:** When you need managed multi-provider fallback, MCP transport and configuration management, content safety guardrails, quality evaluation, server-side deployment outside Next.js, or higher-level features like HITL and audit logging.
 
 ## LangChain and LangGraph
 
@@ -131,7 +132,7 @@ NeuroLink sits between SDK and Framework. Its core is lightweight -- a unified p
 - Steeper learning curve for teams outside the .NET ecosystem, particularly for the plugin authoring model
 - Provider support beyond Azure OpenAI is limited compared to truly provider-agnostic SDKs
 
-**vs NeuroLink:** Semantic Kernel is tied to the Microsoft ecosystem. If your organization is all-in on Azure, it provides the tightest integration. NeuroLink is provider-agnostic with 13 providers, making it the better choice for multi-cloud or cloud-agnostic architectures. Both target enterprise use cases, but from different starting points.
+**vs NeuroLink:** Semantic Kernel is tied to the Microsoft ecosystem. If your organization is all-in on Azure, it provides the tightest integration. NeuroLink is provider-agnostic with 33 named LLM providers, making it the better choice for multi-cloud or cloud-agnostic architectures. Both target enterprise use cases, but from different starting points.
 
 ## Haystack by deepset
 
@@ -148,25 +149,25 @@ Here is the detailed comparison across all major features:
 | Feature | NeuroLink | Vercel AI SDK | LangChain | LlamaIndex | Semantic Kernel |
 |---|---|---|---|---|---|
 | **Primary Language** | TypeScript | TypeScript | Python | Python | C#/Python/Java |
-| **Provider Abstraction** | 13 unified | Provider adapters | 70+ integrations | 20+ LLMs | Azure-focused |
+| **Provider Abstraction** | 33 unified | Provider adapters | 70+ integrations | 20+ LLMs | Azure-focused |
 | **Streaming** | Unified | Native | Provider-specific | Basic | Basic |
 | **RAG** | 10 chunkers, Graph RAG | None built-in | Via retrievers | Best-in-class | Basic |
-| **Agents** | MCP tools + agent loop | None built-in | Agents + LangGraph | Agents | Plugins |
-| **MCP Support** | Native (4 transports) | None | Via adapter | Via adapter | Via plugin |
-| **Workflow Engine** | Ensemble, chain, adaptive | None | LangGraph | None | Planner |
+| **Agents** | MCP tools + agent loop | Tool loop primitives | Agents + LangGraph | Agents | Plugins |
+| **MCP Support** | Native (4 transports) | MCP client + tool bridge | Via adapter | Via adapter | Via plugin |
+| **Workflow Engine** | Ensemble, chain, adaptive, custom | Application-defined | LangGraph | None | Planner |
 | **Server Adapters** | 4 frameworks | Next.js | LangServe | Flask | ASP.NET |
-| **Middleware** | Factory pattern | None | Callbacks | None | Filters |
-| **HITL** | Built-in | None | LangGraph interrupt | None | Manual |
-| **Observability** | OpenTelemetry + Langfuse | None built-in | LangSmith | Built-in tracing | Azure Monitor |
+| **Middleware** | Factory pattern | Language-model middleware | Callbacks | None | Filters |
+| **HITL** | Built-in manager | Application-defined | LangGraph interrupts | None | Manual |
+| **Observability** | OpenTelemetry + Langfuse | Middleware/application-defined | LangSmith | Built-in tracing | Azure Monitor |
 | **Memory** | Redis + Mem0 | None | Multiple types | Chat stores | Semantic memory |
 | **Image/Video Gen** | Imagen, Veo 3.1 | None | Third-party | None | DALL-E |
 | **Open Source** | Yes (Apache 2.0) | Yes (Apache 2.0) | Yes (MIT) | Yes (MIT) | Yes (MIT) |
 
 A few observations from this matrix:
 
-- **MCP support** is a differentiator today. The Model Context Protocol is becoming the standard for tool integration, and NeuroLink is ahead with native support for multiple transport types (stdio, SSE, Streamable HTTP, and WebSocket via the SDK's experimental transport module).
-- **Middleware** is surprisingly absent from most frameworks. NeuroLink's factory pattern for middleware (guardrails, analytics, evaluation) is unique in providing a composable middleware pipeline similar to what Express or Koa provide for HTTP.
-- **HITL** is only built into NeuroLink. LangGraph provides interrupt-based human-in-the-loop, but it is a lower-level primitive. Semantic Kernel leaves HITL entirely to the application developer.
+- **MCP support** exists at different abstraction levels. Vercel AI SDK can connect to MCP servers and convert discovered tools for `generateText()` or `streamText()`. NeuroLink adds four transport types -- stdio, SSE, Streamable HTTP, and WebSocket -- plus SDK and CLI configuration around MCP servers.
+- **Middleware** also differs by scope. Vercel AI SDK provides language-model middleware for request, response, and stream transformations. NeuroLink's middleware and observability layers connect those primitives to guardrails, analytics, and evaluation across its broader orchestration surface.
+- **HITL** is not exclusive to one framework. NeuroLink provides a higher-level built-in HITL manager, while LangGraph provides interrupt primitives that applications compose into review flows. Vercel AI SDK and Semantic Kernel leave more of the review-flow policy to application code.
 
 > **Note:** Feature matrices are snapshots in time. All of these frameworks are actively developed and adding features regularly. Check current documentation before making decisions based on specific feature availability.
 {: .prompt-info }

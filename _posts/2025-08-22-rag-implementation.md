@@ -31,7 +31,7 @@ Before diving in, here is what each component provides:
 
 **NeuroLink SDK provides:**
 
-- Unified LLM generation across 13 providers (OpenAI, Anthropic, Google Vertex, AWS Bedrock, etc.)
+- Unified LLM generation across 33 LLM providers (OpenAI, Anthropic, Google Vertex, AWS Bedrock, etc.)
 - Streaming responses with real-time token delivery
 - Multi-provider fallback and retry logic
 - MCP tool integration for extended capabilities
@@ -42,6 +42,9 @@ Before diving in, here is what each component provides:
 - Embedding generation (OpenAI, Cohere, Voyage AI, or provider-specific APIs)
 - Vector databases (Pinecone, Qdrant, Weaviate, Chroma, pgvector, etc.)
 - Document processing libraries (pdf-parse, mammoth, etc.)
+
+> **Note:** NeuroLink also ships its own built-in RAG module (document loaders, 10 chunking strategies, an in-memory vector store plus Pinecone/pgvector/Chroma adapters, hybrid search, and a `RAGPipeline` orchestrator) importable from `@juspay/neurolink`. This guide builds each stage yourself with external tools for full control over the pipeline; see the SDK's RAG module docs if you'd rather start from the built-in pipeline.
+{: .prompt-info }
 
 ```mermaid
 flowchart TB
@@ -54,7 +57,7 @@ flowchart TB
     subgraph NeuroLink["NeuroLink SDK"]
         Generate["generate() Method<br/>LLM Generation"]
         Stream["stream() Method<br/>Streaming Responses"]
-        Providers[13 AI Providers]
+        Providers[33 LLM Providers]
     end
 
     subgraph RAGApp["Your RAG Application"]
@@ -519,7 +522,7 @@ Return only the queries, one per line, without numbering or bullets.
 Query: ${query}`
       },
       provider: 'openai',
-      model: 'gpt-4-turbo',
+      model: 'gpt-5.4',
       temperature: 0.7
     });
 
@@ -574,7 +577,7 @@ ${doc.text}
 Relevant portions:`
         },
         provider: 'openai',
-        model: 'gpt-4-turbo',
+        model: 'gpt-5.4',
         temperature: 0
       });
 
@@ -876,7 +879,7 @@ class RAGApplication {
     // Generation (uses NeuroLink)
     this.generator = new RAGGenerator(config.neurolink, {
       provider: config.generationProvider || 'openai',
-      model: config.generationModel || 'gpt-4-turbo',
+      model: config.generationModel || 'gpt-5.4',
       includeCitations: true,
       temperature: 0.3
     });
@@ -939,7 +942,7 @@ async function main() {
     openai,
     pineconeIndex: pinecone.index('knowledge-base'),
     generationProvider: 'openai',
-    generationModel: 'gpt-4-turbo'
+    generationModel: 'gpt-5.4'
   });
 
   // Ingest documents
@@ -972,7 +975,7 @@ const claudeRAG = new RAGApplication({
   openai, // Still use OpenAI for embeddings
   pineconeIndex,
   generationProvider: 'anthropic',
-  generationModel: 'claude-3-5-sonnet-20241022'
+  generationModel: 'claude-sonnet-5'
 });
 
 // Use Google Vertex AI for generation
@@ -981,7 +984,7 @@ const vertexRAG = new RAGApplication({
   openai,
   pineconeIndex,
   generationProvider: 'vertex',
-  generationModel: 'gemini-3-flash'
+  generationModel: 'gemini-2.5-flash'
 });
 
 // Use AWS Bedrock for generation
@@ -990,7 +993,7 @@ const bedrockRAG = new RAGApplication({
   openai,
   pineconeIndex,
   generationProvider: 'bedrock',
-  generationModel: 'anthropic.claude-3-sonnet-20240229-v1:0'
+  generationModel: 'anthropic.claude-sonnet-4-6'
 });
 ```
 
@@ -1168,7 +1171,7 @@ This guide covers a complete working RAG pipeline: document processing, semantic
 2. **NeuroLink for generation** -- `generate()` or `stream()` to synthesize answers from retrieved context
 3. **NeuroLink for query enhancement** -- generate query variations and compress retrieved context
 
-NeuroLink does not provide built-in embedding generation or vector storage. It excels at the generation step, where its unified multi-provider interface and provider fallback make your RAG pipeline resilient.
+This guide built the pipeline from external tools for full control, but NeuroLink also ships its own built-in RAG module (chunking, vector stores, hybrid search, and a `RAGPipeline` orchestrator) if you'd rather not wire embeddings and vector storage together yourself. Either way, NeuroLink excels at the generation step, where its unified multi-provider interface and provider fallback make your RAG pipeline resilient.
 
 ## Resources
 

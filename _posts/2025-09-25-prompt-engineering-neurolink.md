@@ -22,7 +22,7 @@ image:
   alt: 'Prompt Engineering with NeuroLink: A Developer''s Guide'
 ---
 
-You will learn to craft effective prompts that work consistently across 13 AI providers using NeuroLink's unified API. By the end of this guide, you will have system prompt patterns, structured output with Zod schemas, chain-of-thought templates, extended thinking configurations, and a systematic testing framework for prompt iteration.
+You will learn to craft effective prompts that work consistently across NeuroLink's 33 supported AI providers using its unified API. By the end of this guide, you will have system prompt patterns, structured output with Zod schemas, chain-of-thought templates, extended thinking configurations, and a systematic testing framework for prompt iteration.
 
 ```mermaid
 flowchart TD
@@ -73,7 +73,7 @@ improvements, then positive observations.`,
 
   // Provider and model configuration
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   temperature: 0.3,
   maxTokens: 2000
 });
@@ -102,7 +102,7 @@ Structure your summary as follows:
 
 Use clear, professional language. Include specific numbers when available.`,
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 ```
 
@@ -176,7 +176,7 @@ const openaiResult = await neurolink.generate({
   input: { text: userInput },
   systemPrompt,
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 
 // Anthropic
@@ -192,7 +192,7 @@ const geminiResult = await neurolink.generate({
   input: { text: userInput },
   systemPrompt,
   provider: "google-ai",
-  model: "gemini-2.0-flash",
+  model: "gemini-2.5-flash",
 });
 
 // Vertex AI
@@ -245,7 +245,7 @@ return structured feedback. Be specific about line numbers and issues.`,
   schema: CodeReviewSchema,
   output: { format: "json" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 
 // Parse the structured response
@@ -361,7 +361,7 @@ const financialResult = await neurolink.generate({
     "Executive summary followed by detailed breakdown with bullet points"
   ),
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 
 // Technical analysis
@@ -447,7 +447,7 @@ const geminiResult = await neurolink.generate({
   },
   systemPrompt: "You are a senior systems architect.",
   provider: "google-ai",
-  model: "gemini-2.0-flash-001",
+  model: "gemini-2.5-flash",
   thinkingConfig: {
     thinkingLevel: "high"  // minimal, low, medium, high
   }
@@ -480,7 +480,7 @@ Focus on:
 
 Provide specific, actionable recommendations.`,
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
 });
 
 // With image alt text for accessibility
@@ -513,7 +513,7 @@ Follow these exact formatting rules:
 3. Add risk indicators: [LOW], [MEDIUM], [HIGH]
 4. End with a critical path analysis section`,
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   temperature: 0.3
 });
 
@@ -598,7 +598,7 @@ const testResults = await testPromptVariations(
   ],
   "How do I implement caching in a Node.js application?",
   "openai",
-  "gpt-4o"
+  "gpt-5.4"
 );
 
 console.log("Test Results:", testResults);

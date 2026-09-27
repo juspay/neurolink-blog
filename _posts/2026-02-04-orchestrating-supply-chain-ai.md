@@ -26,7 +26,7 @@ image:
   alt: 'Orchestrating Supply Chain AI: Multi-Agent Logistics'
 ---
 
-We designed a multi-agent supply chain orchestration system using NeuroLink to coordinate demand forecasting, inventory optimization, logistics routing, and supplier management through specialized AI agents. This deep dive examines the agent communication patterns, conflict resolution strategies, and the trade-offs between centralized and decentralized decision-making in logistics AI.
+This guide designs a hypothetical multi-agent supply chain system using NeuroLink to coordinate demand forecasting, inventory optimization, logistics routing, and supplier management. It focuses on agent boundaries, tool access, evaluation, and human approval for consequential actions.
 
 No single AI model excels at every supply chain task. Demand forecasting requires deep reasoning about trends and seasonality. Route optimization needs real-time tool access to logistics APIs. Inventory management demands data-heavy analysis across warehouse networks. Supplier evaluation needs rapid scoring at scale. Each task has a fundamentally different computational profile.
 
@@ -42,10 +42,10 @@ The architecture assigns each supply chain function to a specialized agent, with
 flowchart TB
     Dashboard[Supply Chain Dashboard] --> Orchestrator[Agent Orchestrator]
 
-    Orchestrator --> Demand[Demand Forecasting<br/>Claude Opus<br/>Reasoning]
-    Orchestrator --> Inventory[Inventory Optimizer<br/>Gemini Pro<br/>Data Analysis]
-    Orchestrator --> Route[Route Planner<br/>GPT-4o + Tools<br/>Logistics APIs]
-    Orchestrator --> Supplier[Supplier Evaluator<br/>Gemini Flash<br/>Scoring]
+    Orchestrator --> Demand[Demand Forecasting<br/>Claude Opus 5<br/>Reasoning]
+    Orchestrator --> Inventory[Inventory Optimizer<br/>Gemini 2.5 Pro<br/>Data Analysis]
+    Orchestrator --> Route[Route Planner<br/>GPT-5.4 + Tools<br/>Logistics APIs]
+    Orchestrator --> Supplier[Supplier Evaluator<br/>Gemini 2.5 Flash<br/>Scoring]
 
     Demand --> ERP[ERP System<br/>MCP Tools]
     Inventory --> WMS[Warehouse Mgmt<br/>MCP Tools]
@@ -63,111 +63,59 @@ flowchart TB
 
 The four agents and their model rationale:
 
-- **Demand Forecasting** (Claude Opus): Trend analysis and seasonal pattern recognition demand the strongest reasoning capabilities. This is the one function where model quality directly impacts financial outcomes -- a bad forecast means either stockouts or excess inventory.
+- **Demand Forecasting** (Claude Opus 5): Use a capable reasoning model to interpret statistical forecasts, trends, and seasonal context. Model selection can affect recommendations, but the numerical forecast should come from a dedicated forecasting method.
 
 > **Note:** LLMs excel at interpreting and summarizing data, not at statistical time-series forecasting. For production demand planning, use dedicated forecasting models (ARIMA, Prophet, or ML-based models) and have the LLM agent orchestrate, interpret, and communicate their outputs rather than generating forecasts directly.
 {: .prompt-info }
 
-- **Inventory Optimization** (Gemini Pro): Cross-warehouse inventory analysis involves processing large data sets and producing actionable reorder recommendations. Gemini Pro's balanced profile handles data-heavy analysis efficiently.
-- **Route Planning** (GPT-4o + Tools): Route optimization requires real-time interaction with logistics APIs to check carrier availability, calculate costs, and evaluate constraints. GPT-4o's strong tool-calling capabilities make it the right choice.
-- **Supplier Evaluation** (Gemini Flash): Scoring hundreds of suppliers on delivery performance, quality metrics, and pricing requires speed over depth. Gemini Flash processes high volumes at minimal cost.
+- **Inventory Optimization** (Gemini 2.5 Pro): Cross-warehouse inventory analysis involves processing large data sets and producing actionable reorder recommendations.
+- **Route Planning** (GPT-5.4 + Tools): Route optimization requires real-time interaction with logistics APIs to check carrier availability, calculate costs, and evaluate constraints.
+- **Supplier Evaluation** (Gemini 2.5 Flash): Repeated structured scoring benefits from a faster model, with validation before results affect procurement.
 
 ## Specialized Agent Configuration
 
-Each agent is created with the appropriate provider and model tier:
+Use one `NeuroLink` instance and select the provider and model for each request. This keeps credentials and operational policy centralized while preserving task-specific routing:
 
 ```typescript
-import { AIProviderFactory, ModelConfigurationManager } from '@juspay/neurolink';
+import { NeuroLink } from "@juspay/neurolink";
 
-const modelConfig = ModelConfigurationManager.getInstance();
+const neurolink = new NeuroLink({
+  credentials: {
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+    openai: { apiKey: process.env.OPENAI_API_KEY },
+    googleAiStudio: { apiKey: process.env.GOOGLE_AI_API_KEY },
+  },
+});
 
-// Demand forecasting - strongest reasoning for trend analysis
-const demandAgent = await AIProviderFactory.createProvider(
-  "bedrock",
-  modelConfig.getModelForTier("bedrock", "quality") // claude-3-opus
-);
+const agents = {
+  demand: { provider: "anthropic", model: "claude-opus-5" },
+  inventory: { provider: "google-ai", model: "gemini-2.5-pro" },
+  route: { provider: "openai", model: "gpt-5.4" },
+  supplier: { provider: "google-ai", model: "gemini-2.5-flash" },
+} as const;
 
-// Inventory optimization - balanced for data processing
-const inventoryAgent = await AIProviderFactory.createProvider(
-  "vertex",
-  modelConfig.getModelForTier("vertex", "balanced") // gemini-2.5-pro
-);
-
-// Route planning - quality model with tool support
-const routeAgent = await AIProviderFactory.createProvider(
-  "openai",
-  modelConfig.getModelForTier("openai", "quality") // gpt-4o
-);
-
-// Supplier evaluation - fast model for high-volume scoring
-const supplierAgent = await AIProviderFactory.createProvider(
-  "google-ai",
-  modelConfig.getModelForTier("google-ai", "fast") // gemini-2.5-flash
-);
-
-// Provider availability check
-const availableProviders = modelConfig.getAvailableProviders();
-// Returns ProviderConfiguration[] for providers with valid env vars
+async function runAgent(agent: keyof typeof agents, text: string) {
+  return neurolink.generate({
+    input: { text },
+    ...agents[agent],
+  });
+}
 ```
 
-The `getModelForTier()` method selects the best model for a given provider and performance tier. The `getAvailableProviders()` method returns only providers with valid API keys configured, enabling dynamic agent configuration based on the deployment environment.
-
-The cost implications are significant:
-
-| Agent | Model | Cost per 1K tokens | Justification |
-|---|---|---|---|
-| Demand Forecasting | claude-3-opus | $0.0015 | Accuracy directly impacts P&L |
-| Inventory Optimizer | gemini-2.5-pro | $0.0003 | Complex but routine analysis |
-| Route Planner | gpt-4o | $0.0006 | Tool calling reliability critical |
-| Supplier Evaluator | gemini-2.5-flash | $0.000075 | High volume, simple scoring |
-
-> **Note:** Supplier scoring at Gemini Flash rates costs 20x less than demand forecasting with Claude Opus. This is the power of multi-agent architecture: each function runs on the most cost-effective model that meets its quality requirements.
-{: .prompt-info }
+Treat the model table as a starting policy, not a benchmark. Validate quality, latency, availability, and current provider pricing with representative workloads before deploying it.
 
 ## ERP/WMS/TMS Integration via MCP Tools
 
-Supply chain agents need access to enterprise systems. NeuroLink's MCP (Model Context Protocol) registry provides a clean interface for connecting to these systems:
+Supply chain agents need access to enterprise systems. NeuroLink can connect to standards-compliant MCP servers configured through the CLI:
 
-```typescript
-import { MCPRegistry } from '@juspay/neurolink';
-import { tool } from "ai";
-import { z } from "zod";
-
-const supplyChainRegistry = new MCPRegistry();
-
-// Register ERP tools
-await supplyChainRegistry.registerServer("erp-connector", {
-  description: "ERP system for sales orders, forecasts, financials",
-  tools: {
-    getSalesHistory: {},
-    getCurrentOrders: {},
-    getFinancialData: {},
-  },
-});
-
-// Register WMS tools
-await supplyChainRegistry.registerServer("wms-connector", {
-  description: "Warehouse Management System",
-  tools: {
-    getInventoryLevels: {},
-    getStockMovements: {},
-    checkReorderPoints: {},
-  },
-});
-
-// Register TMS tools
-await supplyChainRegistry.registerServer("tms-connector", {
-  description: "Transportation Management System",
-  tools: {
-    getAvailableCarriers: {},
-    calculateRoute: {},
-    getShipmentTracking: {},
-    bookShipment: {},
-  },
-});
+```bash
+neurolink mcp add erp-connector node --args ./servers/erp.js
+neurolink mcp add wms-connector node --args ./servers/wms.js
+neurolink mcp add tms-connector node --args ./servers/tms.js
+neurolink mcp list --status
 ```
 
-For the route planning agent, direct tool definitions provide type-safe parameter schemas:
+Those commands register executable MCP servers; each server remains responsible for publishing its own tool schemas. For an application-local integration, pass a direct typed tool to `generate()`:
 
 ```typescript
 // Direct tool definitions for route planning agent
@@ -198,93 +146,80 @@ const calculateRoute = tool({
 });
 ```
 
-The MCP registry provides service discovery with `listServers()` (returning `["erp-connector", "wms-connector", "tms-connector"]`) and tool enumeration with `listTools()`. This is critical in enterprise environments where different facilities may run different ERP vendors.
+Run `neurolink mcp list --status` to inspect configured server connectivity. Keep tool names and schemas stable across ERP vendors so the orchestration layer does not depend on a facility-specific backend.
 
 ## Evaluation for Forecast Quality
 
 Demand forecasts drive purchasing decisions worth millions. Before acting on a forecast, evaluate its quality using NeuroLink's evaluation framework:
 
 ```typescript
-import { generateEvaluation } from '@juspay/neurolink';
+import { NeuroLink } from "@juspay/neurolink";
 
-// Evaluate demand forecast quality
-const forecastEval = await generateEvaluation({
-  userQuery: `Generate demand forecast for ${productSKU} for next 12 weeks`,
-  aiResponse: JSON.stringify(forecastResult),
-  primaryDomain: "supply-chain",
-  toolUsage: [
-    { toolName: "getSalesHistory", result: salesData },
-    { toolName: "getCurrentOrders", result: orderData },
-  ],
-  conversationHistory: [
-    { role: "system", content: `Historical MAPE for this SKU: ${historicalMAPE}%` },
-  ],
-});
+const neurolink = new NeuroLink();
+const forecastEval = await neurolink.evaluate(
+  {
+    query: `Interpret the 12-week forecast for ${productSKU}`,
+    response: JSON.stringify(forecastResult),
+    context: [
+      JSON.stringify(salesData),
+      JSON.stringify(orderData),
+      `Historical MAPE: ${historicalMAPE}%`,
+    ],
+  },
+  {
+    scorers: ["faithfulness", "answer-relevancy", "hallucination"],
+    passThreshold: 0.7,
+  },
+);
 
-// Domain-specific scores
-console.log(`Accuracy: ${forecastEval.accuracy}/10`);
-console.log(`Completeness: ${forecastEval.completeness}/10`);
-console.log(`Domain Alignment: ${forecastEval.domainAlignment}/10`);
-console.log(`Tool Effectiveness: ${forecastEval.toolEffectiveness}/10`);
-
-// Quality gate for procurement decisions
-if (forecastEval.overall >= 7 && forecastEval.toolEffectiveness >= 6) {
-  // Forecast quality sufficient for automated purchasing
-  await triggerPurchaseOrders(forecastResult);
+if (forecastEval.passed) {
+  await queuePurchaseOrderDraft(forecastResult);
 } else {
-  // Flag for supply chain analyst review
-  await escalateToAnalyst(forecastResult, forecastEval);
+  await escalateToAnalyst(forecastResult, forecastEval.scores);
 }
 ```
 
-The evaluation framework provides several dimensions of assessment:
-
-- **Accuracy**: Does the forecast align with historical patterns and current trends?
-- **Completeness**: Does it cover all requested time periods and relevant factors?
-- **Domain Alignment**: Does it use supply chain terminology and methodologies correctly?
-- **Tool Effectiveness**: Did the agent make meaningful use of ERP data, or did it ignore the available data and generate a generic forecast?
-
-Setting `primaryDomain: "supply-chain"` activates domain-specific scoring criteria including `domainAlignment` and `terminologyAccuracy`. This ensures the evaluation understands the difference between a good demand forecast and a good generic text response.
-
-The quality gate pattern is critical: forecasts scoring below 7 overall or below 6 on tool effectiveness are automatically escalated to a human analyst. This prevents low-confidence AI forecasts from triggering automated purchase orders.
+The evaluation result includes per-scorer results, an aggregate `overallScore`, and a `passed` flag. This is an output-quality gate, not a substitute for backtesting the underlying statistical forecast. Compare numerical forecasts against realized demand with forecasting metrics such as MAPE or WAPE before allowing automation.
 
 ## HITL for High-Value Procurement
 
 Some supply chain decisions are too consequential for full automation. NeuroLink's HITL (Human-in-the-Loop) manager enforces approval workflows for high-value actions:
 
 ```typescript
-import { HITLManager } from '@juspay/neurolink';
+import { NeuroLink } from "@juspay/neurolink";
 
-const procurementHITL = new HITLManager({
-  enabled: true,
-  dangerousActions: [
-    "place-purchase-order",
-    "change-supplier",
-    "expedite-shipment",
-    "adjust-safety-stock",
-  ],
-  timeout: 86400000, // 24 hours for procurement review
-  confirmationMethod: "event",
-  allowArgumentModification: true,
-  autoApproveOnTimeout: false,
-  auditLogging: true,
-  customRules: [
-    {
-      name: "high-value-purchase",
-      requiresConfirmation: true,
-      condition: (_toolName, args) => {
-        const typedArgs = args as { totalCost?: number };
-        return typedArgs?.totalCost !== undefined && typedArgs.totalCost > 100000;
+const neurolink = new NeuroLink({
+  hitl: {
+    enabled: true,
+    dangerousActions: [
+      "place-purchase-order",
+      "change-supplier",
+      "expedite-shipment",
+      "adjust-safety-stock",
+    ],
+    timeout: 86400000, // 24 hours for procurement review
+    confirmationMethod: "event",
+    allowArgumentModification: true,
+    autoApproveOnTimeout: false,
+    auditLogging: true,
+    customRules: [
+      {
+        name: "high-value-purchase",
+        requiresConfirmation: true,
+        condition: (_toolName, args) => {
+          const typedArgs = args as { totalCost?: number };
+          return typedArgs?.totalCost !== undefined && typedArgs.totalCost > 100000;
+        },
+        customMessage: "Purchase order exceeds $100K. Procurement manager approval required.",
       },
-      customMessage: "Purchase order exceeds $100K. Procurement manager approval required.",
-    },
-    {
-      name: "new-supplier",
-      requiresConfirmation: true,
-      condition: (toolName) => toolName === "change-supplier",
-      customMessage: "Supplier change requires procurement review.",
-    },
-  ],
+      {
+        name: "new-supplier",
+        requiresConfirmation: true,
+        condition: (toolName) => toolName === "change-supplier",
+        customMessage: "Supplier change requires procurement review.",
+      },
+    ],
+  },
 });
 ```
 
@@ -295,7 +230,7 @@ The HITL configuration implements two critical business rules:
 
 The `autoApproveOnTimeout: false` setting means that if no human responds within 24 hours, the action is rejected rather than approved. For procurement decisions, failing safely (doing nothing) is always better than auto-approving a $500K purchase order.
 
-The `auditLogging: true` flag ensures every approval and rejection is logged for compliance. This audit trail is essential for ISO and SOX compliance in regulated supply chains.
+The `auditLogging: true` flag records approval and rejection events. Your application must still persist, protect, retain, and review those records according to its own control framework.
 
 > **Note:** The `allowArgumentModification: true` setting lets procurement managers adjust order quantities, delivery dates, or supplier selections before approving. This is more practical than a simple approve/reject binary.
 {: .prompt-info }
@@ -305,8 +240,11 @@ The `auditLogging: true` flag ensures every approval and rejection is logged for
 Supply chain operations often run 24/7 and cannot tolerate prolonged outages. Each backend system gets its own circuit breaker:
 
 ```typescript
-import { CircuitBreakerManager, MCPCircuitBreaker } from '@juspay/neurolink';
-import { withRetry, RateLimiter } from '@juspay/neurolink';
+import {
+  CircuitBreakerManager,
+  HTTPRateLimiter,
+  withRetry,
+} from "@juspay/neurolink";
 
 const cbManager = new CircuitBreakerManager();
 
@@ -323,14 +261,18 @@ const wmsBreaker = cbManager.getBreaker("wms", {
 });
 
 // Rate limiter for ERP API (typically has strict limits)
-const erpLimiter = new RateLimiter(10, 60000); // 10 queries/min
+const erpLimiter = new HTTPRateLimiter({
+  requestsPerWindow: 10,
+  windowMs: 60000,
+  maxBurst: 1,
+});
 
 async function queryERP(query: string) {
   await erpLimiter.acquire();
   return erpBreaker.execute(() =>
     withRetry(
-      () => supplyChainRegistry.executeTool("getSalesHistory", { query }),
-      { maxAttempts: 3, initialDelay: 2000 }
+      () => fetchSalesHistory(query),
+      { maxRetries: 2, baseDelayMs: 2000 }
     )
   );
 }
@@ -345,8 +287,8 @@ if (health.openBreakers > 0) {
 The resilience design has several layers:
 
 - **Per-system circuit breakers**: ERP, WMS, and TMS each get independent circuit breakers. An ERP outage does not disable route planning.
-- **Rate limiters**: Enterprise APIs (especially ERPs) often have strict rate limits. The `RateLimiter` prevents exceeding 10 queries per minute to the ERP, avoiding lockouts.
-- **Retry with backoff**: Transient failures get 3 retry attempts with exponential backoff starting at 2 seconds.
+- **Rate limiters**: Enterprise APIs (especially ERPs) often have strict rate limits. The `HTTPRateLimiter` limits the example to 10 requests per minute to the ERP, avoiding lockouts.
+- **Retry with backoff**: Transient failures get up to two retries after the initial attempt, with exponential backoff starting at 2 seconds.
 - **Health monitoring**: `getHealthSummary()` provides real-time visibility into which systems are operational, degraded, or down. This feeds into operations dashboards.
 
 ## Middleware for Analytics and Cost Tracking
@@ -354,44 +296,42 @@ The resilience design has several layers:
 Tracking costs and performance across four agents and three backend systems requires systematic observability:
 
 ```typescript
-import { MiddlewareFactory } from '@juspay/neurolink';
-
-const scmMiddleware = new MiddlewareFactory({
-  middlewareConfig: {
-    analytics: {
-      enabled: true,
-      config: {
-        trackTokenUsage: true,
-        trackCost: true,
-        trackLatency: true,
-      },
-    },
-    guardrails: {
-      enabled: true,
-      config: {
-        badWords: ["confidential-pricing", "competitor-data"],
+const result = await neurolink.generate({
+  input: { text: routePlanningPrompt },
+  provider: "openai",
+  model: "gpt-5.4",
+  middleware: {
+    middlewareConfig: {
+      analytics: { enabled: true },
+      guardrails: {
+        enabled: true,
+        config: {
+          badWords: {
+            enabled: true,
+            list: ["confidential-pricing", "competitor-data"],
+          },
+        },
       },
     },
   },
 });
 
-// Cost tracking per supply chain function
-const demandCost = modelConfig.getCostInfo("bedrock", "anthropic.claude-3-opus-20240229-v1:0");
-const supplierCost = modelConfig.getCostInfo("google-ai", "gemini-2.5-flash");
+console.log(result.analytics?.tokenUsage);
+console.log(result.analytics?.requestDuration);
 ```
 
-The analytics middleware tracks token usage, cost, and latency per agent type. This data answers critical questions: How much does demand forecasting cost per SKU? Is route planning latency acceptable for real-time shipment booking? Which agent consumes the most tokens?
+Analytics exposes token usage and request duration for each generation. Provider pricing changes independently, so calculate cost from the recorded model and usage against a versioned price table rather than hard-coding rates in orchestration code.
 
-The guardrails middleware prevents sensitive data leakage. Keywords like "confidential-pricing" and "competitor-data" are blocked from appearing in agent outputs, protecting proprietary supply chain information.
+The example guardrail redacts listed terms. It is only a narrow defense: use authorization, data minimization, and output validation for sensitive supply-chain information.
 
 ## Putting It All Together
 
 Here is how the complete system processes a typical supply chain request:
 
 1. **Dashboard request**: "Recommend reorder quantities for SKU-4521 for the next quarter."
-2. **Orchestrator**: Routes to the demand forecasting agent (Claude Opus).
+2. **Orchestrator**: Routes to the demand forecasting agent (Claude Opus 5).
 3. **Demand agent**: Calls `getSalesHistory` and `getCurrentOrders` via ERP tools, analyzes trends, produces a 12-week forecast.
-4. **Evaluation**: Scores the forecast at 8.2/10 overall, 7.5/10 tool effectiveness. Passes the quality gate.
+4. **Evaluation**: Runs the configured scorers and either passes the aggregate threshold or routes the result to an analyst.
 5. **Inventory agent**: Uses the forecast to calculate optimal reorder quantities and safety stock levels across warehouses.
 6. **HITL check**: Total procurement value is $180K (above $100K threshold). Paused for procurement manager approval.
 7. **Route planning**: Once approved, the route agent calculates optimal shipping routes and books carriers via TMS.
@@ -401,7 +341,7 @@ Each step is protected by circuit breakers, logged by analytics middleware, and 
 
 ## What's Next
 
-The architecture decisions we have described represent trade-offs that worked for our scale and constraints. The key engineering insights to take away: start with the simplest design that handles your current load, instrument everything so you can identify bottlenecks before they become outages, and resist premature abstraction until you have at least three concrete use cases demanding it. The implementation details will differ for your system, but the underlying constraints -- latency budgets, failure domains, resource contention -- are universal.
+This hypothetical architecture is a starting point, not a production blueprint. Begin with the smallest design that meets your requirements, test it against representative supply-chain data, instrument latency and failures, and keep approval boundaries explicit for actions that create financial or operational commitments.
 
 ---
 

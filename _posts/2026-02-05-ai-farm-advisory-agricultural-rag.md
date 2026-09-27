@@ -47,8 +47,8 @@ flowchart TB
 
     Cloud --> Router[Query Router<br/>Task Classifier]
     Router -->|Quick Lookup| Fast[Fast Agent<br/>Gemini Flash<br/>Planting dates, specs]
-    Router -->|Diagnosis| Expert[Expert Agent<br/>Claude Opus<br/>Disease ID, treatment]
-    Router -->|Weather| Weather[Weather Agent<br/>GPT-4o + Tools<br/>Forecast integration]
+    Router -->|Diagnosis| Expert[Expert Agent<br/>Claude Opus via Bedrock<br/>Disease ID, treatment]
+    Router -->|Weather| Weather[Weather Agent<br/>GPT-5.4 plus Tools<br/>Forecast integration]
 
     Fast --> KB[Agricultural KB<br/>RAG Vector Search]
     Expert --> KB
@@ -70,39 +70,39 @@ The architecture has three key design decisions:
 
 ## Multi-Provider Setup with Offline Fallback
 
-The system uses four different providers, each optimized for a specific type of query:
+The system uses current provider/model pairs for each route. One `NeuroLink` instance can dispatch all four:
 
 ```typescript
-import { AIProviderFactory, ModelConfigurationManager } from '@juspay/neurolink';
+import { NeuroLink } from "@juspay/neurolink";
 
-const modelConfig = ModelConfigurationManager.getInstance();
+const neurolink = new NeuroLink({
+  credentials: {
+    bedrock: {
+      region: process.env.AWS_REGION,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+    openai: { apiKey: process.env.OPENAI_API_KEY },
+    googleAiStudio: { apiKey: process.env.GOOGLE_AI_API_KEY },
+  },
+});
 
-// Fast lookup agent - planting calendars, crop specs
-const lookupAgent = await AIProviderFactory.createProvider(
-  "google-ai",
-  modelConfig.getModelForTier("google-ai", "fast") // gemini-2.5-flash
-);
+const agents = {
+  lookup: { provider: "google-ai", model: "gemini-2.5-flash" },
+  expert: { provider: "bedrock", model: "anthropic.claude-opus-4-6-v1" },
+  weather: { provider: "openai", model: "gpt-5.4" },
+  offline: { provider: "ollama", model: "llama3.1:8b" },
+} as const;
 
-// Expert diagnostic agent - disease identification, treatment plans
-const expertAgent = await AIProviderFactory.createProvider(
-  "bedrock",
-  modelConfig.getModelForTier("bedrock", "quality") // claude-3-opus
-);
-
-// Weather integration agent - with tool calling
-const weatherAgent = await AIProviderFactory.createProvider(
-  "openai",
-  modelConfig.getModelForTier("openai", "balanced") // gpt-4o
-);
-
-// Offline agent - Ollama for rural/disconnected scenarios
-const offlineAgent = await AIProviderFactory.createProvider(
-  "ollama",
-  "llama3.1:8b"
-);
+async function generateWithAgent(
+  agent: keyof typeof agents,
+  text: string,
+) {
+  return neurolink.generate({ input: { text }, ...agents[agent] });
+}
 ```
 
-The Ollama provider is uniquely suited for agricultural use cases in rural areas:
+The Ollama provider is suited to deployments that must continue without a cloud connection:
 
 - **No API keys required**: `requiredEnvVars: []` -- no cloud credentials needed on the device
 - **Zero marginal cost**: `defaultCost: { input: 0, output: 0 }` -- free local inference after hardware setup
@@ -120,17 +120,18 @@ The routing logic detects connectivity and classifies queries to determine the b
 // Connectivity-aware routing
 async function getAdvisory(query: string, hasInternet: boolean) {
   if (!hasInternet) {
-    return offlineAgent.generate({
-      input: { text: `${localKBContext}\n\nFarmer question: ${query}` },
-    });
+    return generateWithAgent(
+      "offline",
+      `${localKBContext}\n\nFarmer question: ${query}`,
+    );
   }
 
   // Online: route by query type
   const queryType = classifyQuery(query);
   switch (queryType) {
-    case "fast": return lookupAgent.generate({ input: { text: query } });
-    case "diagnostic": return expertAgent.generate({ input: { text: query } });
-    case "weather": return weatherAgent.generate({ input: { text: query } });
+    case "fast": return generateWithAgent("lookup", query);
+    case "diagnostic": return generateWithAgent("expert", query);
+    case "weather": return generateWithAgent("weather", query);
   }
 }
 ```
@@ -153,7 +154,10 @@ The RAG (Retrieval-Augmented Generation) pattern grounds AI responses in verifie
 ```typescript
 // RAG pattern: retrieve relevant agricultural knowledge, inject as context
 
-async function queryWithRAG(question: string, agent: any) {
+async function queryWithRAG(
+  question: string,
+  agent: keyof typeof agents,
+) {
   // 1. Retrieve relevant documents from vector search
   const relevantDocs = await vectorSearch(question, {
     collections: ["crop-guides", "pest-database", "soil-maps", "extension-bulletins"],
@@ -175,9 +179,10 @@ Always include source references.
 Knowledge Base Context:
 ${context}`;
 
-  return agent.generate({
-    input: { text: `${systemPrompt}\n\nFarmer question: ${question}` },
-  });
+  return generateWithAgent(
+    agent,
+    `${systemPrompt}\n\nFarmer question: ${question}`,
+  );
 }
 ```
 
@@ -218,24 +223,19 @@ The local cache is refreshed whenever the farmer has connectivity. Priority is g
 
 ## Weather and Sensor Tool Integration
 
-Modern farming benefits from real-time data integration. NeuroLink's MCP tool system connects the advisory AI to weather APIs and IoT soil sensors:
+Modern farming benefits from real-time data integration. NeuroLink can connect to weather and sensor MCP servers configured through the CLI:
+
+```bash
+neurolink mcp add weather-service node --args ./servers/weather.js
+neurolink mcp add soil-sensors node --args ./servers/soil-sensors.js
+neurolink mcp list --status
+```
+
+For an application-local weather integration, define a typed tool and pass it to `generate()`:
 
 ```typescript
-import { MCPRegistry } from '@juspay/neurolink';
 import { tool } from "ai";
 import { z } from "zod";
-
-const farmRegistry = new MCPRegistry();
-
-await farmRegistry.registerServer("weather-service", {
-  description: "Weather forecast and historical data",
-  tools: { getForecast: {}, getHistorical: {}, getAlerts: {} },
-});
-
-await farmRegistry.registerServer("soil-sensors", {
-  description: "IoT soil sensor readings",
-  tools: { getSoilMoisture: {}, getSoilTemp: {}, getSoilPH: {} },
-});
 
 const getWeatherForecast = tool({
   description: "Get weather forecast for farm location",
@@ -262,7 +262,7 @@ const getWeatherForecast = tool({
 });
 ```
 
-The weather tool enables forecast-aware advice. When a farmer asks "Should I spray fungicide this week?", the AI checks the 7-day forecast. If rain is expected within 24 hours, it recommends delaying the application -- saving the farmer the cost of a wasted treatment.
+The weather tool enables forecast-aware advice. When a farmer asks whether to apply a fungicide, the agent can retrieve the forecast and the application can compare it with the product label and local guidance. The language model should not invent a spray interval or override label requirements.
 
 ### Soil Sensor Integration
 
@@ -287,42 +287,39 @@ const getSoilMoisture = tool({
 });
 ```
 
-With soil moisture data, the AI can give specific irrigation recommendations: "Field B root-zone moisture is at 18% (dry). Based on your sandy loam soil and the 5-day forecast showing no rain, irrigate 1.5 inches within the next 48 hours."
+With soil-moisture data, the agent can explain current field conditions and retrieve the applicable irrigation guidance. Any numerical recommendation should come from a validated agronomic calculation that accounts for the crop, growth stage, soil, sensor calibration, weather, and local practice -- not from the language model alone.
 
 ## Safety Guardrails for Agronomic Advice
 
 Agricultural AI must never recommend banned substances, unsafe application rates, or practices that could harm people, animals, or the environment. NeuroLink's middleware guardrails enforce these constraints:
 
 ```typescript
-import { MiddlewareFactory } from '@juspay/neurolink';
-
-const farmMiddleware = new MiddlewareFactory({
-  middlewareConfig: {
-    guardrails: {
-      enabled: true,
-      config: {
-        badWords: [
-          // IMPORTANT: This is a minimal example list. Production systems must
-          // integrate with official databases (EPA, EU Pesticide DB, local registries)
-          // for comprehensive banned substance checking.
-          "ddt", "paraquat", "chlorpyrifos", "endosulfan", "lindane",
-          "aldrin", "dieldrin", "heptachlor", "toxaphene", "mirex",
-          // Prevent unsafe dosage language
-          "unlimited", "as much as possible", "no limit",
-        ],
-        precallEvaluation: {
-          enabled: true, // Block unsafe queries
-        },
-        modelFilter: {
-          enabled: true, // AI-powered safety check for recommendations
+const safeResult = await neurolink.generate({
+  input: { text: advisoryPrompt },
+  provider: "anthropic",
+  model: "claude-opus-5",
+  middleware: {
+    middlewareConfig: {
+      guardrails: {
+        enabled: true,
+        config: {
+          badWords: {
+            enabled: true,
+            list: [
+              // Illustrative only: production systems must query current,
+              // location-specific product registrations and labels.
+              "ddt", "paraquat", "chlorpyrifos", "endosulfan", "lindane",
+              "aldrin", "dieldrin", "heptachlor", "toxaphene", "mirex",
+              "unlimited", "as much as possible", "no limit",
+            ],
+          },
+          precallEvaluation: {
+            enabled: true,
+            blockUnsafeRequests: true,
+          },
         },
       },
-    },
-    autoEvaluation: {
-      enabled: true,
-    },
-    analytics: {
-      enabled: true,
+      analytics: { enabled: true },
     },
   },
 });
@@ -332,7 +329,7 @@ The safety system operates at three levels:
 
 1. **Keyword filtering (`badWords`)**: Blocks responses that mention banned pesticides like DDT, paraquat, or chlorpyrifos, as well as dangerous language like "unlimited" dosage
 2. **Pre-call evaluation (`precallEvaluation`)**: Screens incoming queries to block attempts to bypass safety guidelines
-3. **Model-based filtering (`modelFilter`)**: An AI-powered secondary review of the recommendation for safety concerns
+3. **Post-generation validation**: Validate the structured recommendation against current labels, registrations, dosage limits, weather constraints, and local rules before displaying it
 
 > **Critical:** The pesticide ban list above is a minimal example. Real agricultural advisory systems must integrate with authoritative databases (EPA's Pesticide Product Label System, EU Pesticide Database, or local agricultural extension databases) for comprehensive banned substance checking. Brand names, chemical synonyms, and combination products require specialized lookup — keyword filtering alone is insufficient for chemical safety. Always direct users to consult licensed agronomists and official agricultural extension offices before applying any pesticide.
 {: .prompt-danger }
@@ -376,31 +373,33 @@ This context transforms generic advice into farm-specific guidance. Instead of "
 Not all agricultural advice carries the same risk. A planting date recommendation is low-stakes -- the farmer loses a few days if the advice is wrong. A pesticide application recommendation is high-stakes -- the wrong advice can destroy a crop or contaminate a water source.
 
 ```typescript
-import { generateEvaluation } from '@juspay/neurolink';
+const adviceEval = await neurolink.evaluate(
+  {
+    query: "My tomatoes have yellow leaves with dark spots. What should I do?",
+    response: diagnosticResponse,
+    context: [
+      JSON.stringify(moistureData),
+      JSON.stringify(weatherData),
+      ...seasonHistory,
+    ],
+  },
+  {
+    scorers: ["faithfulness", "answer-relevancy", "hallucination"],
+    passThreshold: 0.75,
+  },
+);
 
-const adviceEval = await generateEvaluation({
-  userQuery: `My tomatoes have yellow leaves with dark spots. What should I do?`,
-  aiResponse: diagnosticResponse,
-  primaryDomain: "agriculture",
-  toolUsage: [
-    { toolName: "getSoilMoisture", result: moistureData },
-    { toolName: "getWeatherForecast", result: weatherData },
-  ],
-  conversationHistory: seasonHistory,
-});
-
-if (adviceEval.accuracy < 7) {
-  // Add disclaimer for lower confidence
-  diagnosticResponse += "\n\nPlease consult your local agricultural extension office to confirm this diagnosis.";
+if (!adviceEval.passed) {
+  diagnosticResponse +=
+    "\n\nPlease consult your local agricultural extension office to confirm this diagnosis.";
 }
 ```
 
 The evaluation checks:
 
-- **Accuracy**: Is the diagnosis consistent with the symptoms described?
-- **Relevance**: Does the recommendation address the specific question?
-- **Tool effectiveness**: Were sensor and weather data used meaningfully in the recommendation?
-- **Safety**: Does the recommendation follow safe application practices?
+- **Faithfulness**: Is the response supported by the supplied context?
+- **Answer relevancy**: Does the recommendation address the specific question?
+- **Hallucination**: Does the response introduce unsupported claims?
 
 Lower-confidence responses automatically include a referral to the local agricultural extension office. The AI assists but does not replace expert human judgment for critical decisions.
 
@@ -409,23 +408,25 @@ Lower-confidence responses automatically include a referral to the local agricul
 Rural internet connections are unreliable. NeuroLink's circuit breaker pattern ensures fast fallback to offline mode rather than long timeouts:
 
 ```typescript
-import { CircuitBreaker, withRetry } from '@juspay/neurolink';
+import { CircuitBreakerManager, withRetry } from "@juspay/neurolink";
 
-const cloudBreaker = new CircuitBreaker(2, 10000); // Fast fallback to offline
+const cloudBreaker = new CircuitBreakerManager().getBreaker("farm-cloud", {
+  failureThreshold: 2,
+  resetTimeout: 10000,
+  operationTimeout: 15000,
+});
 
 async function getAdvisoryResilient(query: string) {
   try {
     return await cloudBreaker.execute(() =>
       withRetry(
-        () => expertAgent.generate({ input: { text: query } }),
-        { maxAttempts: 2, initialDelay: 1000, maxDelay: 5000 }
+        () => generateWithAgent("expert", query),
+        { maxRetries: 1, baseDelayMs: 1000, maxDelayMs: 5000 }
       )
     );
   } catch {
     // Offline fallback
-    return offlineAgent.generate({
-      input: { text: `${localKBContext}\n\n${query}` },
-    });
+    return generateWithAgent("offline", `${localKBContext}\n\n${query}`);
   }
 }
 ```
@@ -438,17 +439,17 @@ Key design decisions for rural resilience:
 
 ## Cost Analysis
 
-AI farm advisory is remarkably cost-effective compared to traditional extension services:
+Farm-advisory costs depend on current provider prices, token usage, retrieval infrastructure, connectivity, hardware, and the human review required for safety-critical guidance. Build the estimate from measured usage rather than a fixed per-question claim:
 
-| Component | Cost | Notes |
-|---|---|---|
-| Cloud queries (average) | ~$0.002/question | Blended across providers |
-| Offline queries (Ollama) | $0/question | Local hardware cost only |
-| Estimated daily usage | 50 queries/farm | During growing season |
-| Monthly cloud cost | ~$3/farm/month | April through October |
-| Annual cost per farm | ~$21/farm/year | 7-month growing season |
+| Component | Measure |
+|---|---|
+| Cloud generation | Input/output tokens by provider and model |
+| Retrieval | Embedding, vector-store, and document-refresh costs |
+| Offline inference | Device purchase, power, storage, and maintenance |
+| Safety controls | Product-database access, validation, and human review |
+| Operations | Monitoring, support, and model/knowledge-base updates |
 
-Compare this to the cost of a single misdiagnosed crop disease ($500-$5,000+ in lost yield) or a single unnecessary pesticide application ($50-$200 per field), and the ROI is overwhelming.
+Log `result.usage` and the selected model, apply a versioned provider price table, and compare the result with observed agronomic outcomes. Do not treat low inference cost as evidence that advice is safe or economically beneficial.
 
 ## What's Next
 

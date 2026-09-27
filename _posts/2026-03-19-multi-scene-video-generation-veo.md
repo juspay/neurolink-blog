@@ -466,7 +466,7 @@ const final = await neurolink.generate({
 });
 ```
 
-> **Note:** Video generation costs scale with resolution, duration, and segment count. A single 1080p, 8-second clip can cost 10-50x what an image generation costs. A five-segment Director Mode video at 1080p could cost 100-250x an image. Budget carefully and use 720p previews to iterate on prompts before committing to final renders.
+> **Note:** Video generation costs substantially more than image generation and scale with resolution, duration, and segment count — a five-segment Director Mode video multiplies the per-clip cost across every segment and transition. Budget accordingly, and use 720p previews to iterate on prompts before committing to final 1080p renders.
 {: .prompt-warning }
 
 ## Error Handling and Partial Failures

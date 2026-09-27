@@ -111,7 +111,7 @@ I submitted roughly a dozen documentation PRs over three months. Each one requir
 
 The maintainers suggested I try adding a provider. Contributing the OpenRouter provider (`feat(openrouter): add OpenRouter provider with 300+ model support`) required understanding four systems:
 
-1. **The `BaseProvider` contract**: `generate()`, `stream()`, `supportsTools()` -- the three abstract methods every provider must implement.
+1. **The `BaseProvider` contract**: `getProviderName()`, `getDefaultModel()`, `getAISDKModel()`, `formatProviderError()` -- the abstract methods every provider must implement.
 2. **The `ProviderFactory` registration pattern**: How providers register themselves with the factory via a canonical name, factory function, default model, and aliases.
 3. **How the AI SDK's `LanguageModelV1` interface maps to provider APIs**: Each provider creates a `LanguageModelV1` instance that the Vercel AI SDK uses for generation and streaming.
 4. **Error handling and edge cases**: What happens when the provider returns an unexpected response format, when the API key is missing, when the model does not support tools.
@@ -120,11 +120,11 @@ The maintainers suggested I try adding a provider. Contributing the OpenRouter p
 // Step 1: Create provider class extending BaseProvider
 export class OpenRouterProvider extends BaseProvider {
   constructor(modelName?: string, providerName?: AIProviderName) {
-    super(modelName || 'openai/gpt-4o', providerName || 'openrouter');
+    super(modelName || 'openai/gpt-5.2', providerName || 'openrouter');
   }
 
   getDefaultModel(): string {
-    return process.env.OPENROUTER_MODEL || 'openai/gpt-4o';
+    return process.env.OPENROUTER_MODEL || 'openai/gpt-5.2';
   }
 
   getProviderName(): AIProviderName {
@@ -136,7 +136,7 @@ export class OpenRouterProvider extends BaseProvider {
 ProviderFactory.registerProvider(
   'openrouter',
   (modelName) => new OpenRouterProvider(modelName),
-  'openai/gpt-4o',
+  'openai/gpt-5.2',
   ['open-router', 'or']
 );
 ```
@@ -178,6 +178,7 @@ In parallel, I contributed the `LaTeXChunker` for academic papers. The RAG subsy
 import { ChunkerRegistry } from '@juspay/neurolink';
 
 // Register a custom chunker for a specific content type
+const chunkerRegistry = ChunkerRegistry.getInstance();
 chunkerRegistry.registerChunker(
   'latex',
   async () => {
@@ -321,7 +322,9 @@ Open-source contribution is a career accelerator in three dimensions.
 
 ## What's Next
 
-The direction is clear, even if the timeline is not. Organizations that invest in these capabilities now -- building the infrastructure, developing the talent, establishing the practices -- will compound their advantage over those that wait. The question is not whether this shift will happen, but whether your team will be leading it or catching up. The tools are available. The patterns are proven. The only remaining variable is execution.
+Eighteen months in, the work does not feel finished -- it feels like a different job than the one I started. I still write code, but less of it. More of my time goes to triage, review, and design discussions about where the abstractions should bend for the next contributor. That shift from building to stewarding is the part nobody tells you about going in.
+
+If you are on the fence about contributing to an open-source project, the barrier is lower than it looks. Find a bug, write a clean reproduction, and see where it leads. The path from that first issue to maintainer is not glamorous, but it is walkable one PR at a time.
 
 ---
 

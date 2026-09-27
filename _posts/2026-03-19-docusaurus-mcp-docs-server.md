@@ -33,7 +33,7 @@ This post walks through how we built a live MCP documentation server that indexe
 
 Documentation has a fundamental discoverability problem in the age of AI-assisted development. The traditional model assumes a human navigates to a docs site, uses search or sidebar navigation, reads a page, and applies the information. AI coding assistants break every step of this model.
 
-When a developer types "help me set up RAG with NeuroLink" into Claude Code, the AI has two choices: guess based on training data, or use tools to find the answer. Without a docs server, it guesses. The guess might be close for popular libraries with extensive training data representation, but for an SDK that evolves across 200+ exports and 13 providers, the guess is usually wrong in the details that matter -- parameter names, configuration keys, import paths.
+When a developer types "help me set up RAG with NeuroLink" into Claude Code, the AI has two choices: guess based on training data, or use tools to find the answer. Without a docs server, it guesses. The guess might be close for popular libraries with extensive training data representation, but for an SDK that evolves across 200+ exports and 33 LLM providers, the guess is usually wrong in the details that matter -- parameter names, configuration keys, import paths.
 
 The cost of wrong documentation is not just developer frustration. It is wasted debugging time, incorrect implementations that pass initial testing but fail in production, and eroded trust in both the AI assistant and the SDK. Every hallucinated API signature is a support ticket waiting to happen.
 

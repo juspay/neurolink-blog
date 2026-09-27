@@ -119,7 +119,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.generate({
   input: { text: 'Summarize this plain text file' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./data/raw-logs.txt'],
     strategy: 'character',
@@ -156,7 +156,7 @@ The Swiss Army knife. It tries to split at `\n\n` (paragraphs) first, then `\n` 
 const result = await neurolink.generate({
   input: { text: 'What are the key configuration options?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./docs/guide.md'],
     strategy: 'recursive',
@@ -198,7 +198,7 @@ Splits text by token count using model-specific tokenizer approximations. Essent
 const result = await neurolink.generate({
   input: { text: 'Explain the rate limiting configuration' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./docs/api-reference.md'],
     strategy: 'token',
@@ -237,7 +237,7 @@ Splits at sentence boundaries (periods, exclamation marks, question marks) and g
 const result = await neurolink.generate({
   input: { text: 'What does the documentation say about authentication?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./docs/security-guide.md'],
     strategy: 'sentence',
@@ -278,7 +278,7 @@ Splits at heading boundaries (`#`, `##`, `###`) while preserving the heading hie
 const result = await neurolink.generate({
   input: { text: 'What are the main configuration sections?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./README.md'],
     strategy: 'markdown',
@@ -321,7 +321,7 @@ Splits at semantic HTML tags (`<article>`, `<section>`, `<p>`, `<div>`) while pr
 const result = await neurolink.generate({
   input: { text: 'Find the pricing details from this webpage' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./scraped/pricing-page.html'],
     strategy: 'html',
@@ -364,7 +364,7 @@ Splits at object boundaries while respecting nesting depth. Every chunk contains
 const result = await neurolink.generate({
   input: { text: 'What are the default configuration values?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./config/defaults.json'],
     strategy: 'json',
@@ -407,7 +407,7 @@ Splits at `\section`, `\subsection`, `\begin{environment}`, and math block bound
 const result = await neurolink.generate({
   input: { text: 'What is the main theorem in this paper?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./papers/attention-is-all-you-need.tex'],
     strategy: 'latex',
@@ -449,7 +449,7 @@ Uses embedding similarity to detect where the topic changes within a document. I
 const result = await neurolink.generate({
   input: { text: 'What are the performance implications of caching?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./docs/architecture-guide.md'],
     strategy: 'semantic',
@@ -493,7 +493,7 @@ Combines markdown splitting with semantic similarity to produce the best of both
 const result = await neurolink.generate({
   input: { text: 'How does the authentication flow work end-to-end?' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   rag: {
     files: ['./docs/auth-guide.md'],
     strategy: 'semantic-markdown',
@@ -562,6 +562,7 @@ const result = await neurolink.generate({
 Use this flowchart to choose the right strategy for your content:
 
 ```mermaid
+{% raw %}
 flowchart TD
     START["What is your<br/>content format?"] --> FORMAT{{"Content format?"}}
 
@@ -585,6 +586,7 @@ flowchart TD
     QUALITY -->|"Quality"| SEM["Semantic<br/>(Strategy 9)"]
 
     FORMAT -->|"Unknown or mixed"| REC2["Recursive<br/>(Strategy 2)"]
+{% endraw %}
 ```
 
 **Quick decision rules:**
@@ -672,27 +674,16 @@ import { RAGPipeline } from '@juspay/neurolink';
 
 const pipeline = new RAGPipeline({
   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
-  generationModel: { provider: 'openai', modelName: 'gpt-4o' },
-  chunkingStrategy: 'semantic-markdown',
-  chunkingConfig: {
-    maxSize: 1000,
-    similarityThreshold: 0.7,
-    preserveMetadata: true,
-  },
-  searchStrategy: 'hybrid',
-  hybridOptions: {
-    vectorWeight: 0.6,
-    bm25Weight: 0.4,
-    fusionMethod: 'rrf',
-  },
-  reranker: {
-    type: 'cohere',
-    model: 'rerank-english-v3.0',
-    topN: 5,
-  },
+  generationModel: { provider: 'openai', modelName: 'gpt-5.4' },
+  defaultChunkingStrategy: 'semantic-markdown',
+  defaultChunkSize: 1000,
+  defaultChunkOverlap: 200,
+  enableHybridSearch: true,
+  enableReranking: true,
+  rerankingModel: { provider: 'cohere', modelName: 'rerank-english-v3.0' },
 });
 
-await pipeline.ingest(['./docs/**/*.md']);
+await pipeline.ingest(['./docs/architecture-guide.md', './docs/auth-guide.md']);
 
 const response = await pipeline.query(
   'How do I implement rate limiting with Redis?'

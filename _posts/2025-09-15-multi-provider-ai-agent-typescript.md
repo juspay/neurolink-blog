@@ -102,7 +102,7 @@ import { tool } from "ai";
 
 const searchTool = tool({
   description: "Search the knowledge base for relevant information",
-  parameters: z.object({
+  inputSchema: z.object({
     query: z.string().describe("Search query"),
     limit: z.number().optional().describe("Max results"),
   }),
@@ -115,7 +115,7 @@ const searchTool = tool({
 
 const calculatorTool = tool({
   description: "Perform mathematical calculations",
-  parameters: z.object({
+  inputSchema: z.object({
     expression: z.string().describe("Math expression to evaluate"),
   }),
   execute: async ({ expression }) => {
@@ -139,11 +139,11 @@ The `.describe()` method on Zod fields is important -- it tells the LLM what eac
 Now you will use the same code and tools with different providers. Switch models by changing two parameters:
 
 ```typescript
-// Fast task -> OpenAI GPT-4o-mini
+// Fast task -> OpenAI GPT-5.4 mini
 const quickAnswer = await neurolink.generate({
   input: { text: "What is 2 + 2?" },
   provider: "openai",
-  model: "gpt-4o-mini",
+  model: "gpt-5.4-mini",
   tools,
 });
 
@@ -151,7 +151,7 @@ const quickAnswer = await neurolink.generate({
 const analysis = await neurolink.generate({
   input: { text: "Analyze this contract for legal risks..." },
   provider: "anthropic",
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-5",
   tools,
   maxTokens: 4096,
 });
@@ -194,25 +194,23 @@ const { primary, fallback } = await createAIProviderWithFallback(
 
 async function resilientGenerate(prompt: string) {
   try {
-    return await neurolink.generate({
+    return await primary.generate({
       input: { text: prompt },
-      provider: "openai",
       tools,
     });
   } catch (error) {
     console.warn("Primary provider failed, using fallback:", error.message);
-    return await neurolink.generate({
+    return await fallback.generate({
       input: { text: prompt },
-      provider: "vertex",
       tools,
     });
   }
 }
 ```
 
-The `createAIProviderWithFallback()` function from `@juspay/neurolink` sets up a primary/fallback pair with built-in circuit breaker logic. After repeated failures on the primary, requests are routed directly to the fallback without even attempting the primary -- reducing latency during outages.
+The `createAIProviderWithFallback()` function from `@juspay/neurolink` creates two independently usable provider instances -- it does not retry or switch between them for you. Your own code decides when to fall back, as in `resilientGenerate()` above: call `primary.generate()`, catch a failure, and call `fallback.generate()`.
 
-For more sophisticated fallback strategies, use NeuroLink's `CircuitBreaker` class with configurable failure thresholds and cooldown periods.
+For more sophisticated fallback strategies -- tracking failure counts and temporarily skipping a provider that is down -- use NeuroLink's `CircuitBreakerManager` to create and monitor per-provider circuit breakers with configurable failure thresholds and cooldown periods.
 
 ## Step 5: Stream Responses in Real Time
 
@@ -222,7 +220,7 @@ Now you will add streaming so users see text appearing word by word instead of w
 const result = await neurolink.stream({
   input: { text: "Write a comprehensive guide to TypeScript generics" },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tools,
   temperature: 0.7,
   maxTokens: 2000,
@@ -236,7 +234,7 @@ for await (const chunk of result.stream) {
 
 // Access analytics after stream completes
 const analytics = await result.analytics;
-console.log("Token usage:", analytics?.providerAnalytics?.tokenUsage);
+console.log("Token usage:", analytics?.tokenUsage);
 ```
 
 The `result.stream` async iterable yields typed chunks. Text chunks have `type: "text"` and a `content` field. Tool call chunks and other event types are also available for advanced use cases.
@@ -245,7 +243,7 @@ After the stream completes, `result.analytics` provides token usage, latency, an
 
 ## Step 6: Smart Model Routing
 
-Instead of manually choosing a provider for every request, you will enable automatic routing. NeuroLink's `ModelRouter` classifies prompts by complexity and selects the optimal model:
+Instead of manually choosing a provider for every request, you will enable automatic routing. Setting `enableOrchestration: true` turns on NeuroLink's internal orchestration layer, which classifies prompts by complexity and selects the optimal model:
 
 ```typescript
 // Enable orchestration for automatic routing
@@ -255,7 +253,7 @@ const neurolink = new NeuroLink({
 
 // NeuroLink automatically classifies and routes:
 // Simple prompts -> fast model (gemini-2.5-flash)
-// Complex prompts -> reasoning model (claude-sonnet-4)
+// Complex prompts -> reasoning model (claude-sonnet-5)
 
 const result = await neurolink.generate({
   input: { text: "Design a distributed caching architecture" },
@@ -265,29 +263,27 @@ const result = await neurolink.generate({
 console.log("Routed to:", result.provider, result.model);
 ```
 
-The `ModelRouter` uses a `BinaryTaskClassifier` to determine prompt complexity. Simple prompts (questions, classifications, formatting) route to the fast tier. Complex prompts (analysis, planning, multi-step reasoning) route to the reasoning tier.
+This internal classifier determines prompt complexity. Simple prompts (questions, classifications, formatting) route to a fast tier. Complex prompts (analysis, planning, multi-step reasoning) route to a reasoning tier. These tiers and their model assignments are internal to NeuroLink and not part of its public configuration surface -- you enable the behavior with `enableOrchestration`, not by importing or tuning the tiers directly.
 
-The routing configuration uses two tiers from `MODEL_CONFIGS`:
-
-| Tier | Models | Avg Latency | Cost |
+| Tier | Example Models | Relative Latency | Relative Cost |
 |------|--------|-------------|------|
-| Fast | Gemini 2.5 Flash, GPT-4o-mini | ~800ms | Low |
-| Reasoning | Claude Sonnet 4, GPT-4o | ~3000ms | Higher |
+| Fast | Gemini 2.5 Flash, GPT-5.4-mini | Lower | Lower |
+| Reasoning | Claude Sonnet 5, GPT-5.4 | Higher | Higher |
 
-This achieves the best of both worlds: fast responses for simple tasks and high-quality responses for complex ones, with cost savings of 60% or more compared to routing everything through reasoning models.
+This achieves the best of both worlds: fast responses for simple tasks and higher-quality responses for complex ones, at a lower blended cost than routing every request through a reasoning-tier model.
 
 ## Architecture overview
 
 ```mermaid
 flowchart TD
     A[User Prompt] --> B[NeuroLink SDK]
-    B --> C{ModelRouter}
+    B --> C{Orchestration Router}
     C -->|Simple Task| D[Fast Tier]
     C -->|Complex Task| E[Reasoning Tier]
     D --> F[Gemini 2.5 Flash]
-    D --> G[GPT-4o-mini]
-    E --> H[Claude Sonnet 4]
-    E --> I[GPT-4o]
+    D --> G[GPT-5.4 mini]
+    E --> H[Claude Sonnet 5]
+    E --> I[GPT-5.4]
     F --> J[Tool Execution]
     G --> J
     H --> J
@@ -332,7 +328,7 @@ import { tool } from "ai";
 const tools = {
   search: tool({
     description: "Search for information",
-    parameters: z.object({
+    inputSchema: z.object({
       query: z.string().describe("Search query"),
     }),
     execute: async ({ query }) => {
@@ -342,7 +338,7 @@ const tools = {
   }),
   calculator: tool({
     description: "Perform calculations",
-    parameters: z.object({
+    inputSchema: z.object({
       expression: z.string().describe("Math expression"),
     }),
     execute: async ({ expression }) => {
@@ -379,7 +375,7 @@ async function agentGenerate(prompt: string) {
     console.log("\n---");
     const analytics = await result.analytics;
     console.log("Provider:", analytics?.provider);
-    console.log("Tokens:", analytics?.providerAnalytics?.tokenUsage);
+    console.log("Tokens:", analytics?.tokenUsage);
   } catch (error) {
     console.error("Agent error:", error.message);
   }
@@ -399,7 +395,7 @@ Before deploying your multi-provider agent to production:
 - [ ] **Configure conversation memory**: For multi-turn agents, enable Redis-backed memory for persistence.
 - [ ] **Add HITL for dangerous tools**: Use `dangerousActions` to require human approval for sensitive operations.
 - [ ] **Test with multiple providers**: Verify your agent works correctly with each provider you plan to use. Tool calling behavior can vary.
-- [ ] **Pin model versions**: Use specific model versions (e.g., `claude-sonnet-4-20250514`) rather than aliases in production.
+- [ ] **Pin model versions**: Use specific model versions (e.g., `claude-sonnet-4-5-20250929`) rather than aliases in production.
 
 ## What you built and What's Next
 

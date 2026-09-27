@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Building a Full-Stack AI Chatbot with Next.js and NeuroLink
+title: 'Building a Full-Stack AI Chatbot with Next.js and NeuroLink'
 date: '2026-01-16 10:00:00 +0530'
 categories:
   - Tutorial
@@ -32,7 +32,7 @@ This tutorial walks through building a complete, production-ready AI chatbot wit
 - A streaming API route that sends tokens as Server-Sent Events
 - A React chat interface with real-time text display
 - Tool calling for dynamic actions (weather lookups, knowledge base search)
-- Conversation memory that persists across page reloads
+- Conversation memory that preserves model-side context across requests
 - Provider switching so users can choose their preferred AI model
 
 The stack is Next.js 14+ App Router, NeuroLink SDK on the backend, and React on the frontend.
@@ -81,7 +81,7 @@ OPENAI_API_KEY=sk-...
 REDIS_URL=redis://localhost:6379
 ```
 
-> **Note:** You can use any NeuroLink-supported provider. Replace `OPENAI_API_KEY` with your preferred provider's key. NeuroLink supports 13 providers including Anthropic, Google AI, Vertex, Bedrock, and more.
+> **Note:** You can use any NeuroLink-supported provider. Replace `OPENAI_API_KEY` with your preferred provider's key. NeuroLink supports 33 named LLM providers including Anthropic, Google AI, Vertex, Bedrock, and more.
 {: .prompt-info }
 
 ---
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   const result = await neurolink.stream({
     input: { text: message },
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-5.4",
     temperature: 0.7,
     maxTokens: 2000,
   });
@@ -197,7 +197,7 @@ import { chatTools } from "./tools";
 const result = await neurolink.stream({
   input: { text: message },
   provider: "openai",
-  model: "gpt-4o",
+  model: "gpt-5.4",
   tools: chatTools,
   temperature: 0.7,
   maxTokens: 2000,
@@ -222,7 +222,7 @@ type Message = {
   content: string;
 };
 
-export default function ChatInterface() {
+export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -344,13 +344,13 @@ export default function ChatInterface() {
 
 ## Step 5: Add Conversation Memory
 
-Persist conversation history across page reloads so users can continue conversations where they left off.
+Preserve model-side conversational context across requests by sending a stable session identity with every turn. This does not rehydrate the React `messages` state after a page reload; add a separate session-history endpoint and load it on mount if the transcript must reappear in the UI.
 
 ```typescript
 const neurolink = new NeuroLink({
   conversationMemory: {
     enabled: true,
-    redis: {
+    redisConfig: {
       url: process.env.REDIS_URL || "redis://localhost:6379",
     },
   },
@@ -360,6 +360,10 @@ const neurolink = new NeuroLink({
 const result = await neurolink.stream({
   input: { text: "What did I ask you earlier?" },
   provider: "openai",
+  context: {
+    sessionId: "chat-123",
+    userId: "user-456",
+  },
 });
 ```
 
@@ -370,7 +374,9 @@ With conversation memory enabled:
 - Long conversations are automatically summarized to stay within the model's context window
 - Session IDs can be tied to user accounts for multi-user support
 
-> **Note:** In-memory conversation storage works for development but is lost on server restart. Use Redis for production deployments where conversation persistence matters.
+Supply the same stable `sessionId` and `userId` on every request that belongs to the conversation. Changing either value starts a different memory key.
+
+> **Note:** In-memory conversation storage works for development but is lost on server restart. Use Redis for production deployments where model-side context must survive a restart. Restoring the visible transcript after a browser reload remains an application responsibility.
 {: .prompt-info }
 
 ---
@@ -380,13 +386,13 @@ With conversation memory enabled:
 Let users choose their preferred AI provider and model from the chat interface.
 
 ```typescript
-// app/api/chat/route.ts - accept provider from client
-const { message, provider, model } = await request.json();
+// app/api/chat/route.ts - accept a matching provider/model pair
+const { message, provider = "openai", model = "gpt-5.4" } = await request.json();
 
 const result = await neurolink.stream({
   input: { text: message },
-  provider: provider || "openai",
-  model: model || "gpt-4o",
+  provider,
+  model,
   tools: chatTools,
   temperature: 0.7,
   maxTokens: 2000,
@@ -397,19 +403,42 @@ On the frontend, add a provider selector:
 
 ```typescript
 const providers = [
-  { value: "openai", label: "OpenAI GPT-4o", model: "gpt-4o" },
-  { value: "anthropic", label: "Claude Sonnet", model: "claude-sonnet-4-5-20250929" },
-  { value: "google-ai", label: "Gemini Pro", model: "gemini-2.5-pro" },
-];
+  { provider: "openai", label: "OpenAI GPT-5.4", model: "gpt-5.4" },
+  { provider: "anthropic", label: "Claude Sonnet", model: "claude-sonnet-5" },
+  { provider: "google-ai", label: "Gemini Pro", model: "gemini-2.5-pro" },
+] as const;
+
+const [selection, setSelection] = useState<(typeof providers)[number]>(providers[0]);
+
+// Include the selected pair in the existing fetch request
+const response = await fetch("/api/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    message: userMessage,
+    provider: selection.provider,
+    model: selection.model,
+  }),
+});
 
 // In the form, add a select dropdown
 <select
-  value={selectedProvider}
-  onChange={(e) => setSelectedProvider(e.target.value)}
+  value={`${selection.provider}:${selection.model}`}
+  onChange={(e) => {
+    const next = providers.find(
+      (option) => `${option.provider}:${option.model}` === e.target.value
+    );
+    if (next) setSelection(next);
+  }}
   className="p-2 border rounded"
 >
-  {providers.map((p) => (
-    <option key={p.value} value={p.value}>{p.label}</option>
+  {providers.map((option) => (
+    <option
+      key={`${option.provider}:${option.model}`}
+      value={`${option.provider}:${option.model}`}
+    >
+      {option.label}
+    </option>
   ))}
 </select>
 ```

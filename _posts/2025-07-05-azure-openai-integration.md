@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Azure OpenAI Integration Guide with NeuroLink
+title: 'Azure OpenAI Integration Guide with NeuroLink'
 date: '2025-07-05 10:00:00 +0530'
 categories:
   - Tutorial
@@ -13,8 +13,8 @@ tags:
   - microsoft
 author: neurolink
 description: >-
-  Integrate Azure OpenAI with NeuroLink. Enterprise GPT-4 deployment with Azure
-  security.
+  Set up Azure OpenAI API-key authentication, regional deployments, and
+  content-filtering controls behind NeuroLink's unified generate/stream API.
 toc: true
 mermaid: false
 pin: false
@@ -23,17 +23,17 @@ image:
   alt: Azure OpenAI Integration Guide with NeuroLink
 ---
 
-By the end of this guide, you'll have Azure OpenAI connected through NeuroLink with enterprise authentication, regional deployments, and compliance-ready configuration.
+By the end of this guide, you'll have Azure OpenAI connected through NeuroLink with API-key authentication, regional deployments, and production-oriented configuration.
 
-You will set up Azure OpenAI Service, configure NeuroLink's Azure provider with Azure Active Directory authentication, and deploy AI capabilities that stay within your organization's compliance boundaries. This guide covers everything from initial Azure resource creation to advanced enterprise patterns.
+You will set up Azure OpenAI Service, configure NeuroLink's Azure provider with an API key, and deploy AI capabilities within your Azure environment. This guide covers everything from initial Azure resource creation to advanced enterprise patterns.
 
 ## Understanding Azure OpenAI Service
 
-Azure OpenAI Service provides REST API access to OpenAI's powerful language models including GPT-4, GPT-4 Turbo, GPT-3.5-Turbo, and the Embeddings model series. Unlike the standard OpenAI API, Azure OpenAI runs entirely within Microsoft's Azure cloud infrastructure, providing additional enterprise benefits.
+Azure OpenAI Service provides REST API access to OpenAI's language models -- from the current GPT-5 series (such as GPT-5.4) down to earlier GPT-4 and GPT-3.5 generations still available in some deployments -- plus the Embeddings model series. Unlike the standard OpenAI API, Azure OpenAI runs entirely within Microsoft's Azure cloud infrastructure, providing additional enterprise benefits.
 
 ### Key Differences from Standard OpenAI
 
-The Azure OpenAI offering differs from standard OpenAI in several important ways. First, all data processing occurs within Azure's compliance boundary, meaning your prompts and completions never leave the Microsoft ecosystem. Second, Azure provides enterprise authentication through Azure Active Directory, eliminating the need for API keys in production environments. Third, Azure's regional deployment options allow organizations to keep data within specific geographic boundaries for regulatory compliance.
+The Azure OpenAI offering differs from standard OpenAI in several important ways. It runs through Azure resources and deployment endpoints, and its regional options can help organizations align deployments with data-residency requirements. Azure OpenAI itself offers multiple authentication approaches, but NeuroLink's current Azure provider requires an API key and sends it in the `api-key` header.
 
 ### Enterprise Security Features
 
@@ -47,11 +47,11 @@ Before beginning the integration process, ensure you have the necessary componen
 
 You need an active Azure subscription with appropriate permissions to create resources. The Azure OpenAI Service requires explicit access approval from Microsoft, which typically takes one to two business days for enterprise accounts. Once approved, you need contributor-level access to create Azure OpenAI resources within your subscription.
 
-Additionally, ensure your Azure subscription has sufficient quota allocated for your intended model deployments. GPT-4 models have regional availability restrictions and quota limits that vary by subscription type. Check the Azure OpenAI quota management page to verify available capacity in your preferred region.
+Additionally, ensure your Azure subscription has sufficient quota allocated for your intended model deployments. GPT-5 series models have regional availability restrictions and quota limits that vary by subscription type. Check the Azure OpenAI quota management page to verify available capacity in your preferred region.
 
 ### NeuroLink Requirements
 
-Your NeuroLink installation should be NeuroLink version 8.0 or higher to access all Azure OpenAI integration features. The Azure provider is included in the standard `@juspay/neurolink` package and requires no additional installation.
+Your NeuroLink installation should be a current release of `@juspay/neurolink` to access all Azure OpenAI integration features, including the latest model IDs. The Azure provider is included in the standard package and requires no additional installation.
 
 ## Setting Up Azure OpenAI Resources
 
@@ -69,15 +69,14 @@ Network security configuration deserves careful consideration. For development e
 
 After the Azure OpenAI resource is created, you must deploy specific models before they can be accessed. Navigate to your Azure OpenAI resource in the portal and select Model Deployments from the left navigation menu.
 
-Click Create New Deployment and select the model you wish to deploy. For most NeuroLink use cases, GPT-4 Turbo provides the optimal balance of capability and cost. Assign a deployment name that you will reference in NeuroLink configurations. This name can differ from the model name and should reflect your organizational naming standards.
+Click Create New Deployment and select the model you wish to deploy. For most NeuroLink use cases, GPT-5.4-mini provides the optimal balance of capability and cost. Assign a deployment name that you will reference in NeuroLink configurations. This name can differ from the model name and should reflect your organizational naming standards.
 
 Configure the tokens-per-minute rate limit based on your expected workload. Start conservatively and increase as you understand actual usage patterns. Azure allows quota adjustments without redeploying the model.
 
 ```json
 {
-  "deployment_name": "neurolink-gpt4-prod",
-  "model": "gpt-4-turbo",
-  "version": "2024-04-09",
+  "deployment_name": "neurolink-gpt54-mini-prod",
+  "model": "gpt-5.4-mini",
   "rate_limit_tpm": 80000,
   "rate_limit_rpm": 480
 }
@@ -85,11 +84,11 @@ Configure the tokens-per-minute rate limit based on your expected workload. Star
 
 ### Retrieving Connection Information
 
-NeuroLink requires three pieces of information to connect with your Azure OpenAI deployment: the endpoint URL, an API key or Azure AD credentials, and the deployment name.
+NeuroLink requires three pieces of information to connect with your Azure OpenAI deployment: the endpoint URL, `AZURE_OPENAI_API_KEY`, and the deployment name.
 
 Find the endpoint URL in the Azure Portal under your Azure OpenAI resource's Keys and Endpoint section. The endpoint follows the pattern {% raw %}`https://{resource-name}.openai.azure.com/`{% endraw %}. Copy one of the two provided API keys for initial testing. The deployment name is what you specified when deploying the model.
 
-For production deployments using Azure AD authentication, you also need the Azure AD tenant ID and may need to register an application for service principal authentication.
+Store the API key in a secret manager and expose it to the application as `AZURE_OPENAI_API_KEY`; do not commit it to source control.
 
 ## Configuring NeuroLink for Azure OpenAI
 
@@ -103,22 +102,28 @@ Set the following environment variables for your NeuroLink application:
 export AZURE_OPENAI_API_KEY="your-api-key-here"
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 
-# Model/Deployment configuration (use one of the following)
-export AZURE_OPENAI_MODEL="gpt-4o"              # Model name
-export AZURE_OPENAI_DEPLOYMENT="my-gpt4-deployment"  # Deployment name (optional, overrides model)
-export AZURE_OPENAI_DEPLOYMENT_ID="my-gpt4-deployment"  # Alternative to AZURE_OPENAI_DEPLOYMENT
+# Deployment selector: set exactly one to your actual Azure deployment name.
+# AZURE_OPENAI_MODEL has highest precedence, followed by
+# AZURE_OPENAI_DEPLOYMENT, then AZURE_OPENAI_DEPLOYMENT_ID.
+export AZURE_OPENAI_DEPLOYMENT="neurolink-gpt54-mini-prod"
+
+# Custom aliases for GPT-5 or o-series deployments: tell NeuroLink to send
+# max_completion_tokens (it cannot infer the backing model from the alias).
+export AZURE_OPENAI_USE_MAX_COMPLETION_TOKENS="true"
 
 # API Version (optional, defaults to 2025-04-01-preview)
 export AZURE_API_VERSION="2025-04-01-preview"
 ```
 
-The `AZURE_API_VERSION` environment variable is optional and defaults to `2025-04-01-preview`. You can override this if you need to use a specific API version for compatibility or to access features in newer preview versions. The SDK will use this version for all Azure OpenAI API calls.
+The `AZURE_API_VERSION` environment variable is optional and defaults to `2025-04-01-preview`. You can override it when a deployment requires a different compatible API version. The SDK will use this version for all Azure OpenAI API calls.
 
-For deployment configuration, you can use either `AZURE_OPENAI_MODEL` (which maps to the model name), or `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_DEPLOYMENT_ID` to specify your Azure deployment name directly. The deployment environment variables take precedence over the model name when both are set.
+All three selector variables identify the Azure **deployment name** used in the `/deployments/{deployment}/chat/completions` URL. `AZURE_OPENAI_MODEL` takes precedence, followed by `AZURE_OPENAI_DEPLOYMENT`, then `AZURE_OPENAI_DEPLOYMENT_ID`; set one of them to the deployment alias you created in Azure rather than setting several competing values.
 
-### Azure AD Authentication
+GPT-5-series and o-series deployments require `max_completion_tokens` instead of `max_tokens`. NeuroLink infers this only when the deployment name starts with the model ID (for example `gpt-5.4-mini` or `o3`). For custom aliases such as `neurolink-gpt54-mini-prod`, set `AZURE_OPENAI_USE_MAX_COMPLETION_TOKENS=true` (or `useMaxCompletionTokens` in the Azure credentials).
 
-Production deployments should use Azure AD authentication instead of API keys. This approach provides better security, easier key rotation, and integration with Azure's identity management features. Register an application in Azure AD or use an existing managed identity, then grant the application the "Cognitive Services OpenAI User" role on your Azure OpenAI resource. Configure the appropriate Azure AD environment variables for your deployment.
+### Authentication Support
+
+NeuroLink's current Azure provider requires `AZURE_OPENAI_API_KEY`. It validates that the key exists and sends it in Azure's `api-key` header. Azure AD bearer tokens and managed identities are not currently accepted by this provider, so do not configure those methods for this integration unless NeuroLink adds explicit support first.
 
 ## Using the NeuroLink SDK with Azure OpenAI
 
@@ -137,7 +142,7 @@ const neurolink = new NeuroLink();
 const response = await neurolink.generate({
   input: { text: "Explain the benefits of cloud computing for enterprises." },
   provider: "azure",
-  model: "gpt-4o", // Your Azure deployment name or model
+  model: "neurolink-gpt54-prod", // Your Azure deployment name
   systemPrompt: "You are an enterprise technology consultant.",
   maxTokens: 1024,
   temperature: 0.7
@@ -148,34 +153,34 @@ console.log(response.content);
 
 ### Using Azure-Specific Models
 
-Azure OpenAI supports a wide range of models. Use string literals to specify the model name (which should match your Azure deployment name or the base model):
+Azure OpenAI supports a wide range of models. In NeuroLink calls, the `model` value selects the Azure deployment, so use the deployment name you created. A deployment may share its name with the underlying model, as in these examples:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 
 const neurolink = new NeuroLink();
 
-// GPT-4o for multimodal tasks
+// A deployment named after its GPT-5.4 base model
 const response = await neurolink.generate({
   input: { text: "Analyze this business scenario and provide recommendations." },
   provider: "azure",
-  model: "gpt-4o",
+  model: "neurolink-gpt54-prod",
   maxTokens: 2048
 });
 
-// GPT-4o Mini for cost-effective processing
+// A deployment backed by GPT-5.4 Mini for cost-effective processing
 const quickResponse = await neurolink.generate({
   input: { text: "Summarize the key points of cloud migration." },
   provider: "azure",
-  model: "gpt-4o-mini",
+  model: "neurolink-gpt54-mini-prod",
   maxTokens: 512
 });
 
-// O-Series reasoning models for complex analysis
+// A deployment backed by GPT-5.4 Mini for complex analysis
 const reasoningResponse = await neurolink.generate({
   input: { text: "Solve this complex optimization problem step by step." },
   provider: "azure",
-  model: "o3-mini",
+  model: "neurolink-gpt54-mini-reasoning-prod",
   maxTokens: 4096
 });
 ```
@@ -186,18 +191,15 @@ Azure OpenAI provides access to the latest OpenAI models:
 
 | Model | Description | Context Window | Best For |
 |-------|-------------|----------------|----------|
-| `gpt-4.1` | Latest GPT-4 series with enhanced capabilities | 1M tokens | Complex reasoning, long documents |
-| `gpt-4.1-mini` | Cost-effective variant of GPT-4.1 | 1M tokens | Balanced performance and cost |
-| `gpt-4.1-nano` | Lightweight GPT-4.1 variant | 1M tokens | High-volume, simple tasks |
-| `gpt-4o` | Multimodal model with vision capabilities | 128K tokens | Image analysis, general tasks |
-| `gpt-4o-mini` | Smaller, faster GPT-4o variant | 128K tokens | Quick responses, cost efficiency |
+| `gpt-5.4` | Newest GPT-5 series model in NeuroLink's Azure catalog | 1.05M tokens | Complex reasoning and long documents |
+| `gpt-5.4-mini` | Cost-effective, balanced-tier variant of GPT-5.4 | 400K tokens | Balanced performance and cost, quick responses |
+| `gpt-5.4-nano` | Lightweight, low-latency variant of GPT-5.4 | 400K tokens | High-volume, simple tasks |
 | `o3` | Advanced reasoning model | 200K tokens | Complex problem solving |
-| `o3-mini` | Efficient reasoning model | 200K tokens | Reasoning with lower cost |
-| `o4-mini` | Latest compact reasoning model | 200K tokens | Fast reasoning tasks |
+| `o4-mini` | Compact reasoning model | 200K tokens | Fast reasoning tasks |
 
-The GPT-4.1 series is the successor to GPT-4o, featuring a 1 million token context window and improved instruction following. The o-series models (o3, o3-mini, o4-mini) excel at step-by-step reasoning and complex problem solving.
+GPT-5.4 is the newest series in NeuroLink's `AzureOpenAIModels` catalog, succeeding the earlier GPT-4.1 and GPT-4o generations, with GPT-5.4-mini and GPT-5.4-nano covering the balanced and lightweight tiers. The o-series reasoning models (o3, o4-mini) remain available for step-by-step reasoning and complex problem solving; o3-mini has been superseded by GPT-5.4-mini.
 
-> **Note:** O-series model availability (o3, o3-mini, o4-mini) varies by Azure region and subscription type. These advanced reasoning models may require additional access approval or may not be available in all regions. Check the [Azure OpenAI model availability documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for current regional availability and access requirements.
+> **Note:** O-series model availability (o3, o4-mini) varies by Azure region and subscription type. These advanced reasoning models may require additional access approval or may not be available in all regions. Check the [Azure OpenAI model availability documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for current regional availability and access requirements.
 
 ### Document Analysis with Azure OpenAI
 
@@ -220,10 +222,10 @@ const DocumentAnalysis = z.object({
 const response = await neurolink.generate({
   input: { text: documentContent },
   provider: "azure",
-  model: "gpt-4o",
+  model: "neurolink-gpt54-prod",
   systemPrompt: "Analyze the document and extract structured information.",
   schema: DocumentAnalysis,
-  disableTools: true // Required when using schema with structured output
+  disableTools: true // Optional: disables all tool execution; omit for schema plus tools
 });
 
 console.log(response.content); // Structured JSON output
@@ -231,14 +233,13 @@ console.log(response.content); // Structured JSON output
 
 ### Multimodal Capabilities
 
-Azure OpenAI's GPT-4o supports image analysis:
+NeuroLink validates image input against an Azure vision allowlist before sending the request. The current allowlist does not yet include the GPT-5.4 family, so use a supported Azure deployment such as one backed by `gpt-5.1` for image analysis. The check matches the deployment name, so name the deployment after its base model (for example `gpt-5.1`):
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';
 import * as fs from 'fs';
 
 const neurolink = new NeuroLink();
-
 const imageBuffer = fs.readFileSync('architecture-diagram.png');
 
 const response = await neurolink.generate({
@@ -247,7 +248,7 @@ const response = await neurolink.generate({
     images: [imageBuffer]
   },
   provider: "azure",
-  model: "gpt-4o",
+  model: "gpt-5.1", // Deployment named after its base model
   maxTokens: 2048
 });
 
@@ -307,7 +308,7 @@ const neurolink = new NeuroLink();
 const result = await neurolink.stream({
   input: { text: userQuestion },
   provider: "azure",
-  model: "gpt-4o",
+  model: "neurolink-gpt54-prod",
 });
 
 // Process streaming response
@@ -334,7 +335,7 @@ const summaries = await Promise.all(
     neurolink.generate({
       input: { text: `Summarize this document: ${doc}` },
       provider: "azure",
-      model: "gpt-4o-mini",
+      model: "neurolink-gpt54-mini-prod",
       maxTokens: 500
     })
   )
@@ -347,7 +348,7 @@ Integration projects encounter predictable challenges. Understanding common issu
 
 ### Authentication Failures
 
-Authentication errors typically stem from incorrect credentials or permission issues. Verify the API key is copied correctly and not expired. For Azure AD authentication, confirm the application has the correct role assignment on the Azure OpenAI resource. The error message often indicates whether the issue is credential validity or permission scope.
+Authentication errors typically stem from an incorrect API key or endpoint. Verify `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT`, and confirm that the key belongs to the selected Azure OpenAI resource.
 
 ### Model Not Found Errors
 
@@ -371,7 +372,7 @@ Deploy Azure OpenAI resources with private endpoints to eliminate public interne
 
 ### Secret Management
 
-Never store API keys in configuration files or source control. Use Azure Key Vault for secret storage and reference secrets through environment variables or managed identity. Rotate API keys regularly and use separate keys for development and production.
+Never store API keys in configuration files or source control. Use Azure Key Vault or another secret manager and inject the key through `AZURE_OPENAI_API_KEY`. Rotate keys regularly and use separate credentials for development and production.
 
 ### Data Protection
 
@@ -379,14 +380,14 @@ Understand what data flows through Azure OpenAI and apply appropriate protection
 
 ## Conclusion
 
-You now have Azure OpenAI integrated with NeuroLink, complete with enterprise authentication, compliance configuration, and production patterns. Here is what you built:
+You now have Azure OpenAI integrated with NeuroLink, complete with API-key authentication, deployment configuration, and production patterns. Here is what you built:
 
 1. Azure resource setup with proper deployment configuration
-2. NeuroLink connection with API key and Azure AD authentication
+2. NeuroLink connection with an API key and deployment selector
 3. Generation, streaming, and structured output through the unified API
-4. Enterprise security with content filtering, audit logging, and network isolation
+4. Enterprise controls with content filtering, audit logging, and network isolation
 
-Your next step: deploy this configuration to your staging environment with Azure AD authentication, validate the compliance boundaries, and run your existing test suite against the Azure provider. From there, add it as a fallback provider alongside your primary.
+Your next step: deploy this configuration to your staging environment with a securely injected API key, validate the deployment and network boundaries, and run your existing test suite against the Azure provider. From there, add it as a fallback provider alongside your primary.
 
 ---
 
@@ -394,4 +395,4 @@ Your next step: deploy this configuration to your staging environment with Azure
 
 - [Multi-Provider Failover: Never Lose an API Call](/posts/provider-failover-patterns/)
 - [Real-Time AI: Streaming Response Patterns with NeuroLink](/posts/streaming-best-practices/)
-- [OpenAI Integration Guide: GPT-4o, o1, and Beyond with NeuroLink](/posts/openai-integration-guide/)
+- [OpenAI Integration Guide: GPT-5.4 and Beyond with NeuroLink](/posts/openai-integration-guide/)

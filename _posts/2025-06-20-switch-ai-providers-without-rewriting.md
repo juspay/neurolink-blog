@@ -1,6 +1,6 @@
 ---
 layout: post
-title: How to Switch AI Providers Without Rewriting Code
+title: 'How to Switch AI Providers Without Rewriting Code'
 date: '2025-06-20 10:00:00 +0530'
 categories:
   - Tutorial
@@ -41,7 +41,7 @@ Here is what typical provider-specific code looks like:
 import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const response = await openai.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   messages: [{ role: 'user', content: 'Hello' }],
 });
 ```
@@ -78,7 +78,7 @@ const neurolink = new NeuroLink();
 const result1 = await neurolink.generate({
   input: { text: 'Explain AI' },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 
 // Switch to Claude -- same interface, same result shape
@@ -92,7 +92,7 @@ const result2 = await neurolink.generate({
 const result3 = await neurolink.generate({
   input: { text: 'Explain AI' },
   provider: 'vertex',
-  model: 'gemini-3-flash',
+  model: 'gemini-2.5-flash',
 });
 ```
 
@@ -133,7 +133,7 @@ You can also drive provider selection from configuration or environment variable
 const result = await neurolink.generate({
   input: { text: 'Hello' },
   provider: process.env.AI_PROVIDER || 'openai',
-  model: process.env.AI_MODEL || 'gpt-4o',
+  model: process.env.AI_MODEL || 'gpt-5.4',
 });
 ```
 
@@ -148,11 +148,11 @@ Streaming is where provider differences are most painful. OpenAI uses Server-Sen
 NeuroLink normalizes all of this into a single async iterator:
 
 ```typescript
-// Streaming works identically across all 13 providers
+// Streaming works identically across every provider in the table above
 const result = await neurolink.stream({
   input: { text: 'Write a story' },
   provider: process.env.AI_PROVIDER || 'openai',
-  model: process.env.AI_MODEL || 'gpt-4o',
+  model: process.env.AI_MODEL || 'gpt-5.4',
 });
 
 for await (const chunk of result.stream) {
@@ -195,9 +195,9 @@ The Zod schema defines the tool parameters with full TypeScript type inference. 
 
 ---
 
-## All 13 Supported Providers
+## 13 Provider Configuration Examples
 
-Here is the complete reference for every provider NeuroLink supports:
+Here are configuration keys for 13 supported providers. NeuroLink supports 33 named LLM providers in total -- see the `AIProviderName` enum in NeuroLink's source for the complete list:
 
 | Provider | Config Key | Environment Variable |
 |---|---|---|
@@ -230,7 +230,7 @@ Find every direct provider SDK call and replace it with a NeuroLink call:
 ```typescript
 // Before: locked to OpenAI
 const response = await openai.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
   messages: [{ role: 'user', content: prompt }],
 });
 const text = response.choices[0].message.content;
@@ -239,7 +239,7 @@ const text = response.choices[0].message.content;
 const result = await neurolink.generate({
   input: { text: prompt },
   provider: 'openai',
-  model: 'gpt-4o',
+  model: 'gpt-5.4',
 });
 const text = result.content;
 ```
@@ -250,7 +250,7 @@ Move provider and model strings to environment variables or configuration:
 
 ```typescript
 const AI_PROVIDER = process.env.AI_PROVIDER || 'openai';
-const AI_MODEL = process.env.AI_MODEL || 'gpt-4o';
+const AI_MODEL = process.env.AI_MODEL || 'gpt-5.4';
 
 const result = await neurolink.generate({
   input: { text: prompt },

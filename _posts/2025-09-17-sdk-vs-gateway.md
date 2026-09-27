@@ -15,7 +15,7 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  SDK or gateway? We evaluated both architectures for unifying 29+ AI providers.
+  SDK or gateway? We evaluated both architectures for unifying 33+ AI providers.
   Here is why NeuroLink chose SDK-first and what we gained.
 toc: true
 mermaid: true
@@ -31,7 +31,7 @@ LangChain is an SDK. LiteLLM Proxy is a gateway. Portkey is a gateway (now part 
 
 This comparison examines both approaches with evidence from real projects: what each gives you, what each costs you, and a decision framework for choosing. We also cover the hybrid pattern -- SDK for latency-sensitive paths, gateway for shared services -- which avoids the forced either/or choice.
 
-> **Tested: 2026-07-04 against NeuroLink v9.81.** Provider count has grown from 13 at the original writing to 29+ named providers. Competitor status has changed materially: Portkey was acquired by Palo Alto Networks (closed May 29, 2026) and Helicone entered maintenance mode (acquired by Mintlify, March 2026). All claims below reflect the current state.
+> **Tested: 2026-09-27 against NeuroLink v12.27.x.** Provider count has grown from 13 at the original writing to 33+ named LLM providers (41 named providers in total, including embedding, image/video, and decision providers). Competitor status has changed materially: Portkey was acquired by Palo Alto Networks (closed May 29, 2026) and Helicone entered maintenance mode (acquired by Mintlify, March 2026). All claims below reflect the current state.
 
 ## Defining the Two Approaches
 
