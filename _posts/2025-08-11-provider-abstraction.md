@@ -178,7 +178,7 @@ User input strings like `"google-ai"`, `"Google AI"`, `"GOOGLE_AI"`, or `"google
 
 ### 3. Environment Variable Resolution
 
-Each enum value maps to provider configuration and a registry default. For OpenAI, an explicit model wins; otherwise factory-created providers use the registry's legacy `gpt-4o-mini` default. The provider class also reads `OPENAI_MODEL` when it is constructed without a model and otherwise uses its own legacy `gpt-4o` default. Those legacy defaults document the current implementation rather than a current model recommendation; new explicit configurations should use a current in-catalog model such as `gpt-5.4-mini` for the balanced tier.
+Each enum value maps to provider configuration and a registry default. For OpenAI, an explicit model wins; otherwise factory-created providers use the registry's legacy `gpt-4o-mini` default. The provider class also reads `OPENAI_MODEL` when it is constructed without a model and otherwise falls back to its own default, which is `gpt-5.4` in the current release. The registry's `gpt-4o-mini` value is the one still worth flagging -- it documents the current implementation rather than a current model recommendation; new explicit configurations should use a current in-catalog model such as `gpt-5.4-mini` for the balanced tier.
 
 The `AUTO` value is special -- it triggers `createBestAIProvider()`, which scans environment variables for available API keys and selects the best configured provider automatically.
 

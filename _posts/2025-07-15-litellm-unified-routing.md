@@ -44,7 +44,7 @@ flowchart LR
     B -->|Provider-specific| H[100+ Others]
 ```
 
-Under the hood, the `LiteLLMProvider` extends NeuroLink's shared `OpenAIChatCompletionsProvider` base class -- a direct HTTP client, not the Vercel AI SDK -- configured with a custom base URL pointing to the LiteLLM proxy (typically `http://localhost:4000`). Models are referenced using LiteLLM's `provider/model` naming convention -- for example, `openai/gpt-4o-mini` or `anthropic/claude-sonnet-5`.
+Under the hood, the `LiteLLMProvider` extends NeuroLink's shared `OpenAIChatCompletionsProvider` base class -- a direct HTTP client, not the Vercel AI SDK -- configured with a custom base URL pointing to the LiteLLM proxy (typically `http://localhost:4000`). Models are referenced using LiteLLM's `provider/model` naming convention -- for example, `openai/gpt-5.4-mini` or `anthropic/claude-sonnet-5`.
 
 This architecture gives you several advantages:
 
@@ -64,10 +64,10 @@ Setting up LiteLLM with NeuroLink is a two-step process: start the LiteLLM proxy
 pip install litellm
 
 # Start with a default model
-litellm --model openai/gpt-4o-mini --port 4000
+litellm --model openai/gpt-5.4-mini --port 4000
 ```
 
-This starts a local proxy server on port 4000 that routes requests to OpenAI's GPT-4o Mini. You can configure additional models through a YAML config file (covered in the production section below).
+This starts a local proxy server on port 4000 that routes requests to OpenAI's GPT-5.4 Mini. You can configure additional models through a YAML config file (covered in the production section below).
 
 ### Step 2: Configure NeuroLink
 
@@ -75,7 +75,7 @@ This starts a local proxy server on port 4000 that routes requests to OpenAI's G
 # .env
 LITELLM_BASE_URL=http://localhost:4000  # default
 LITELLM_API_KEY=sk-anything             # default passthrough key for local dev
-LITELLM_MODEL=openai/gpt-4o-mini       # optional - sets default model
+LITELLM_MODEL=openai/gpt-5.4-mini       # optional - sets default model
 ```
 
 The default base URL is `http://localhost:4000` and the default API key is `sk-anything`, which is a passthrough key for local development. In production, you will configure real authentication.
@@ -97,9 +97,9 @@ for await (const chunk of result.stream) {
 }
 ```
 
-That is it. NeuroLink sends the request to LiteLLM, which routes it to the configured model (defaulting to `openai/gpt-4o-mini`).
+That is it. NeuroLink sends the request to LiteLLM, which routes it to the configured model (defaulting to `openai/gpt-5.4-mini`).
 
-> **Tip:** The default model is `openai/gpt-4o-mini`. You can override it per-request via the `model` parameter or globally via the `LITELLM_MODEL` environment variable.
+> **Tip:** The default model is `openai/gpt-5.4-mini`. You can override it per-request via the `model` parameter or globally via the `LITELLM_MODEL` environment variable.
 {: .prompt-tip }
 
 ## Model Discovery
@@ -121,8 +121,8 @@ console.log(models);
 
 If the LiteLLM proxy is temporarily unavailable for model discovery, NeuroLink falls back to a sensible default list:
 
-- `openai/gpt-4o`
-- `anthropic/claude-3-haiku`
+- `openai/gpt-5.4`
+- `anthropic/claude-haiku-4-5`
 - `meta-llama/llama-3.1-8b-instruct`
 - `google/gemini-2.5-flash`
 
@@ -248,7 +248,7 @@ try {
 } catch (error) {
   if (error.message.includes("ECONNREFUSED")) {
     console.error("LiteLLM proxy is not running.");
-    console.error("Start it with: litellm --model openai/gpt-4o-mini --port 4000");
+    console.error("Start it with: litellm --model openai/gpt-5.4-mini --port 4000");
   } else if (error.message.includes("model") && error.message.includes("not found")) {
     console.error("Model not configured in LiteLLM. Check your config.yaml.");
   } else if (error.message.includes("rate limit")) {

@@ -89,7 +89,7 @@ Every evaluation produces three scores on a 0-10 scale:
 
 ### The Judge Model
 
-The "judge" is a separate LLM call that evaluates the response. NeuroLink's current source still falls back to `gemini-1.5-flash` via Vertex AI when no judge is configured, but Google has retired that model. Set `NEUROLINK_RAGAS_EVALUATION_MODEL` or the evaluation config explicitly; the examples below use `gemini-2.5-flash`.
+The "judge" is a separate LLM call that evaluates the response. NeuroLink defaults to `gemini-2.5-flash` via Vertex AI when no judge is configured. Override it with `NEUROLINK_RAGAS_EVALUATION_MODEL` or the evaluation config when you want a different judge; the examples below also use `gemini-2.5-flash`.
 
 The default threshold is 7/10, configurable via `NEUROLINK_EVALUATION_THRESHOLD`. Responses scoring below this threshold are flagged as potentially low quality.
 
