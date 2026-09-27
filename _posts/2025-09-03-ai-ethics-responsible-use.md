@@ -521,8 +521,11 @@ const neurolink = new NeuroLink({
     autoApproveOnTimeout: false,
     // Optional: Enable basic audit logging for HITL events
     // Note: This is a simple boolean flag for logging HITL confirmation
-    // requests. For full compliance logging (SOC2, HIPAA, etc.),
-    // see docs/guides/enterprise/compliance.md
+    // requests. NeuroLink is not SOC 2 or HIPAA certified -- there is no
+    // third-party audit behind those labels. If your regulatory program
+    // requires SOC2- or HIPAA-grade controls, build your own audit
+    // pipeline, encryption, and access controls on top of this flag; see
+    // docs/guides/enterprise/compliance.md for the building blocks NeuroLink provides.
     auditLogging: true
   }
 });
@@ -676,7 +679,7 @@ Replace PII with generic placeholders like [EMAIL], [PHONE], etc.`
 
 ### Audit Logging for Compliance
 
-The example below demonstrates a custom audit logging implementation pattern for regulatory compliance and debugging. Note that the `auditLogging` flag in the HITL configuration above is a simple boolean that enables basic logging of HITL events—for comprehensive compliance logging (SOC2, HIPAA, GDPR, etc.), you'll need to implement a custom solution like the one shown here, or refer to our [Enterprise Compliance Guide](https://docs.neurolink.ink/docs/guides/enterprise/compliance) for production-ready patterns:
+The example below demonstrates a custom audit logging implementation pattern for regulatory compliance and debugging. Note that the `auditLogging` flag in the HITL configuration above is a simple boolean that enables basic logging of HITL events -- it is not a certification. **NeuroLink itself is not SOC2- or HIPAA-certified; no third-party audit backs those labels.** If your application needs to meet SOC2, HIPAA, GDPR, or a similar framework, that compliance program is your responsibility to build and get audited, not something NeuroLink grants you. What NeuroLink does provide are building blocks toward that goal -- structured audit trails, PII detection/redaction (shown above), HITL approval gates, and role-based API key access -- which you can extend with a custom solution like the one shown here. Our [Enterprise Compliance Guide](https://docs.neurolink.ink/docs/guides/enterprise/compliance) documents those building blocks and integration patterns:
 
 ```typescript
 import { NeuroLink } from '@juspay/neurolink';

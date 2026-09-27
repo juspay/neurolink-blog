@@ -46,7 +46,7 @@ NeuroLink supports the complete OpenAI model lineup through its `OpenAIModels` e
 | **O-Series** | `o3`, `o3-mini`, `o3-pro`, `o4-mini`, `o1` | Earlier reasoning models; prefer `gpt-5.4-pro` for new reasoning work |
 | **Legacy** | `gpt-4-turbo`, `gpt-3.5-turbo` | Backward compatibility |
 
-NeuroLink's built-in fallback is `gpt-4o` (`getProviderModel("OPENAI_MODEL", "gpt-4o")`) when `OPENAI_MODEL` is left unset -- a legacy default kept for backward compatibility. For new projects, set `OPENAI_MODEL=gpt-5.4` to use the newest OpenAI model in NeuroLink's catalog. OpenAI has since released newer model families that NeuroLink's `OpenAIModels` catalog does not list yet; check [OpenAI's models page](https://developers.openai.com/api/docs/models) for the full current lineup. You can override the model per-request or globally via the `OPENAI_MODEL` environment variable.
+NeuroLink's built-in fallback is `gpt-5.4` (`getProviderModel("OPENAI_MODEL", "gpt-5.4")`) when `OPENAI_MODEL` is left unset -- the newest OpenAI model in NeuroLink's catalog as of this writing. OpenAI has since released newer model families that NeuroLink's `OpenAIModels` catalog does not list yet; check [OpenAI's models page](https://developers.openai.com/api/docs/models) for the full current lineup. You can override the model per-request or globally via the `OPENAI_MODEL` environment variable.
 
 The default embedding model is `text-embedding-3-small`, overridable via the `OPENAI_EMBEDDING_MODEL` environment variable.
 
@@ -65,7 +65,7 @@ Getting started with OpenAI through NeuroLink takes two steps: set your API key 
 
 ```bash
 OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-5.4          # optional; SDK falls back to gpt-4o if unset
+OPENAI_MODEL=gpt-5.4          # optional; SDK falls back to gpt-5.4 if unset
 ```
 
 The API key is validated on provider initialization via `validateApiKey(createOpenAIConfig())`. If the key is missing or malformed, you get a clear error immediately rather than a cryptic API failure.
