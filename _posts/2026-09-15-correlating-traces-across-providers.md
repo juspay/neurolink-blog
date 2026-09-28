@@ -368,6 +368,6 @@ Nothing here invents a new tracing system. `proxyTraceContext.ts` is a Map and t
 
 **Related posts:**
 
-- [Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale](/posts/claude-proxy-multi-account-oauth/)
 - [OpenTelemetry for AI: Tracing Every Token Through Your Pipeline](/posts/opentelemetry-ai-observability/)
 - [ModelPool's error-class fallback design](/posts/modelpools-error-class-fallback-design/)
+- [The byte-cursor ledger: tracking proxy state precisely](/posts/the-byte-cursor-ledger-tracking-proxy-state-precisely/)

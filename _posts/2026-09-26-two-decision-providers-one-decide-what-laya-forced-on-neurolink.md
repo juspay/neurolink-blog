@@ -234,5 +234,5 @@ The provider reference is in the [NeuroLink documentation](https://docs.neurolin
 **Related posts:**
 
 - [generate, stream, decide: a third inference type for NeuroLink](/posts/generate-stream-decide-a-third-inference-type-for-neurolink/)
-- [What You Actually Inherit When You Extend BaseProvider](/posts/what-you-actually-inherit-when-you-extend-baseprovider/)
 - [Twenty-four providers, one BaseProvider: the adapter catalog](/posts/twenty-four-providers-one-baseprovider-the-adapter-catalog/)
+- [Managing a 64-model catalog without chaos](/posts/managing-a-64-model-catalog-without-chaos/)

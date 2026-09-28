@@ -390,4 +390,4 @@ xAI shipped in the same commit as eleven other chat providers (Groq, Cohere, Tog
 
 - [OpenAI-Compatible Endpoints: Connect Any API to NeuroLink](/posts/openai-compatible-endpoints/)
 - [Generating talking avatars with NeuroLink](/posts/generating-talking-avatars-with-neurolink/)
-- [NeuroLink can now generate music: how it works](/posts/neurolink-can-now-generate-music-how-it-works/)
+- [Fireworks vs Perplexity on NeuroLink](/posts/fireworks-vs-perplexity-on-neurolink/)

@@ -232,4 +232,4 @@ If you're integrating another reasoning-capable, OpenAI-compatible provider that
 
 - [Rolling out 4 new providers (2 local, 2 cloud) — and the AI SDK bug we hit](/posts/rolling-out-4-new-providers-2-local-2-cloud-and-the-ai-sdk-bug-we-hit/)
 - [The Gemini thoughtSignature bug](/posts/the-gemini-thoughtsignature-bug/)
-- [Why Azure is excluded from the model catalog](/posts/why-azure-is-excluded-from-the-model-catalog/)
+- [Morph provider: quirks and workarounds](/posts/morph-provider-quirks-and-workarounds/)

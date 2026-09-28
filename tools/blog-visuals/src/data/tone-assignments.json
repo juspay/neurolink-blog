@@ -1204,5 +1204,131 @@
     "title": "DeepSeek gotchas on NeuroLink",
     "tone": "deep-dive",
     "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "stepindex-bookkeeping-keeping-multi-step-calls-in-order",
+    "title": "stepIndex bookkeeping: keeping multi-step calls in order",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "hitting-the-smollm2-ceiling",
+    "title": "Hitting the SmolLM2 ceiling",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "combining-avatar-and-voice-for-talking-head-output",
+    "title": "Combining avatar and voice for talking-head output",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "choosing-between-image-avatar-and-music-generation-apis",
+    "title": "Choosing between image, avatar, and music generation APIs",
+    "tone": "comparison",
+    "reason": "side-by-side comparison grounded in the SDK's provider and API code"
+  },
+  {
+    "slug": "together-ai-deep-dive",
+    "title": "Together AI deep dive",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "fireworks-vs-perplexity-on-neurolink",
+    "title": "Fireworks vs Perplexity on NeuroLink",
+    "tone": "comparison",
+    "reason": "side-by-side comparison grounded in the SDK's provider and API code"
+  },
+  {
+    "slug": "jina-embeddings-on-neurolink",
+    "title": "Jina embeddings on NeuroLink",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "scaling-livekit-rooms-for-production-voice-agents",
+    "title": "Scaling LiveKit rooms for production voice agents",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "debugging-webrtc-audio-issues-in-production",
+    "title": "Debugging WebRTC audio issues in production",
+    "tone": "tutorial",
+    "reason": "hands-on walkthrough with working code"
+  },
+  {
+    "slug": "embedding-fast-path-and-session-stickiness",
+    "title": "Embedding fast-path and session stickiness",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "zero-downtime-updates-for-the-proxy",
+    "title": "Zero-downtime updates for the proxy",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "deterministic-replay-for-proxy-debugging",
+    "title": "Deterministic replay for proxy debugging",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "coordinating-multiple-agents-without-collisions",
+    "title": "Coordinating multiple agents without collisions",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "designing-the-accounts-endpoint",
+    "title": "Designing the /accounts endpoint",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "the-byte-cursor-ledger-tracking-proxy-state-precisely",
+    "title": "The byte-cursor ledger: tracking proxy state precisely",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "cerebras-integration-deep-dive",
+    "title": "Cerebras integration deep dive",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "git-tools-why-we-pass-values-not-flags",
+    "title": "git-tools: why we pass values, not flags",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "integrating-gmi-cloud",
+    "title": "Integrating GMI Cloud",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "managing-a-64-model-catalog-without-chaos",
+    "title": "Managing a 64-model catalog without chaos",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "morph-provider-quirks-and-workarounds",
+    "title": "Morph provider: quirks and workarounds",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "testing-proxyir-for-exhaustiveness",
+    "title": "Testing proxyIR for exhaustiveness",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
   }
 ]

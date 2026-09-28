@@ -290,4 +290,4 @@ Practically, this raises the same recommendation NeuroLink's own comments elsewh
 
 - [Structured Output from LLMs: JSON Schema Validation in TypeScript](/posts/structured-output-llm-json-schema-typescript/)
 - [Mastering Claude with NeuroLink: Complete Anthropic Guide](/posts/anthropic-claude-guide/)
-- [Defending against decompression bombs](/posts/defending-against-decompression-bombs/)
+- [Hitting the SmolLM2 ceiling](/posts/hitting-the-smollm2-ceiling/)

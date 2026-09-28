@@ -231,5 +231,5 @@ For an integration that doesn't expose a `timeout` option natively, the same eff
 **Related posts:**
 
 - [Voice as Three Stream Topologies: TTS, STT, and Full-Duplex Realtime](/posts/voice-as-three-stream-topologies-tts-stt-and-full-duplex-realtime/)
-- [MCP Circuit Breaker: Preventing Cascading Failures in AI Tool Calls](/posts/mcp-circuit-breaker-pattern/)
 - [Security considerations for voice agents](/posts/security-considerations-for-voice-agents/)
+- [Debugging WebRTC audio issues in production](/posts/debugging-webrtc-audio-issues-in-production/)

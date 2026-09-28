@@ -297,5 +297,5 @@ The real story here isn't the arithmetic — it's that the arithmetic is even de
 **Related posts:**
 
 - [The Factory + Registry Pattern: How NeuroLink Breaks Circular Dependencies](/posts/factory-registry-pattern/)
-- [Generating talking avatars with NeuroLink](/posts/generating-talking-avatars-with-neurolink/)
 - [xAI / Grok integration deep dive](/posts/xai-grok-integration-deep-dive/)
+- [Choosing between image, avatar, and music generation APIs](/posts/choosing-between-image-avatar-and-music-generation-apis/)
