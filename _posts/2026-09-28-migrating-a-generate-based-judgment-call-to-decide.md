@@ -393,5 +393,5 @@ If instead you're writing your *own* judgment call — a ticket triage function,
 **Related posts:**
 
 - [generate, stream, decide: a third inference type for NeuroLink](/posts/generate-stream-decide-a-third-inference-type-for-neurolink/)
-- [Provider switching at runtime: providerFallback callbacks and modelChain arrays](/posts/provider-switching-at-runtime-providerfallback-callbacks-and-modelchain-arrays/)
 - [Advanced MCP: Tool Routing, Caching, and Batching Strategies](/posts/advanced-mcp-routing-caching-batching/)
+- [Embedding fast-path and session stickiness](/posts/embedding-fast-path-and-session-stickiness/)

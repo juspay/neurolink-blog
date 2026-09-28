@@ -308,6 +308,6 @@ The concurrency pool is shared between the two, though: a delegation made via a 
 
 **Related posts:**
 
-- [Building AI Agents with NeuroLink: From Chatbot to Autonomous System](/posts/building-ai-agents/)
 - [Multi-Agent Networks: Orchestrating AI Teams with NeuroLink](/posts/multi-agent-networks/)
 - [Building custom skills for NeuroLink](/posts/building-custom-skills-for-neurolink/)
+- [Coordinating multiple agents without collisions](/posts/coordinating-multiple-agents-without-collisions/)

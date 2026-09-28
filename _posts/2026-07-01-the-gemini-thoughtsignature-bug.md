@@ -343,4 +343,4 @@ That fourth one matters on its own: an abort mid-tool-execution could plausibly 
 
 - [Gemini 3 Native Integration: Google's Latest Models in NeuroLink](/posts/gemini-3-native-integration/)
 - [Why Every Native Provider Must Wire the Same Tool-Persistence Hook](/posts/why-every-native-provider-must-wire-the-same-tool-persistence-hook/)
-- [Twenty-four providers, one BaseProvider: the adapter catalog](/posts/twenty-four-providers-one-baseprovider-the-adapter-catalog/)
+- [stepIndex bookkeeping: keeping multi-step calls in order](/posts/stepindex-bookkeeping-keeping-multi-step-calls-in-order/)
