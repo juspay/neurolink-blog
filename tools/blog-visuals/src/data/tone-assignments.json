@@ -1096,5 +1096,113 @@
     "title": "How we built a 14-gate AI content pipeline",
     "tone": "deep-dive",
     "reason": "engineering-story post on the content factory pipeline architecture"
+  },
+  {
+    "slug": "free-tier-myths-what-providers-actually-give-you-for-free",
+    "title": "Free-tier myths: what providers actually give you for free",
+    "tone": "opinion",
+    "reason": "myth-busting position piece grounded in the SDK's own provider docs"
+  },
+  {
+    "slug": "security-considerations-for-voice-agents",
+    "title": "Security considerations for voice agents",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "the-hold-and-rewrite-pipeline-for-stale-drafts",
+    "title": "The hold-and-rewrite pipeline for stale drafts",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "rolling-out-4-new-providers-2-local-2-cloud-and-the-ai-sdk-bug-we-hit",
+    "title": "Rolling out 4 new providers (2 local, 2 cloud) — and the AI SDK bug we hit",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "xai-grok-integration-deep-dive",
+    "title": "xAI / Grok integration deep dive",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "how-we-shipped-12-providers-in-one-pr",
+    "title": "How we shipped 12 providers in one PR",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "disaster-recovery-from-a-session-log",
+    "title": "Disaster recovery from a session log",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "flagging-call-graph-claims-automatically",
+    "title": "Flagging call-graph claims automatically",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "modelpools-error-class-fallback-design",
+    "title": "ModelPool's error-class fallback design",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "the-gemini-thoughtsignature-bug",
+    "title": "The Gemini thoughtSignature bug",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "building-custom-skills-for-neurolink",
+    "title": "Building custom skills for NeuroLink",
+    "tone": "tutorial",
+    "reason": "hands-on walkthrough with working code"
+  },
+  {
+    "slug": "building-a-custom-sub-agent",
+    "title": "Building a custom sub-agent",
+    "tone": "tutorial",
+    "reason": "hands-on walkthrough with working code"
+  },
+  {
+    "slug": "latency-engineering-for-realtime-voice-agents",
+    "title": "Latency engineering for realtime voice agents",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "the-mistral-quirk-we-had-to-special-case-registrydefaultmodelchecksenvvar",
+    "title": "The Mistral quirk we had to special-case: registryDefaultModelChecksEnvVar",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "why-azure-is-excluded-from-the-model-catalog",
+    "title": "Why Azure is excluded from the model catalog",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "hardening-the-background-command-tool",
+    "title": "Hardening the background-command tool",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "correlating-traces-across-providers",
+    "title": "Correlating traces across providers",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "deepseek-gotchas-on-neurolink",
+    "title": "DeepSeek gotchas on NeuroLink",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
   }
 ]
