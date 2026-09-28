@@ -1330,5 +1330,23 @@
     "title": "Testing proxyIR for exhaustiveness",
     "tone": "deep-dive",
     "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "probing-our-own-ai-share-of-voice",
+    "title": "Probing our own AI share-of-voice",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "we-ran-a-41-agent-red-team-review-on-our-own-content",
+    "title": "We ran a 41-agent red-team review on our own content",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "scraping-the-dependents-graph-to-find-real-users",
+    "title": "Scraping the dependents graph to find real users",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
   }
 ]
