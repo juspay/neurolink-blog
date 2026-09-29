@@ -823,7 +823,7 @@
   },
   {
     "slug": "claude-proxy-multi-account-oauth",
-    "title": "Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale",
+    "title": "Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use",
     "tone": "deep-dive",
     "reason": "architecture/internals content"
   },

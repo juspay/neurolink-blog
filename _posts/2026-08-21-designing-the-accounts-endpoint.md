@@ -421,6 +421,6 @@ Filter on `kind === "account"` to drop plumbing rows, read `costUsd` against `co
 
 **Related posts:**
 
-- [Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale](/posts/claude-proxy-multi-account-oauth/)
+- [Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use](/posts/claude-proxy-multi-account-oauth/)
 - [Defending against decompression bombs](/posts/defending-against-decompression-bombs/)
 - [Deterministic replay for proxy debugging](/posts/deterministic-replay-for-proxy-debugging/)

@@ -817,7 +817,7 @@
   },
   {
     "slug": "claude-proxy-multi-account-oauth",
-    "title": "Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale",
+    "title": "Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use",
     "prompt": "Abstract digital illustration, multiple authentication tokens rotating through a central proxy gateway with rate-limit shields, dark background with blue (#016fb9) and orange (#ff9505) accent lighting, complex, layered, technical aesthetic, minimal, modern, technology art style, cinematic lighting, no text, no logos, no words, no letters",
     "tone": "deep-dive"
   },

@@ -1136,4 +1136,4 @@ Every module follows the same pattern: import, configure, compose. Start with th
 
 - [MCP Tools: Extending AI with External Capabilities](/posts/mcp-tools-integration/)
 - [How We Built MCP Integration: Supporting 4 Transport Protocols](/posts/how-we-built-mcp-integration/)
-- [Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale](/posts/claude-proxy-multi-account-oauth/)
+- [Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use](/posts/claude-proxy-multi-account-oauth/)
