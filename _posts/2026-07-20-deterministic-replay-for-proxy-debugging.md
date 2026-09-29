@@ -427,6 +427,6 @@ What it does solve is the specific, previously unsolved problem: turning "here's
 
 **Related posts:**
 
-- [Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale](/posts/claude-proxy-multi-account-oauth/)
+- [Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use](/posts/claude-proxy-multi-account-oauth/)
 - [Fixing SSRF and TOCTOU in fetch pinning](/posts/fixing-ssrf-and-toctou-in-fetch-pinning/)
 - [Zero-downtime updates for the proxy](/posts/zero-downtime-updates-for-the-proxy/)

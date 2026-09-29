@@ -322,6 +322,6 @@ What `accountLedger.ts` adds on top of that skeleton is the domain-specific half
 
 **Related posts:**
 
-- [Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale](/posts/claude-proxy-multi-account-oauth/)
+- [Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use](/posts/claude-proxy-multi-account-oauth/)
 - [ModelPool's error-class fallback design](/posts/modelpools-error-class-fallback-design/)
 - [Designing the /accounts endpoint](/posts/designing-the-accounts-endpoint/)

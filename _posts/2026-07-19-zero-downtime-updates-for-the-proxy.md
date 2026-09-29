@@ -235,6 +235,6 @@ None of these are bugs; they're the actual shape of the trade-off this commit ma
 
 **Related posts:**
 
-- [Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale](/posts/claude-proxy-multi-account-oauth/)
+- [Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use](/posts/claude-proxy-multi-account-oauth/)
 - [ModelPool's error-class fallback design](/posts/modelpools-error-class-fallback-design/)
 - [Fixing SSRF and TOCTOU in fetch pinning](/posts/fixing-ssrf-and-toctou-in-fetch-pinning/)

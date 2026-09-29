@@ -1,16 +1,14 @@
 ---
 layout: post
-title: 'Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale'
+title: 'Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use'
 date: '2026-03-11 09:00:00 +0530'
 categories:
   - Deep Dive
-  - Enterprise
 tags:
   - neurolink
   - claude
   - proxy
   - oauth
-  - enterprise
   - anthropic
   - scaling
 author: neurolink
@@ -23,7 +21,7 @@ mermaid: true
 pin: false
 image:
   path: /assets/img/posts/claude-proxy-multi-account-oauth/hero.png
-  alt: 'Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale'
+  alt: 'Claude Proxy: Multi-Account OAuth Pooling for Heavy Claude Code Use'
 ---
 
 A single Anthropic account hits rate limits fast. When Claude Code is part of your daily work -- code review, architecture exploration, bug triage -- one account is a bottleneck, and two accounts managed manually is a headache. Picture one developer with a Pro subscription and a Max subscription of their own, switching between them by hand every time a rate-limit window closes: the math does not work.
