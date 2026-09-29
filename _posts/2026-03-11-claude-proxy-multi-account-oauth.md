@@ -16,8 +16,8 @@ tags:
 author: neurolink
 description: >-
   How NeuroLink's Claude Proxy pools multiple Anthropic accounts with OAuth 2.0
-  rotation, rate-limit failover, and subscription-aware routing for enterprise
-  Claude access at scale.
+  rotation, rate-limit failover, and subscription-aware routing for heavy Claude
+  Code use across your own accounts.
 toc: true
 mermaid: true
 pin: false
@@ -26,7 +26,7 @@ image:
   alt: 'Claude Proxy: Multi-Account OAuth Pooling at Enterprise Scale'
 ---
 
-A single Anthropic API key hits rate limits fast. When your entire engineering organization depends on Claude Code for daily work -- code review, architecture exploration, bug triage -- one key is a bottleneck, and two keys managed manually is a headache. Picture an engineering org with dozens of developers hitting Claude simultaneously: the math does not work.
+A single Anthropic account hits rate limits fast. When Claude Code is part of your daily work -- code review, architecture exploration, bug triage -- one account is a bottleneck, and two accounts managed manually is a headache. Picture one developer with a Pro subscription and a Max subscription of their own, switching between them by hand every time a rate-limit window closes: the math does not work.
 
 So we built a proxy. NeuroLink's Claude Proxy sits between Claude Code and the Anthropic API, pooling multiple accounts with automatic OAuth token refresh, exponential-backoff failover on rate limits, and a fallback chain to alternative providers when every Claude account is exhausted. This post traces the architecture from request ingestion to response delivery, with the actual TypeScript that powers it.
 
@@ -38,13 +38,13 @@ Claude Code supports one Anthropic account at a time. That constraint creates th
 
 2. **Token expiry during sessions.** OAuth tokens expire. If the token dies mid-conversation, Claude Code stops working. You re-authenticate manually, losing context.
 
-3. **Single point of failure.** One account, one billing relationship, one set of credentials. If anything goes wrong with that account -- billing issue, credential rotation, service disruption -- everyone is blocked.
+3. **Single point of failure.** One account, one billing relationship, one set of credentials. If anything goes wrong with that account -- billing issue, credential rotation, service disruption -- you are blocked.
 
 The naive solution is "just add more API keys and retry." That breaks for OAuth-authenticated accounts (Pro/Max subscriptions), where tokens expire, refresh tokens can fail, and different subscription tiers grant access to different models. You need a system that understands account health, token lifecycle, and subscription capabilities.
 
 ```typescript
 // The problem: manual account switching
-// This is what engineers were doing before the proxy
+// This is what juggling two of your own accounts by hand looks like
 const accounts = [
   { key: process.env.ANTHROPIC_KEY_1, label: "personal" },
   { key: process.env.ANTHROPIC_KEY_2, label: "work" },
@@ -52,7 +52,7 @@ const accounts = [
 
 // Which account is rate-limited? Which token expired?
 // Which one has Max subscription for Opus access?
-// Nobody knows. Everyone is frustrated.
+// Hard to know without checking each one. Frustrating.
 ```
 
 ## Architecture Overview
