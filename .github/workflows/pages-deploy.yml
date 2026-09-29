@@ -8,6 +8,12 @@ on:
       - README.md
       - LICENSE
 
+  # Jekyll skips future-dated posts at build time and posts publish at 10:00 IST, so a
+  # push-only trigger leaves a scheduled post out until the next unrelated push.
+  # Rebuild daily at 10:01 IST (04:31 UTC) to pick up whatever became due.
+  schedule:
+    - cron: "31 4 * * *"
+
   workflow_dispatch:
 
 permissions:
