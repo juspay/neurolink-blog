@@ -287,5 +287,5 @@ None of this required touching `BaseProvider`, `ConfiguredOpenAICompatProvider`,
 **Related posts:**
 
 - [The Mistral quirk we had to special-case: registryDefaultModelChecksEnvVar](/posts/the-mistral-quirk-we-had-to-special-case-registrydefaultmodelchecksenvvar/)
-- [How we shipped 12 providers in one PR](/posts/how-we-shipped-12-providers-in-one-pr/)
+- [What a green provider sweep proves, and what it skips](/posts/what-a-green-provider-sweep-proves-and-what-it-skips/)
 - [Cerebras integration deep dive](/posts/cerebras-integration-deep-dive/)
