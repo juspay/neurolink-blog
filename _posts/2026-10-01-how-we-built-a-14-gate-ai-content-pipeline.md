@@ -244,4 +244,4 @@ The corpus scan gate 14 ran against 171 already-published posts is the honest me
 
 - [Symbol-grounding: catching hallucinated APIs before publish](/posts/symbol-grounding-catching-hallucinated-apis-before-publish/)
 - [Yama: AI-Native Code Review Powered by NeuroLink](/posts/yama-ai-code-review/)
-- [Flagging call-graph claims automatically](/posts/flagging-call-graph-claims-automatically/)
+- [Scraping the dependents graph to find real users](/posts/scraping-the-dependents-graph-to-find-real-users/)

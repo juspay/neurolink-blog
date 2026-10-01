@@ -1336,5 +1336,11 @@
     "title": "What a green provider sweep proves, and what it skips",
     "tone": "deep-dive",
     "reason": "gap-fill: rewritten from the SDK source at 5519852fc after the review of PR #39; dated 2026-08-23, after the nightly live matrix and the per-PR key-free suites existed"
+  },
+  {
+    "slug": "scraping-the-dependents-graph-to-find-real-users",
+    "title": "Scraping the dependents graph to find real users",
+    "tone": "deep-dive",
+    "reason": "engineering deep-dive grounded in the shipping commit"
   }
 ]
