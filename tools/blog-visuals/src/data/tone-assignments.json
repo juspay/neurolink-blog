@@ -1348,5 +1348,11 @@
     "title": "XOR in NeuroLink: a decision model that reads images and answers in numbers",
     "tone": "deep-dive",
     "reason": "provider internals plus a measured run on real ads, grounded in the provider source and the recorded runs"
+  },
+  {
+    "slug": "what-our-first-ai-share-of-voice-baseline-actually-measured",
+    "title": "What our first AI share-of-voice baseline actually measured",
+    "tone": "deep-dive",
+    "reason": "gap-fill: written from the recorded probe run and its script at 328f48a; dated 2026-07-04"
   }
 ]
