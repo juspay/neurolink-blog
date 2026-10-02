@@ -1342,5 +1342,11 @@
     "title": "Scraping the dependents graph to find real users",
     "tone": "deep-dive",
     "reason": "engineering deep-dive grounded in the shipping commit"
+  },
+  {
+    "slug": "xor-in-neurolink-a-decision-model-that-reads-images-and-answers-in-numbers",
+    "title": "XOR in NeuroLink: a decision model that reads images and answers in numbers",
+    "tone": "deep-dive",
+    "reason": "provider internals plus a measured run on real ads, grounded in the provider source and the recorded runs"
   }
 ]
