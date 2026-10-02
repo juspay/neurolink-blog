@@ -227,4 +227,4 @@ The lesson worth carrying past this one script: a `try { } catch { return null }
 
 - [Symbol-grounding: catching hallucinated APIs before publish](/posts/symbol-grounding-catching-hallucinated-apis-before-publish/)
 - [Flagging call-graph claims automatically](/posts/flagging-call-graph-claims-automatically/)
-- [The hold-and-rewrite pipeline for stale drafts](/posts/the-hold-and-rewrite-pipeline-for-stale-drafts/)
+- [What our first AI share-of-voice baseline actually measured](/posts/what-our-first-ai-share-of-voice-baseline-actually-measured/)
