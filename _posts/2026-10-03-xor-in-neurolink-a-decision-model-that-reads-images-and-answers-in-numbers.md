@@ -1,7 +1,7 @@
 ---
 layout: post
 title: 'XOR in NeuroLink: a decision model that reads images and answers in numbers'
-date: '2026-10-03 10:00:00 +0530'
+date: '2026-10-03 04:30:00 +0530'
 categories:
   - Deep Dive
   - Open Source
