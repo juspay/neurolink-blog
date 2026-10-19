@@ -1030,5 +1030,47 @@
     "title": "Two decision providers, one decide(): what Laya forced on NeuroLink",
     "tone": "deep-dive",
     "reason": "architecture/internals post on generalizing the shared decision-provider base for a second provider"
+  },
+  {
+    "slug": "building-reliable-tool-loops-maxsteps-onstepfinish-and-escape-conditions",
+    "title": "Building reliable tool loops: maxSteps, onStepFinish, and escape conditions",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "evaluating-your-ai-outputs-with-pipelinebuilder-and-the-eight-built-in-presets",
+    "title": "Evaluating your AI outputs with PipelineBuilder and the eight built-in presets",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "scheduled-ai-work-from-scratch-cron-tasks-interval-tasks-and-one-shot-tasks-with",
+    "title": "Scheduled AI work from scratch: cron tasks, interval tasks, and one-shot tasks with TaskManager",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "building-a-livekit-voice-agent-definevoiceagent-createvoicebrain-and-mintjointok",
+    "title": "Building a LiveKit voice agent: defineVoiceAgent, createVoiceBrain, and mintJoinToken",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "evaluating-ai-outputs-with-pipelinebuilder-and-built-in-presets",
+    "title": "Evaluating AI Outputs with PipelineBuilder and Built-in Presets",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "scheduled-ai-work-from-scratch-cron-interval-and-one-shot-tasks",
+    "title": "Scheduled AI work from scratch: cron, interval, and one-shot tasks",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
+  },
+  {
+    "slug": "automatic-output-quality-gating-with-createautoevaluationmiddleware",
+    "title": "Automatic Output Quality Gating with createAutoEvaluationMiddleware",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
