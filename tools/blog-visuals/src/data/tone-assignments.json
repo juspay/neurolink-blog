@@ -937,7 +937,7 @@
   },
   {
     "slug": "four-mcp-transports-stdio-http-sse-websocket-picking-the-right-one",
-    "title": "Four MCP transports: stdio, http, sse, websocket \u2014 picking the right one",
+    "title": "Four MCP transports: stdio, http, sse, websocket — picking the right one",
     "tone": "tutorial",
     "reason": "factory-generated post; registered by lib/drafter.mjs"
   },
@@ -1354,5 +1354,11 @@
     "title": "What our first AI share-of-voice baseline actually measured",
     "tone": "deep-dive",
     "reason": "gap-fill: written from the recorded probe run and its script at 328f48a; dated 2026-07-04"
+  },
+  {
+    "slug": "we-ran-our-decision-model-audit-again-and-recorded-every-request",
+    "title": "We ran our decision-model audit again, and recorded every request",
+    "tone": "engineering",
+    "reason": "a recorded two-day rerun of five decision models on two public benchmarks, with every figure counted from the saved requests"
   }
 ]

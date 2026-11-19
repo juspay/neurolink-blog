@@ -1,6 +1,7 @@
 ---
 layout: post
 title: 'We ran our decision-model audit again, and recorded every request'
+date: '2026-10-18 00:00:00 +0530'
 categories:
   - Deep Dive
   - Engineering
@@ -13,6 +14,9 @@ description: >-
   Five decision models, two public benchmarks, two days, every request and response recorded with the keys masked, and every figure in the tables counted by two separate programs that must agree byte for byte.
 toc: true
 pin: false
+image:
+  path: /assets/img/posts/we-ran-our-decision-model-audit-again-and-recorded-every-request/poster.png
+  alt: 'We ran our decision-model audit again, and recorded every request.'
 ---
 Our first pass at this article had a problem we could not argue our way out of: the models had been run on different days, between 5 and 9 Oct, and the numbers were assembled afterwards. So before publishing, we ran the audit again through decide() in NeuroLink, Juspay's AI harness, and this time we recorded every call. decide() asks a model one multiple-choice question and gets back its choice and a probability for each option.
 
@@ -130,3 +134,8 @@ The keys are masked inside the recording itself, not only on screen: the Authori
 - These are counts on two benchmarks, not a ranking and not a Decision Index score.
 
 BANKING77 is by PolyAI (CC BY 4.0) and CLINC150 by Clinc (CC BY 3.0).
+
+**Related posts:**
+
+- [generate, stream, decide: a third inference type for NeuroLink](/posts/generate-stream-decide-a-third-inference-type-for-neurolink/)
+- [XOR in NeuroLink: a decision model that reads images and answers in numbers](/posts/xor-in-neurolink-a-decision-model-that-reads-images-and-answers-in-numbers/)
