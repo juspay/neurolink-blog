@@ -1360,5 +1360,11 @@
     "title": "We ran our decision-model audit again, and recorded every request",
     "tone": "engineering",
     "reason": "a recorded two-day rerun of five decision models on two public benchmarks, with every figure counted from the saved requests"
+  },
+  {
+    "slug": "advanced-hitl-patterns-audit-logs-statistics-and-custom-rule-engines-with-hitlma",
+    "title": "Advanced HITL patterns: audit logs, statistics, and custom rule engines with HITLManager",
+    "tone": "tutorial",
+    "reason": "factory-generated post; registered by lib/drafter.mjs"
   }
 ]
