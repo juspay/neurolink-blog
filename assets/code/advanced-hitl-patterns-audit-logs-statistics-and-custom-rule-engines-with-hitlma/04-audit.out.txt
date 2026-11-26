@@ -1,0 +1,3 @@
+{"event":"confirmation-requested","tool":"deleteUser","by":"ops-bot"}
+{"event":"confirmation-rejected","tool":"deleteUser","by":"reviewer-42","reason":"needs a ticket number"}
+approved: false

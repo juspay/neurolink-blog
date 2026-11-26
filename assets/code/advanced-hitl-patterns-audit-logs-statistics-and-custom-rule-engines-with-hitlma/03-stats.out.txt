@@ -1,0 +1,10 @@
+Waiting on deleteOrder: 1 pending
+Waiting on deleteOrder: 1 pending
+--- HITL Statistics ---
+Total requests: 2
+Pending now: 0
+Approved: 1
+Rejected: 1
+Timed out: 0
+Average response time: 1000ms
+Pending (live count): 0
