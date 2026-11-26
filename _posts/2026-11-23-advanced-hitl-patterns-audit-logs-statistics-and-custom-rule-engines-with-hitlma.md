@@ -19,7 +19,7 @@ image:
 
 In NeuroLink, the `dangerousActions` list in a `HITLConfig` is a keyword match on the tool name: `HITLManager` lowercases the name and asks for confirmation if it contains any keyword. That is a good default, but it cannot look at arguments. A tool called updateConfigFile is harmless when it writes to a scratch directory and risky when it writes to /etc/, and a keyword list treats both calls the same. You either confirm every call and train reviewers to click "approve" without reading, or confirm none.
 
-We built `HITLManager` with the pieces a production deployment needs beyond that list: argument-aware rules, a way for the reviewer to correct a call before it runs, an audit event stream, and live statistics. This tutorial walks through each one, using only the methods and fields the class exposes.
+`HITLManager` adds four pieces a production deployment needs beyond that list: argument-aware rules, a way for the reviewer to correct a call before it runs, an audit event stream, and live statistics. This tutorial walks through each one, using only the methods and fields the class exposes.
 
 ## Beyond Keywords: A Custom Rule Engine
 
@@ -94,7 +94,7 @@ sequenceDiagram
     end
 ```
 
-The promise settles in one of three ways. It resolves with a `ConfirmationResult` when the reviewer answers, whether they approve or reject: a rejection is `{ approved: false, reason }`, not an exception. It rejects with `HITLTimeoutError` when nobody answers in time (unless timeout auto-approval is on), and with `HITLCancelledError` when the request is withdrawn. This shape is the same idea behind [migrating a generate()-based judgment call to decide()](/posts/migrating-a-generate-based-judgment-call-to-decide/): the decision comes back as data you branch on.
+In normal use the promise settles in one of three ways. It resolves with a `ConfirmationResult` when the reviewer answers, whether they approve or reject: a rejection is `{ approved: false, reason }`, not an exception. It rejects with `HITLTimeoutError` when nobody answers in time (unless timeout auto-approval is on), and with `HITLCancelledError` when the request is withdrawn. Apart from those, `cleanup()` rejects every request still pending with a plain `Error`. This shape is the same idea behind [migrating a generate()-based judgment call to decide()](/posts/migrating-a-generate-based-judgment-call-to-decide/): the decision comes back as data you branch on.
 
 ## Argument Modification: The Human as a Sanitizer
 
@@ -213,7 +213,7 @@ Average response time: 1000ms
 Pending (live count): 0
 ```
 
-Counters tell you how the system behaves; an audit trail tells you who decided what. Set `auditLogging: true` and the manager writes an entry for each step of a confirmation's life (requested, approved, rejected, timed out, auto-approved, cancelled) and emits it as a `hitl:audit` event. Each entry is a `HITLAuditLog` with a timestamp, an `eventType`, the tool name, the arguments, and, where the step has them, the reviewer's `userId`, the reason and the response time. Subscribe once and forward entries to the store your compliance team already uses.
+Counters tell you how the system behaves; an audit trail tells you who decided what. Set `auditLogging: true` and the manager writes an entry for each step of a confirmation's life (requested, approved, rejected, timed out, auto-approved, cancelled) and emits it as a `hitl:audit` event. Each entry is a `HITLAuditLog` with a timestamp, an `eventType`, the tool name, the arguments, a `userId`, and, where the step has them, the reason and the response time. On a `confirmation-requested` entry the `userId` is the requester's, taken from the request context; on a decision entry it is the reviewer's, taken from the response. Subscribe once and forward entries to the store your compliance team already uses.
 
 ```typescript
 import { HITLManager } from '@juspay/neurolink/hitl';
@@ -268,11 +268,11 @@ A confirmation cannot wait forever. `timeout` in the config sets how long the ma
 
 For low-risk tools you can fail open instead: `autoApproveOnTimeout: true` resolves a timed-out request as approved, and its reason says it was auto-approved. `autoApproveExclusions` lists exact tool names that still need an explicit answer, so one flag does not quietly approve your most dangerous tool.
 
-Two error classes can reject a `requestConfirmation` promise, and both come from the @juspay/neurolink/hitl entry point. A third, `HITLConfigurationError`, is thrown by the constructor (and by `updateConfig`) when the config is invalid, for example a `timeout` of zero.
+Two error classes can reject a `requestConfirmation` promise, and both come from the @juspay/neurolink/hitl entry point. `cleanup()` can also reject one, with a plain `Error`, which is why the example below rethrows anything else. A third class, `HITLConfigurationError`, is thrown by the constructor (and by `updateConfig`) when a config with `enabled: true` is invalid, for example a `timeout` of zero. A config with `enabled: false` is not validated.
 
 - `HITLTimeoutError`: nobody answered before the timeout and auto-approval did not apply.
 - `HITLCancelledError`: the request was withdrawn, through `cancelConfirmation(confirmationId, reason)` or an aborted `signal` in the context. It carries the `reason`.
-- `HITLConfigurationError`: the manager was given an invalid config.
+- `HITLConfigurationError`: the manager was given an invalid config with `enabled: true`.
 
 A rejection by the reviewer is not on this list: it resolves with `approved: false`.
 
