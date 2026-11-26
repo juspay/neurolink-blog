@@ -8,7 +8,7 @@ tags:
   - neurolink
 author: neurolink
 description: >-
-  Advanced HITL patterns: audit logs, statistics, and custom rule engines with HITLManager — companion deep-dive for the NeuroLink blog with architectural detail and code examples.
+  Put human approval in front of risky tool calls with HITLManager: argument-aware custom rules, reviewer edits to a call before it runs, hitl:audit events for every decision, and live statistics.
 toc: true
 mermaid: true
 pin: false
@@ -57,6 +57,15 @@ console.log(hitlManager.requiresConfirmation('updateConfigFile', { path: '/tmp/a
 
 // Confirmation required: the rule's condition matches.
 console.log(hitlManager.requiresConfirmation('updateConfigFile', { path: '/etc/app.conf' })); // true
+
+export {};
+```
+
+It prints:
+
+```text
+false
+true
 ```
 
 Because the condition receives the arguments as `unknown`, narrow them before you read a field. That keeps the rule safe when a model sends a malformed payload: the property read returns `undefined` and the rule returns `false` instead of throwing.
@@ -133,6 +142,15 @@ function run(toolName: string, args: unknown) {
 }
 
 runToolWithConfirmation('updateConfigFile', { path: './staging.conf', content: 'data' });
+
+export {};
+```
+
+It prints the arguments the reviewer saw, then the call that ran:
+
+```text
+Review requested: { path: './staging.conf', content: 'data' }
+Executing updateConfigFile { path: './production.conf', content: 'data' }
 ```
 
 The reviewer becomes a final validation layer, and the corrected call is the one that runs.
@@ -159,7 +177,40 @@ function printStats() {
   console.log(`Pending (live count): ${hitlManager.getPendingCount()}`);
 }
 
-setInterval(printStats, 60_000);
+// A stand-in reviewer: approves the first request and rejects the second. It passes
+// responseTime itself so the average below is the same on every run.
+let answered = 0;
+hitlManager.on('hitl:confirmation-request', (event) => {
+  const { confirmationId, toolName } = event.payload;
+  console.log(`Waiting on ${toolName}: ${hitlManager.getPendingCount()} pending`);
+  answered += 1;
+  if (answered === 1) {
+    hitlManager.processUserResponse(confirmationId, { approved: true, userId: 'reviewer-42', responseTime: 1200 });
+  } else {
+    hitlManager.processUserResponse(confirmationId, { approved: false, reason: 'wrong customer', userId: 'reviewer-42', responseTime: 800 });
+  }
+});
+
+await hitlManager.requestConfirmation('deleteOrder', { orderId: 'A-1001' });
+await hitlManager.requestConfirmation('deleteOrder', { orderId: 'A-1002' });
+printStats();
+
+export {};
+```
+
+After one approval and one rejection, it prints:
+
+```text
+Waiting on deleteOrder: 1 pending
+Waiting on deleteOrder: 1 pending
+--- HITL Statistics ---
+Total requests: 2
+Pending now: 0
+Approved: 1
+Rejected: 1
+Timed out: 0
+Average response time: 1000ms
+Pending (live count): 0
 ```
 
 Counters tell you how the system behaves; an audit trail tells you who decided what. Set `auditLogging: true` and the manager writes an entry for each step of a confirmation's life (requested, approved, rejected, timed out, auto-approved, cancelled) and emits it as a `hitl:audit` event. Each entry is a `HITLAuditLog` with a timestamp, an `eventType`, the tool name, the arguments, and, where the step has them, the reviewer's `userId`, the reason and the response time. Subscribe once and forward entries to the store your compliance team already uses.
@@ -175,22 +226,47 @@ const hitlManager = new HITLManager({
 });
 
 hitlManager.on('hitl:audit', (entry: HITLAuditLog) => {
-  // Forward to your log pipeline; one line per decision.
+  // Forward to your log pipeline; one line per audit event. Keep entry.timestamp in a
+  // real pipeline; it is left out here so the saved output is the same on every run.
   console.log(JSON.stringify({
-    at: entry.timestamp,
     event: entry.eventType,
     tool: entry.toolName,
     by: entry.userId,
     reason: entry.reason,
   }));
 });
+
+// A stand-in reviewer that answers a moment after the request is shown.
+hitlManager.on('hitl:confirmation-request', (event) => {
+  const { confirmationId } = event.payload;
+  setTimeout(() => {
+    hitlManager.processUserResponse(confirmationId, {
+      approved: false,
+      reason: 'needs a ticket number',
+      userId: 'reviewer-42',
+    });
+  }, 10);
+});
+
+const result = await hitlManager.requestConfirmation('deleteUser', { userId: 'u-314' }, { userId: 'ops-bot' });
+console.log(`approved: ${result.approved}`);
+
+export {};
+```
+
+The rejected request leaves one entry for the request and one for the decision:
+
+```text
+{"event":"confirmation-requested","tool":"deleteUser","by":"ops-bot"}
+{"event":"confirmation-rejected","tool":"deleteUser","by":"reviewer-42","reason":"needs a ticket number"}
+approved: false
 ```
 
 ## Handling Timeouts and Errors
 
 A confirmation cannot wait forever. `timeout` in the config sets how long the manager waits for an answer, 30,000 ms when you leave it out. When it expires, the manager counts a timeout and, by default, rejects the promise with `HITLTimeoutError`, which carries the `timeout` that applied. This is the fail-safe posture.
 
-For low-risk tools you can fail open instead: `autoApproveOnTimeout: true` resolves a timed-out request as approved, with the reason "Auto-approved due to timeout". `autoApproveExclusions` lists exact tool names that still need an explicit answer, so one flag does not quietly approve your most dangerous tool.
+For low-risk tools you can fail open instead: `autoApproveOnTimeout: true` resolves a timed-out request as approved, and its reason says it was auto-approved. `autoApproveExclusions` lists exact tool names that still need an explicit answer, so one flag does not quietly approve your most dangerous tool.
 
 Two error classes can reject a `requestConfirmation` promise, and both come from the @juspay/neurolink/hitl entry point. A third, `HITLConfigurationError`, is thrown by the constructor (and by `updateConfig`) when the config is invalid, for example a `timeout` of zero.
 
@@ -231,6 +307,8 @@ async function runCriticalTask(signal: AbortSignal) {
     }
   }
 }
+
+export {};
 ```
 
 Choosing between fail-safe and fail-open per tool is the same kind of decision you make for different backends in [runtime provider switching](/posts/provider-switching-at-runtime-providerfallback-callbacks-and-modelchain-arrays/): the safe default stays on, and you relax it only where you have decided the risk is acceptable.
@@ -241,4 +319,3 @@ Choosing between fail-safe and fail-open per tool is the same kind of decision y
 
 - [We ran our decision-model audit again, and recorded every request](/posts/we-ran-our-decision-model-audit-again-and-recorded-every-request/)
 - [Migrating a generate()-based judgment call to decide()](/posts/migrating-a-generate-based-judgment-call-to-decide/)
-- [How we built a 14-gate AI content pipeline](/posts/how-we-built-a-14-gate-ai-content-pipeline/)
