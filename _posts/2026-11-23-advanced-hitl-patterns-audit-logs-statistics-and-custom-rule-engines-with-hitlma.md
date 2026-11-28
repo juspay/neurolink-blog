@@ -213,7 +213,7 @@ Average response time: 1000ms
 Pending (live count): 0
 ```
 
-Counters tell you how the system behaves; an audit trail tells you who decided what. Set `auditLogging: true` and the manager writes an entry for each step of a confirmation's life (requested, approved, rejected, timed out, auto-approved, cancelled) and emits it as a `hitl:audit` event. Each entry is a `HITLAuditLog` with a timestamp, an `eventType`, the tool name, the arguments, a `userId`, and, where the step has them, the reason and the response time. On a `confirmation-requested` entry the `userId` is the requester's, taken from the request context; on a decision entry it is the reviewer's, taken from the response. Subscribe once and forward entries to the store your compliance team already uses.
+Counters tell you how the system behaves; an audit trail tells you who decided what. Set `auditLogging: true` and the manager writes an entry for each step of a confirmation's life (requested, approved, rejected, timed out, auto-approved, cancelled) and emits it as a `hitl:audit` event. Each entry is a `HITLAuditLog` with a timestamp, an `eventType`, the tool name, the arguments, and, where the step has them, a `userId`, the reason and the response time. Only request and decision entries carry a `userId`: on a `confirmation-requested` entry it is the requester's, taken from the request context; on an approved or rejected entry it is the reviewer's, taken from the response. Timed-out, auto-approved and cancelled entries have none. Subscribe once and forward entries to the store your compliance team already uses.
 
 ```typescript
 import { HITLManager } from '@juspay/neurolink/hitl';
